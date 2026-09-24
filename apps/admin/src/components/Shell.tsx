@@ -1,6 +1,6 @@
 import {
   Building2, CalendarDays, FileSignature, Gauge, Handshake, Home, Images, KeyRound, LogOut,
-  Megaphone, Menu, Plug, ScrollText, Store, UserRound, Users, BarChart3, type LucideIcon,
+  Megaphone, Menu, Plug, ScrollText, Store, Tags, UserRound, Users, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -14,8 +14,9 @@ interface Group { label?: string; items: Item[] }
 const NAV: Group[] = [
   { items: [{ label: 'Dashboard', icon: Gauge, to: '/' }] },
   { label: 'Imóveis', items: [
-    { label: 'Imóveis', icon: Home, perm: 'property.view' },
-    { label: 'Proprietários', icon: UserRound, perm: 'property.view' },
+    { label: 'Imóveis', icon: Home, to: '/imoveis', perm: 'property.view' },
+    { label: 'Proprietários', icon: UserRound, to: '/proprietarios', perm: 'property.edit' },
+    { label: 'Catálogo', icon: Tags, to: '/catalogo', perm: 'property.edit' },
   ] },
   { label: 'Relacionamento', items: [
     { label: 'CRM', icon: Handshake, perm: 'lead.view' },

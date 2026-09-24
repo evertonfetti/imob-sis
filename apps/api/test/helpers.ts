@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { hash } from '@node-rs/argon2';
-import { createPrismaClient, seedRoles } from '@imob/database';
+import { createPrismaClient, seedCatalog, seedRoles } from '@imob/database';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createApp } from '../src/app.setup';
 import { loadEnv } from '../src/config/env';
@@ -18,13 +18,14 @@ export async function bootApp() {
 export async function resetAndSeed() {
   const prisma = createPrismaClient(process.env.TEST_DATABASE_URL!);
   await prisma.$executeRawUnsafe(
-    'TRUNCATE audit_logs, password_reset_tokens, refresh_tokens, users, role_permissions, roles, permissions, branches, companies CASCADE',
+    'TRUNCATE property_features, properties, features, property_types, owners, audit_logs, password_reset_tokens, refresh_tokens, users, role_permissions, roles, permissions, branches, companies CASCADE',
   );
   const passwordHash = await hash(PASSWORD);
   const out: Record<string, { companyId: string }> = {};
   for (const [tag, name] of [['A', 'Empresa A'], ['B', 'Empresa B']] as const) {
     const company = await prisma.company.create({ data: { name } });
     await seedRoles(prisma, company.id);
+    await seedCatalog(prisma, company.id);
     for (const key of ['ADMIN', 'BROKER'] as const) {
       const role = await prisma.role.findUniqueOrThrow({ where: { companyId_key: { companyId: company.id, key } } });
       await prisma.user.create({

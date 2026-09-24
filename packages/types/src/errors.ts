@@ -21,6 +21,16 @@ export const ERROR_CODES = {
   USER_SELF_DELETE: 'Você não pode excluir o seu próprio usuário.',
   USER_ROLE_INVALID: 'O papel informado não existe.',
   BRANCH_INVALID: 'A filial informada não existe.',
+  PROPERTY_INVALID_PRICE: 'O valor informado para o imóvel é inválido.',
+  PROPERTY_INCOMPLETE: 'Complete os dados obrigatórios antes de publicar o imóvel.',
+  PROPERTY_NOT_DELETABLE: 'Só é possível excluir imóveis em rascunho. Use "Arquivar" para os demais.',
+  PROPERTY_STATUS_INVALID: 'Use a ação "Arquivar" para arquivar o imóvel.',
+  PROPERTY_TYPE_INVALID: 'O tipo de imóvel informado não existe.',
+  OWNER_INVALID: 'O proprietário informado não existe.',
+  OWNER_HAS_PROPERTIES: 'Este proprietário possui imóveis vinculados e não pode ser excluído.',
+  BROKER_INVALID: 'O corretor informado não existe ou está inativo.',
+  FEATURE_INVALID: 'Uma ou mais características informadas não existem.',
+  CATALOG_NAME_TAKEN: 'Já existe um item com este nome.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

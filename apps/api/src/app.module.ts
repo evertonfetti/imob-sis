@@ -5,10 +5,13 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { JwtAuthGuard, PermissionsGuard } from './common/guards';
+import { CatalogModule } from './catalog/catalog.module';
 import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
+import { OwnersModule } from './owners/owners.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PropertiesModule } from './properties/properties.module';
 import { RolesController } from './roles/roles.controller';
 import { StorageModule } from './storage/storage.module';
 import { UsersModule } from './users/users.module';
@@ -29,6 +32,9 @@ export class AppModule {
         AuthModule,
         UsersModule,
         CompanyModule,
+        OwnersModule,
+        CatalogModule,
+        PropertiesModule,
       ],
       controllers: [HealthController, RolesController],
       providers: [

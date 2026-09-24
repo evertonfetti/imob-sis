@@ -18,9 +18,9 @@ const STATS = [
 
 const ACTIONS: Record<string, string> = {
   LOGIN: 'entrou no sistema', LOGOUT: 'saiu do sistema', CREATE: 'criou', UPDATE: 'atualizou', DEACTIVATE: 'desativou',
-  ROLE_CHANGE: 'alterou o papel de', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
+  ROLE_CHANGE: 'alterou o papel de', PUBLISH: 'publicou', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
 };
-const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial' };
+const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
 
 interface AuditItem { id: string; action: string; entity: string; userName: string | null; createdAt: string }
 
@@ -31,6 +31,11 @@ export function Dashboard() {
     queryKey: ['audit', 'recent'],
     queryFn: () => api<Paginated<AuditItem>>('/audit-logs?pageSize=8'),
     enabled: canAudit,
+  });
+  const props = useQuery({
+    queryKey: ['properties', 'summary'],
+    queryFn: () => api<Record<string, number>>('/properties/summary'),
+    enabled: can('property.view'),
   });
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
@@ -43,8 +48,17 @@ export function Dashboard() {
         {STATS.map((s) => (
           <div key={s.label} className="card stat">
             <div className="stat-label">{s.label}<s.icon /></div>
-            <div className="stat-value muted">—</div>
-            <div className="stat-foot">Disponível com o Bloco {s.block}</div>
+            {s.label === 'Imóveis disponíveis' && props.data ? (
+              <>
+                <div className="stat-value">{props.data.AVAILABLE ?? 0}</div>
+                <div className="stat-foot">{props.data.published ?? 0} publicados no site · {props.data.DRAFT ?? 0} rascunhos</div>
+              </>
+            ) : (
+              <>
+                <div className="stat-value muted">—</div>
+                <div className="stat-foot">Disponível com o Bloco {s.block}</div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -76,7 +90,7 @@ export function Dashboard() {
             <li className="step done"><span className="step-n">✓</span><div><div className="step-t">Acessar o painel</div><div className="step-d">Sua conta está ativa.</div></div></li>
             {can('admin.company') && <li className="step"><span className="step-n">2</span><div><Link to="/empresa" className="step-t">Completar dados da empresa</Link><div className="step-d">Nome, CRECI, contatos e identidade visual.</div></div></li>}
             {can('admin.users') && <li className="step"><span className="step-n">3</span><div><Link to="/usuarios" className="step-t">Convidar a equipe</Link><div className="step-d">Cadastre corretores, atendentes e marketing.</div></div></li>}
-            <li className="step"><span className="step-n">4</span><div><div className="step-t">Cadastrar os primeiros imóveis</div><div className="step-d">Disponível no próximo bloco.</div></div></li>
+            {can('property.create') && <li className="step"><span className="step-n">4</span><div><Link to="/imoveis/novo" className="step-t">Cadastrar o primeiro imóvel</Link><div className="step-d">Dados, valores, endereço e características.</div></div></li>}
           </ol>
         </section>
       </div>

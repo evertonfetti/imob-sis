@@ -25,38 +25,39 @@ pnpm dev:api                    # http://localhost:3333/api/v1
 pnpm dev:admin                  # http://localhost:5173
 ```
 
-`docker-compose.yml` sobe PostgreSQL, Redis e MinIO para desenvolvimento.
+`docker-compose.dev.yml` sobe PostgreSQL, Redis e MinIO para desenvolvimento.
 
 Verificações: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 
-## Deploy no Easypanel
+## Deploy no Easypanel (Docker Compose)
 
-Crie um projeto com **PostgreSQL** (serviço nativo do Easypanel) e três serviços de **App** apontando para este repositório.
-Em todos: *Source → GitHub*, **Build → Dockerfile**, **Build Path `/`** (raiz do repo).
+Um único serviço do tipo **Docker Compose**, apontando para este repositório (branch `main`).
+O `docker-compose.yml` da raiz sobe tudo: **PostgreSQL + api + admin + website**.
 
-### 1. `api` — Dockerfile: `apps/api/Dockerfile` — porta `3333`
-
-As **migrations rodam automaticamente a cada deploy** (`prisma migrate deploy`), seguidas da sincronização
-idempotente de papéis/permissões, antes de a API subir. Se a migration falhar, o container não inicia.
-
-Variáveis de ambiente:
+### Variáveis (aba "Ambiente")
 
 | Variável | Valor |
 | --- | --- |
-| `NODE_ENV` | `production` |
-| `DATABASE_URL` | URL interna do PostgreSQL do Easypanel |
+| `POSTGRES_PASSWORD` | senha do banco (gere uma forte) |
 | `JWT_ACCESS_SECRET` | segredo aleatório com 32+ caracteres (`openssl rand -base64 48`) |
-| `ADMIN_URL` | URL pública do admin (CORS e links de e-mail), ex.: `https://painel.seudominio.com.br` |
-| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | primeiro administrador (criado só se o e-mail não existir) |
-| `SEED_COMPANY_NAME` | nome da imobiliária (opcional, só na primeira execução) |
-| `S3_*` | credenciais do storage S3-compatible (a partir do Bloco 3) |
+| `ADMIN_URL` | URL pública do painel, ex.: `https://painel.seudominio.com.br` (CORS e links de e-mail) |
+| `VITE_API_URL` | URL pública da API, ex.: `https://api.seudominio.com.br/api/v1` (embutida no build do painel) |
+| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | primeiro administrador (criado só se o e-mail ainda não existir) |
+| `SEED_COMPANY_NAME` | nome da imobiliária (opcional; só na primeira execução) |
+| `S3_*` | storage S3-compatible (necessário a partir do Bloco 3) |
 
-Domínio sugerido: `api.seudominio.com.br`. Health check: `/api/v1/health`.
+### Domínios (aba "Domínios")
 
-### 2. `admin` — Dockerfile: `apps/admin/Dockerfile` — porta `80`
+| Serviço | Porta | Exemplo |
+| --- | --- | --- |
+| `api` | 3333 | `api.seudominio.com.br` |
+| `admin` | 80 | `painel.seudominio.com.br` |
+| `website` | 3000 | `www.seudominio.com.br` |
 
-*Build argument* (obrigatório): `VITE_API_URL=https://api.seudominio.com.br/api/v1`
+As **migrations rodam automaticamente a cada deploy**: ao subir, a `api` executa `prisma migrate deploy` e a
+sincronização idempotente de papéis/permissões. Se a migration falhar, o container não inicia (veja os logs da `api`).
+Health check: `/api/v1/health`.
 
-### 3. `website` — Dockerfile: `apps/website/Dockerfile` — porta `3000`
+Depois do primeiro acesso, troque a senha do administrador e remova `SEED_ADMIN_PASSWORD` do ambiente.
 
-Depois do primeiro acesso, troque a senha do administrador e remova `SEED_ADMIN_PASSWORD` do serviço.
+> Desenvolvimento local: `docker compose -f docker-compose.dev.yml up -d` (PostgreSQL, Redis e MinIO).

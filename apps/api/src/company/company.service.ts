@@ -4,10 +4,8 @@ import type { BranchInput, UpdateCompanyInput } from '@imob/types';
 import { AuditService, diff, sanitize } from '../audit/audit.service';
 import { notFound } from '../common/app-exception';
 import type { AuthedCtx } from '../common/request-context';
+import { blankToNull } from '../common/util';
 import { PrismaService } from '../prisma/prisma.service';
-
-const blankToNull = <T extends object>(o: T) =>
-  Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === '' ? null : v]));
 
 @Injectable()
 export class CompanyService {

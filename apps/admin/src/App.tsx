@@ -4,8 +4,12 @@ import { Spinner } from './components/ui';
 import { useAuth } from './lib/auth';
 import { Audit } from './pages/Audit';
 import { CompanyPage } from './pages/Company';
+import { Catalog } from './pages/Catalog';
 import { Dashboard } from './pages/Dashboard';
 import { ForgotPassword, Login, ResetPassword } from './pages/Login';
+import { Owners } from './pages/Owners';
+import { Properties } from './pages/Properties';
+import { PropertyForm } from './pages/PropertyForm';
 import { Roles } from './pages/Roles';
 import { Users } from './pages/Users';
 
@@ -30,6 +34,11 @@ export function App() {
       <Route element={<Protected />}>
         <Route element={<Shell />}>
           <Route index element={<Dashboard />} />
+          <Route path="imoveis" element={<Guard perm="property.view"><Properties /></Guard>} />
+          <Route path="imoveis/novo" element={<Guard perm="property.create"><PropertyForm /></Guard>} />
+          <Route path="imoveis/:id" element={<Guard perm="property.view"><PropertyForm /></Guard>} />
+          <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />
+          <Route path="catalogo" element={<Guard perm="property.edit"><Catalog /></Guard>} />
           <Route path="usuarios" element={<Guard perm="admin.users"><Users /></Guard>} />
           <Route path="permissoes" element={<Guard perm="admin.users"><Roles /></Guard>} />
           <Route path="empresa" element={<Guard perm="admin.company"><CompanyPage /></Guard>} />

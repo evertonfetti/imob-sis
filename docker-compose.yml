@@ -1,23 +1,72 @@
+# Stack de produção (Easypanel → Serviço "Docker Compose").
+# Não publica portas: o Easypanel roteia por domínio para a porta interna de cada serviço.
+#   api     → porta 3333   (ex.: api.seudominio.com.br)
+#   admin   → porta 80     (ex.: painel.seudominio.com.br)
+#   website → porta 3000   (ex.: www.seudominio.com.br)
+# Variáveis: defina na aba "Ambiente" do Easypanel (veja .env.example / README).
+
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: imob
-      POSTGRES_PASSWORD: imob_dev
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}"
       POSTGRES_DB: imob
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
-  redis:
-    image: redis:7-alpine
-    ports: ["6379:6379"]
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imob -d imob"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3333"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports: ["9000:9000", "9001:9001"]
-    volumes: [miniodata:/data]
+      NODE_ENV: production
+      API_PORT: "3333"
+      # As migrations rodam automaticamente quando este container sobe.
+      DATABASE_URL: postgresql://imob:${POSTGRES_PASSWORD}@postgres:5432/imob
+      JWT_ACCESS_SECRET: "${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET (32+ caracteres)}"
+      ADMIN_URL: "${ADMIN_URL:?defina ADMIN_URL (URL pública do painel)}"
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_COMPANY_NAME: ${SEED_COMPANY_NAME:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_BUCKET: ${S3_BUCKET:-imob-media}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL:?defina VITE_API_URL (ex. https://api.seudominio.com.br/api/v1)}"
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - "80"
+
+  website:
+    build:
+      context: .
+      dockerfile: apps/website/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "3000"
+
 volumes:
   pgdata:
-  miniodata:

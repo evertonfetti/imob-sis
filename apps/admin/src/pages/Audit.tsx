@@ -11,11 +11,11 @@ interface Log {
   before: Record<string, unknown> | null; after: Record<string, unknown> | null; createdAt: string;
 }
 
-const ENTITIES = { AUTH: 'Acesso', USER: 'Usuário', COMPANY: 'Empresa', BRANCH: 'Filial' } as const;
+const ENTITIES = { AUTH: 'Acesso', USER: 'Usuário', COMPANY: 'Empresa', BRANCH: 'Filial', PROPERTY: 'Imóvel', OWNER: 'Proprietário', PROPERTY_TYPE: 'Tipo de imóvel', FEATURE: 'Característica' } as const;
 const ACTIONS: Record<string, [string, 'ok' | 'warn' | 'danger' | 'accent' | undefined]> = {
   LOGIN: ['Login', 'ok'], LOGOUT: ['Logout', undefined], LOGIN_FAILED: ['Login falhou', 'danger'], CREATE: ['Criação', 'accent'],
   UPDATE: ['Alteração', 'warn'], DEACTIVATE: ['Desativação', 'danger'], ROLE_CHANGE: ['Mudança de papel', 'warn'],
-  PASSWORD_RESET: ['Senha redefinida', 'warn'], PASSWORD_RESET_REQUESTED: ['Redefinição solicitada', undefined],
+  PASSWORD_RESET: ['Senha redefinida', 'warn'], PUBLISH: ['Publicação', 'ok'], UNPUBLISH: ['Despublicação', 'warn'], ARCHIVE: ['Arquivamento', 'warn'], DELETE: ['Exclusão', 'danger'], PASSWORD_RESET_REQUESTED: ['Redefinição solicitada', undefined],
 };
 const fmt = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v));
 
