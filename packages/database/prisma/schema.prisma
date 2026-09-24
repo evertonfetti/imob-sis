@@ -1,0 +1,182 @@
+// Bloco 1 — Fundação. Todas as entidades de negócio carregam companyId (pronto para SaaS).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+model Company {
+  id             String        @id @default(uuid(7))
+  name           String
+  tradeName      String?
+  document       String?
+  creci          String?
+  email          String?
+  phone          String?
+  whatsapp       String?
+  website        String?
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  status         CompanyStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  branches Branch[]
+  users    User[]
+  roles    Role[]
+  audits   AuditLog[]
+
+  @@map("companies")
+}
+
+model Branch {
+  id        String   @id @default(uuid(7))
+  companyId String
+  name      String
+  phone     String?
+  whatsapp  String?
+  email     String?
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  users   User[]
+
+  @@index([companyId])
+  @@map("branches")
+}
+
+model Role {
+  id        String   @id @default(uuid(7))
+  companyId String
+  key       String
+  name      String
+  system    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  company     Company          @relation(fields: [companyId], references: [id])
+  permissions RolePermission[]
+  users       User[]
+
+  @@unique([companyId, key])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid(7))
+  key         String @unique
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id           String     @id @default(uuid(7))
+  companyId    String
+  branchId     String?
+  roleId       String
+  name         String
+  email        String     @unique
+  phone        String?
+  passwordHash String
+  avatarUrl    String?
+  creci        String?
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  company       Company              @relation(fields: [companyId], references: [id])
+  branch        Branch?              @relation(fields: [branchId], references: [id])
+  role          Role                 @relation(fields: [roleId], references: [id])
+  refreshTokens RefreshToken[]
+  resetTokens   PasswordResetToken[]
+
+  @@index([companyId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid(7))
+  userId     String
+  tokenHash  String    @unique
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid(7))
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid(7))
+  companyId String
+  userId    String?
+  entity    String
+  entityId  String?
+  action    String
+  before    Json?
+  after     Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([companyId, entity, entityId])
+  @@map("audit_logs")
+}

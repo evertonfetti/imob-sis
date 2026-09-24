@@ -1,0 +1,22 @@
+{
+  "name": "real-estate-platform",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build:packages": "pnpm --filter @imob/types build && pnpm --filter @imob/database build",
+    "dev:api": "pnpm --filter @imob/api dev",
+    "dev:admin": "pnpm --filter @imob/admin dev",
+    "dev:website": "pnpm --filter @imob/website dev",
+    "build": "pnpm build:packages && pnpm -r --filter './apps/*' build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @imob/api test",
+    "db:migrate": "pnpm --filter @imob/database migrate",
+    "db:seed": "pnpm --filter @imob/database seed",
+    "db:studio": "pnpm --filter @imob/database studio"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

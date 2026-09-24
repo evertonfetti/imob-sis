@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.next
+.git
+.env
+.env.*
+!.env.example
+**/*.log
+**/coverage
+packages/database/src/generated
