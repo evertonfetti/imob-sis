@@ -36,6 +36,21 @@ enum PropertyStatus {
   ARCHIVED
 }
 
+enum MediaType {
+  IMAGE
+  VIDEO
+  FLOOR_PLAN
+  TOUR_360
+  DOCUMENT
+}
+
+enum MediaStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -69,6 +84,7 @@ model Company {
   propertyTypes PropertyType[]
   features      Feature[]
   properties    Property[]
+  media         PropertyMedia[]
 
   @@map("companies")
 }
@@ -326,6 +342,7 @@ model Property {
   owner    Owner?            @relation(fields: [ownerId], references: [id])
   broker   User?             @relation(fields: [brokerId], references: [id])
   features PropertyFeature[]
+  media    PropertyMedia[]
 
   @@unique([companyId, code])
   @@unique([companyId, slug])
@@ -345,4 +362,41 @@ model PropertyFeature {
 
   @@id([propertyId, featureId])
   @@map("property_features")
+}
+
+// ---------- Bloco 3 — Fotos e mídias ----------
+// O arquivo original NUNCA é substituído: versões processadas (e, no futuro, geradas por IA) ficam em chaves separadas.
+// Guardamos as chaves de storage (não URLs): trocar de CDN/domínio não exige migração de dados.
+
+model PropertyMedia {
+  id         String @id @default(uuid(7))
+  companyId  String
+  propertyId String
+
+  type        MediaType   @default(IMAGE)
+  status      MediaStatus @default(PENDING)
+  filename    String?
+  contentType String
+  sizeBytes   Int
+  width       Int?
+  height      Int?
+
+  originalKey  String
+  processedKey String?
+  thumbnailKey String?
+
+  caption    String?
+  position   Int     @default(0)
+  isCover    Boolean @default(false)
+  aiModified Boolean @default(false)
+
+  processingError String?
+  createdAt       DateTime @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, position])
+  @@index([companyId])
+  @@map("property_media")
 }

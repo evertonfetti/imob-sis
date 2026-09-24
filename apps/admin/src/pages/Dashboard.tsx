@@ -18,7 +18,7 @@ const STATS = [
 
 const ACTIONS: Record<string, string> = {
   LOGIN: 'entrou no sistema', LOGOUT: 'saiu do sistema', CREATE: 'criou', UPDATE: 'atualizou', DEACTIVATE: 'desativou',
-  ROLE_CHANGE: 'alterou o papel de', PUBLISH: 'publicou', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
+  ROLE_CHANGE: 'alterou o papel de', PUBLISH: 'publicou', MEDIA_ADDED: 'adicionou arquivo em', MEDIA_REMOVED: 'removeu arquivo de', COVER_CHANGED: 'alterou a capa de', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
 };
 const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
 

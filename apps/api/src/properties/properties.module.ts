@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
+import { MediaModule } from '../media/media.module';
 import { PropertiesController } from './properties.controller';
 import { PropertiesService } from './properties.service';
 
-@Module({ controllers: [PropertiesController], providers: [PropertiesService] })
+@Module({ imports: [MediaModule], controllers: [PropertiesController], providers: [PropertiesService] })
 export class PropertiesModule {}

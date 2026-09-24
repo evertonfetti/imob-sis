@@ -12,6 +12,7 @@ export interface PropertyRow {
   id: string; code: string; slug: string; title: string; purpose: keyof typeof PURPOSE_LABELS; status: PropertyStatus; published: boolean;
   salePrice: number | null; rentPrice: number | null; neighborhood: string | null; city: string | null; state: string | null;
   bedrooms: number | null; parkingSpaces: number | null; totalArea: number | null;
+  coverUrl: string | null; mediaCount: number;
   type: { id: string; name: string }; broker: { id: string; name: string } | null;
 }
 
@@ -79,7 +80,7 @@ export function Properties() {
                   <tr key={p.id} className="row-link" onClick={() => nav(`/imoveis/${p.id}`)}>
                     <td>
                       <div className="cell-user">
-                        <div className="thumb"><Home /></div>
+                        <div className="thumb">{p.coverUrl ? <img src={p.coverUrl} alt="" loading="lazy" /> : <Home />}</div>
                         <div style={{ minWidth: 0 }}>
                           <strong>{p.title}</strong>
                           <span>{p.code} · {[p.neighborhood, p.city].filter(Boolean).join(', ') || 'Sem endereço'}</span>

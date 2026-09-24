@@ -50,6 +50,22 @@ describe('autenticação', () => {
   });
 });
 
+describe('CORS', () => {
+  it('libera preflight de PATCH, DELETE e PUT para a origem do painel e bloqueia outras', async () => {
+    for (const method of ['PATCH', 'DELETE', 'PUT']) {
+      const res = await app.inject({
+        method: 'OPTIONS', url: '/api/v1/users/x',
+        headers: { origin: 'http://localhost:5173', 'access-control-request-method': method, 'access-control-request-headers': 'authorization,content-type' },
+      });
+      expect(res.statusCode).toBe(204);
+      expect(res.headers['access-control-allow-methods']).toContain(method);
+      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+    }
+    const other = await app.inject({ method: 'OPTIONS', url: '/api/v1/users/x', headers: { origin: 'https://evil.example', 'access-control-request-method': 'PATCH' } });
+    expect(other.headers['access-control-allow-origin']).toBeUndefined();
+  });
+});
+
 describe('RBAC', () => {
   it('sem permissão → 403; com permissão → 200', async () => {
     const { body: broker } = await login(app, 'broker.a@teste.com');

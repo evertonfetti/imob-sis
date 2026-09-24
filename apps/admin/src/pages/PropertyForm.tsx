@@ -11,6 +11,7 @@ import { ApiError, api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dateTime } from '../lib/format';
 import { MoneyInput } from '../lib/money';
+import { Gallery } from '../components/Gallery';
 import { OwnerModal, type Owner } from './Owners';
 import { statusBadge } from './Properties';
 
@@ -71,6 +72,7 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: 'Cadastrado', UPDATE: 'Alterado', PUBLISH: 'Publicado', UNPUBLISH: 'Despublicado', ARCHIVE: 'Arquivado',
+  MEDIA_ADDED: 'Arquivo adicionado', MEDIA_REMOVED: 'Arquivo removido', COVER_CHANGED: 'Capa alterada',
 };
 
 export function PropertyForm() {
@@ -192,6 +194,12 @@ export function PropertyForm() {
                 </div>
               </Section>
 
+              {isNew ? (
+                <Section title="Fotos e vídeos">
+                  <div className="photos-soon"><Images /><strong style={{ color: 'var(--ink)', fontWeight: 500 }}>Salve o rascunho para adicionar fotos</strong><span>Depois de salvar, você poderá enviar as fotos, escolher a capa e reordenar.</span></div>
+                </Section>
+              ) : can('media.view') && <Gallery propertyId={id!} />}
+
               <Section title="Ambientes e áreas">
                 <div className="form-grid g4">
                   <Field label="Dormitórios"><Input type="number" min={0} {...text('bedrooms')} /></Field>
@@ -247,10 +255,6 @@ export function PropertyForm() {
                     </div>
                   </div>
                 ))}
-              </Section>
-
-              <Section title="Fotos e vídeos">
-                <div className="photos-soon"><Images /><strong style={{ color: 'var(--ink)', fontWeight: 500 }}>Galeria de fotos</strong><span>Upload, capa e ordenação chegam no próximo bloco.</span></div>
               </Section>
 
               {!isNew && canEdit && (

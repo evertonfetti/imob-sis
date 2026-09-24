@@ -1,4 +1,8 @@
 import 'reflect-metadata';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
 import { hash } from '@node-rs/argon2';
 import { createPrismaClient, seedCatalog, seedRoles } from '@imob/database';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
@@ -7,8 +11,11 @@ import { loadEnv } from '../src/config/env';
 
 export const PASSWORD = 'Senha@12345';
 
-export async function bootApp() {
-  const env = loadEnv({ ...process.env, NODE_ENV: 'test', DATABASE_URL: process.env.TEST_DATABASE_URL });
+export async function bootApp(extra: Record<string, string> = {}) {
+  const env = loadEnv({
+    ...process.env, NODE_ENV: 'test', DATABASE_URL: process.env.TEST_DATABASE_URL,
+    LOCAL_STORAGE_DIR: mkdtempSync(path.join(tmpdir(), 'imob-uploads-')), REDIS_URL: '', STORAGE_DRIVER: 'local', ...extra,
+  });
   const app = await createApp(env);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
@@ -50,3 +57,31 @@ export async function login(app: NestFastifyApplication, email: string, password
 }
 
 export const auth = (token: string) => ({ authorization: `Bearer ${token}` });
+
+export async function makeImage(width = 800, height = 600, format: 'png' | 'jpeg' = 'png') {
+  const img = sharp({ create: { width, height, channels: 3, background: { r: 90, g: 120, b: 110 } } });
+  return format === 'png' ? img.png().toBuffer() : img.jpeg().toBuffer();
+}
+
+/** Fluxo completo de upload: URL assinada → envio do arquivo → confirmação. Retorna a resposta da confirmação. */
+export async function uploadPhoto(
+  app: NestFastifyApplication, token: string, propertyId: string,
+  opts: { buffer?: Buffer; contentType?: string; type?: string } = {},
+) {
+  const buffer = opts.buffer ?? (await makeImage());
+  const contentType = opts.contentType ?? 'image/png';
+  const type = opts.type ?? 'IMAGE';
+  const target = await app.inject({
+    method: 'POST', url: `/api/v1/properties/${propertyId}/media/upload-url`, headers: auth(token),
+    payload: { type, filename: 'foto.png', contentType, size: buffer.length },
+  });
+  if (target.statusCode !== 200) return { target, put: null, confirm: null };
+  const { uploadUrl, key } = target.json();
+  const u = new URL(uploadUrl);
+  const put = await app.inject({ method: 'PUT', url: u.pathname + u.search, headers: { 'content-type': contentType }, payload: buffer });
+  const confirm = await app.inject({
+    method: 'POST', url: `/api/v1/properties/${propertyId}/media`, headers: auth(token),
+    payload: { type, key, contentType, filename: 'foto.png' },
+  });
+  return { target, put, confirm, key };
+}

@@ -4,7 +4,9 @@ import { AuditService, diff, sanitize } from '../audit/audit.service';
 import { AppException, notFound } from '../common/app-exception';
 import type { AuthedCtx, AuthedUser } from '../common/request-context';
 import { blankToNull } from '../common/util';
+import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 const DECIMALS = [
   'salePrice', 'rentPrice', 'condominiumFee', 'propertyTax', 'minimumNegotiationPrice',
@@ -17,6 +19,8 @@ const include = {
   branch: { select: { id: true, name: true } },
   owner: { select: { id: true, name: true, phone: true, whatsapp: true, email: true } },
   features: { include: { feature: { select: { id: true, name: true, category: true, icon: true } } } },
+  media: { where: { isCover: true }, take: 1, select: { thumbnailKey: true, processedKey: true } },
+  _count: { select: { media: true } },
 } as const;
 
 type Row = Record<string, any>;
@@ -37,7 +41,7 @@ function present(p: Row, user: AuthedUser) {
 
 /** Foto do registro para auditoria: colunas simples + ids das características. */
 function snapshot(p: Row) {
-  const { type, broker, branch, owner, features, ...cols } = p;
+  const { type, broker, branch, owner, features, media, _count, ...cols } = p;
   const out: Row = { ...cols };
   for (const k of DECIMALS) out[k] = toNum(p[k]);
   out.featureIds = features.map((f: Row) => f.featureId).sort();
@@ -46,7 +50,24 @@ function snapshot(p: Row) {
 
 @Injectable()
 export class PropertiesService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly storage: StorageService,
+    private readonly mediaService: MediaService,
+  ) {}
+
+  /** Resposta da API: adiciona a URL da capa (miniatura) e o total de mídias. */
+  private out(p: Row, user: AuthedUser) {
+    const o = present(p, user);
+    const cover = p.media?.[0];
+    const key = cover?.thumbnailKey ?? cover?.processedKey ?? null;
+    o.coverUrl = key ? this.storage.publicUrl(key) : null;
+    o.mediaCount = p._count?.media ?? 0;
+    delete o.media;
+    delete o._count;
+    return o;
+  }
 
   // ---------- Consultas ----------
   async list(user: AuthedUser, q: ListPropertiesQuery) {
@@ -82,7 +103,7 @@ export class PropertiesService {
       }),
       this.prisma.property.count({ where }),
     ]);
-    return { items: rows.map((r) => present(r, user)), total, page: q.page, pageSize: q.pageSize };
+    return { items: rows.map((r) => this.out(r, user)), total, page: q.page, pageSize: q.pageSize };
   }
 
   async summary(companyId: string) {
@@ -112,7 +133,7 @@ export class PropertiesService {
   }
 
   async get(user: AuthedUser, id: string) {
-    return present(await this.load(user.companyId, id), user);
+    return this.out(await this.load(user.companyId, id), user);
   }
 
   async history(user: AuthedUser, id: string) {
@@ -180,7 +201,7 @@ export class PropertiesService {
       });
     });
     await this.audit.record({ companyId, entity: 'PROPERTY', entityId: created.id, action: 'CREATE', after: snapshot(created), ctx });
-    return present(created, ctx.user);
+    return this.out(created, ctx.user);
   }
 
   async update(ctx: AuthedCtx, id: string, input: UpdatePropertyInput) {
@@ -215,7 +236,7 @@ export class PropertiesService {
     if (d.changed) {
       await this.audit.record({ companyId, entity: 'PROPERTY', entityId: id, action: 'UPDATE', before: d.before, after: d.after, ctx });
     }
-    return present(updated, ctx.user);
+    return this.out(updated, ctx.user);
   }
 
   async publish(ctx: AuthedCtx, id: string) {
@@ -228,6 +249,7 @@ export class PropertiesService {
     need(p.neighborhood, 'neighborhood', 'Informe o bairro.');
     if (p.purpose !== 'RENT') need(toNum(p.salePrice) && toNum(p.salePrice)! > 0, 'salePrice', 'Informe o valor de venda.');
     if (p.purpose !== 'SALE') need(toNum(p.rentPrice) && toNum(p.rentPrice)! > 0, 'rentPrice', 'Informe o valor do aluguel.');
+    need(await this.prisma.propertyMedia.count({ where: { propertyId: id, type: 'IMAGE', status: { not: 'FAILED' } } }), 'media', 'Adicione ao menos uma foto do imóvel.');
     if (missing.length) throw new AppException('PROPERTY_INCOMPLETE', 422, missing[0]!.message, missing);
 
     const updated = await this.prisma.property.update({
@@ -243,7 +265,7 @@ export class PropertiesService {
       companyId, entity: 'PROPERTY', entityId: id, action: 'PUBLISH',
       before: { published: p.published, status: p.status }, after: { published: true, status: updated.status }, ctx,
     });
-    return present(updated, ctx.user);
+    return this.out(updated, ctx.user);
   }
 
   async unpublish(ctx: AuthedCtx, id: string) {
@@ -251,7 +273,7 @@ export class PropertiesService {
     const p = await this.load(companyId, id);
     const updated = await this.prisma.property.update({ where: { id }, data: { published: false }, include });
     await this.audit.record({ companyId, entity: 'PROPERTY', entityId: id, action: 'UNPUBLISH', before: { published: p.published }, after: { published: false }, ctx });
-    return present(updated, ctx.user);
+    return this.out(updated, ctx.user);
   }
 
   async archive(ctx: AuthedCtx, id: string) {
@@ -262,13 +284,14 @@ export class PropertiesService {
       companyId, entity: 'PROPERTY', entityId: id, action: 'ARCHIVE',
       before: { status: p.status, published: p.published }, after: { status: 'ARCHIVED', published: false }, ctx,
     });
-    return present(updated, ctx.user);
+    return this.out(updated, ctx.user);
   }
 
   async remove(ctx: AuthedCtx, id: string) {
     const { companyId } = ctx.user;
     const p = await this.load(companyId, id);
     if (p.status !== 'DRAFT' || p.publishedAt) throw new AppException('PROPERTY_NOT_DELETABLE', 409);
+    await this.mediaService.purgeFiles(companyId, id);
     await this.prisma.property.delete({ where: { id } });
     await this.audit.record({ companyId, entity: 'PROPERTY', entityId: id, action: 'DELETE', before: snapshot(p), ctx });
   }

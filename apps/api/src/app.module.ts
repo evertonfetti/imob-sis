@@ -9,6 +9,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
+import { MediaModule } from './media/media.module';
 import { OwnersModule } from './owners/owners.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PropertiesModule } from './properties/properties.module';
@@ -34,6 +35,7 @@ export class AppModule {
         CompanyModule,
         OwnersModule,
         CatalogModule,
+        MediaModule,
         PropertiesModule,
       ],
       controllers: [HealthController, RolesController],

@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Bloco 1 (Fundação) concluído — autenticação, RBAC, multiempresa, auditoria, erros padronizados, logs, base de storage.
+**Status:** Blocos 1 a 3 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo e fotos (upload direto, fila, WebP, capa e ordenação).
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -41,10 +41,10 @@ O `docker-compose.yml` da raiz sobe tudo: **PostgreSQL + api + admin + website**
 | `POSTGRES_PASSWORD` | senha do banco (gere uma forte) |
 | `JWT_ACCESS_SECRET` | segredo aleatório com 32+ caracteres (`openssl rand -base64 48`) |
 | `ADMIN_URL` | URL pública do painel, ex.: `https://painel.seudominio.com.br` (CORS e links de e-mail) |
-| `VITE_API_URL` | URL pública da API, ex.: `https://api.seudominio.com.br/api/v1` (embutida no build do painel) |
+| `API_PUBLIC_URL` | URL pública da API **sem barra final e sem `/api/v1`**, ex.: `https://api.seudominio.com.br` (links das fotos e build do painel) |
 | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | primeiro administrador (criado só se o e-mail ainda não existir) |
 | `SEED_COMPANY_NAME` | nome da imobiliária (opcional; só na primeira execução) |
-| `S3_*` | storage S3-compatible (necessário a partir do Bloco 3) |
+| `S3_*` | opcional: storage S3-compatible (R2/S3/MinIO). Sem isso, as fotos ficam no volume `uploads` |
 
 ### Domínios (aba "Domínios")
 
@@ -53,6 +53,12 @@ O `docker-compose.yml` da raiz sobe tudo: **PostgreSQL + api + admin + website**
 | `api` | 3333 | `api.seudominio.com.br` |
 | `admin` | 80 | `painel.seudominio.com.br` |
 | `website` | 3000 | `www.seudominio.com.br` |
+
+### Fotos e mídias
+
+- **Padrão (sem configurar nada):** as fotos ficam no volume `uploads` do Docker e são servidas pela própria API. **Faça backup desse volume.**
+- **S3 / Cloudflare R2 / MinIO (recomendado para escalar):** defina `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION` e `S3_PUBLIC_URL` (URL pública/CDN do bucket). Nesse modo o navegador envia direto ao bucket, então configure o **CORS do bucket** para permitir `PUT` e o header `Content-Type` a partir de `ADMIN_URL`.
+- Cada foto gera uma versão otimizada (WebP, até 2400 px) e uma miniatura; **o original é sempre preservado**. O processamento roda em fila (Redis + BullMQ) com 3 tentativas.
 
 As **migrations rodam automaticamente a cada deploy**: ao subir, a `api` executa `prisma migrate deploy` e a
 sincronização idempotente de papéis/permissões. Se a migration falhar, o container não inicia (veja os logs da `api`).

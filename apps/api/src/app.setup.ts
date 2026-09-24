@@ -30,8 +30,14 @@ export async function configureApp(app: NestFastifyApplication, env: Env) {
   await app.register(cors, {
     origin: [env.ADMIN_URL],
     credentials: true,
+    // O painel roda em outro domínio da API: PATCH/PUT/DELETE precisam estar liberados no preflight.
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['authorization', 'content-type', 'x-request-id'],
+    maxAge: 86400,
     exposedHeaders: ['x-request-id'],
   });
+  // Uploads locais chegam como binário: entregamos o stream cru ao endpoint (sem carregar tudo em memória).
+  app.getHttpAdapter().getInstance().addContentTypeParser('*', (_req: unknown, payload: unknown, done: (e: Error | null, b?: unknown) => void) => done(null, payload));
   app.getHttpAdapter().getInstance().addHook('onSend', async (req, reply) => {
     reply.header('x-request-id', req.id);
   });

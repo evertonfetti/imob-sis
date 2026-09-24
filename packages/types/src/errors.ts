@@ -31,6 +31,15 @@ export const ERROR_CODES = {
   BROKER_INVALID: 'O corretor informado não existe ou está inativo.',
   FEATURE_INVALID: 'Uma ou mais características informadas não existem.',
   CATALOG_NAME_TAKEN: 'Já existe um item com este nome.',
+  MEDIA_TYPE_INVALID: 'Tipo de arquivo não permitido para esta mídia.',
+  MEDIA_TOO_LARGE: 'O arquivo excede o tamanho máximo permitido.',
+  MEDIA_NOT_UPLOADED: 'O arquivo não foi encontrado no armazenamento. Tente enviar novamente.',
+  MEDIA_KEY_INVALID: 'Referência de arquivo inválida.',
+  MEDIA_LIMIT_REACHED: 'Este imóvel atingiu o limite de mídias.',
+  MEDIA_NOT_IMAGE: 'Somente fotos podem ser definidas como capa.',
+  MEDIA_ORDER_INVALID: 'A ordem informada não corresponde às mídias do imóvel.',
+  MEDIA_NOT_FAILED: 'Somente mídias com falha podem ser reprocessadas.',
+  STORAGE_UPLOAD_INVALID: 'Envio inválido ou expirado.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

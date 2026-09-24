@@ -3,6 +3,7 @@
 #   api     → porta 3333   (ex.: api.seudominio.com.br)
 #   admin   → porta 80     (ex.: painel.seudominio.com.br)
 #   website → porta 3000   (ex.: www.seudominio.com.br)
+# Volumes (pgdata, redisdata, uploads) guardam banco, fila e fotos: inclua-os no backup.
 # Variáveis: defina na aba "Ambiente" do Easypanel (veja .env.example / README).
 
 services:
@@ -21,6 +22,19 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # noeviction: a fila de processamento nunca pode perder jobs por falta de memória.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -29,6 +43,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads:/data/uploads
     expose:
       - "3333"
     environment:
@@ -53,7 +71,7 @@ services:
       context: .
       dockerfile: apps/admin/Dockerfile
       args:
-        VITE_API_URL: "${VITE_API_URL:?defina VITE_API_URL (ex. https://api.seudominio.com.br/api/v1)}"
+        VITE_API_URL: ${API_PUBLIC_URL}/api/v1
     restart: unless-stopped
     depends_on:
       - api
@@ -70,3 +88,5 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
+  uploads:

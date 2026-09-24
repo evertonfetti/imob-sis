@@ -1,6 +1,6 @@
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { auth, bootApp, login, resetAndSeed } from './helpers';
+import { auth, bootApp, login, resetAndSeed, uploadPhoto } from './helpers';
 
 let app: NestFastifyApplication;
 let admin: { accessToken: string; user: { companyId: string } };
@@ -70,6 +70,7 @@ describe('imóveis', () => {
     expect(fail.json().details[0].field).toBe('salePrice');
 
     const ok = (await call('POST', '/properties', admin.accessToken, newProperty())).json();
+    await uploadPhoto(app, admin.accessToken, ok.id);
     const pub = await call('POST', `/properties/${ok.id}/publish`, admin.accessToken);
     expect(pub.statusCode).toBe(200);
     expect(pub.json()).toMatchObject({ published: true, status: 'AVAILABLE' });
