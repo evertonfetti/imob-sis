@@ -80,6 +80,12 @@ export class TasksService {
     return task;
   }
 
+  /** Como `createSystem`, mas só uma vez por `ref` (qualquer status): evita recriar a mesma automação. */
+  async createSystemOnce(input: Parameters<TasksService['createSystem']>[0] & { ref: string }) {
+    if (await this.prisma.task.findFirst({ where: { companyId: input.companyId, ref: input.ref }, select: { id: true } })) return null;
+    return this.createSystem(input);
+  }
+
   /** Cancela tarefas automáticas em aberto ligadas a um evento (ex.: visita reagendada/cancelada). */
   cancelByRef(companyId: string, ref: string) {
     return this.prisma.task.updateMany({ where: { companyId, ref, status: 'OPEN' }, data: { status: 'CANCELLED' } });

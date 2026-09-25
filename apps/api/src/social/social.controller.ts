@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
-  activateAccountsSchema, createSocialPostSchema, listSocialPostsSchema, socialAppSchema, updateSocialPostSchema,
-  type CreateSocialPostInput, type SocialAppInput, type UpdateSocialPostInput,
+  activateAccountsSchema, createSocialPostSchema, listSocialPostsSchema, connectSocialSchema, socialAppSchema, updateSocialAppSchema, updateSocialPostSchema,
+  type ConnectSocialInput, type CreateSocialPostInput, type SocialAppInput, type UpdateSocialAppInput, type UpdateSocialPostInput,
 } from '@imob/types';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
@@ -27,7 +27,7 @@ export class SocialController {
 
   // ---------- Login com o Facebook ----------
   @Post('connect') @HttpCode(200) @RequirePermissions('marketing.manage')
-  connect(@Ctx() ctx: ReqCtx) { return this.accounts.connectUrl(c(ctx)); }
+  connect(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(connectSocialSchema)) body: ConnectSocialInput) { return this.accounts.connectUrl(c(ctx), body.appId); }
 
   /** Retorno do Facebook: público (o navegador vem de outro site), protegido pelo `state` assinado. */
   @Public() @SkipThrottle() @Get('oauth/callback')
@@ -36,12 +36,15 @@ export class SocialController {
     return reply.status(302).header('location', `${this.env.ADMIN_URL.replace(/\/$/, '')}/redes-sociais?aba=contas&status=${status}`).send();
   }
 
-  // ---------- Aplicativo Meta desta empresa ----------
-  @Put('app') @RequirePermissions('marketing.manage')
-  saveApp(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(socialAppSchema)) body: SocialAppInput): Promise<unknown> { return this.accounts.saveApp(c(ctx), body); }
+  // ---------- Aplicativos da Meta desta empresa ----------
+  @Post('apps') @RequirePermissions('marketing.manage')
+  createApp(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(socialAppSchema)) body: SocialAppInput): Promise<unknown> { return this.accounts.createApp(c(ctx), body); }
 
-  @Delete('app') @HttpCode(204) @RequirePermissions('marketing.manage')
-  async removeApp(@Ctx() ctx: ReqCtx) { await this.accounts.removeApp(c(ctx)); }
+  @Patch('apps/:id') @RequirePermissions('marketing.manage')
+  updateApp(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string, @Body(new ZodPipe(updateSocialAppSchema)) body: UpdateSocialAppInput): Promise<unknown> { return this.accounts.updateApp(c(ctx), id, body); }
+
+  @Delete('apps/:id') @HttpCode(204) @RequirePermissions('marketing.manage')
+  async removeApp(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string) { await this.accounts.removeApp(c(ctx), id); }
 
   @Get('accounts') @RequirePermissions('marketing.view')
   list(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.accounts.list(ctx.user!.companyId); }

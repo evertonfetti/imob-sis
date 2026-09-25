@@ -33,7 +33,7 @@ const NAV: Group[] = [
     { label: 'Marketing', icon: Megaphone, to: '/marketing', perm: 'marketing.view' },
     { label: 'Redes sociais', icon: Share2, to: '/redes-sociais', perm: 'marketing.view' },
     { label: 'Mídia / IA', icon: Images, perm: 'media.view' },
-    { label: 'Relatórios', icon: BarChart3 },
+    { label: 'Relatórios', icon: BarChart3, to: '/relatorios', perm: 'lead.view' },
   ] },
   { label: 'Administração', items: [
     { label: 'Usuários', icon: Users, to: '/usuarios', perm: 'admin.users' },

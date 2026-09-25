@@ -1,3 +1,5 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PropertyEvents } from '../intelligence/intelligence.events';
 import { Injectable } from '@nestjs/common';
 import { slugify, type CreatePropertyInput, type ListPropertiesQuery, type UpdatePropertyInput } from '@imob/types';
 import { AuditService, diff, sanitize } from '../audit/audit.service';
@@ -55,6 +57,7 @@ export class PropertiesService {
     private readonly audit: AuditService,
     private readonly storage: StorageService,
     private readonly mediaService: MediaService,
+    private readonly events: EventEmitter2,
   ) {}
 
   /** Resposta da API: adiciona a URL da capa (miniatura) e o total de mídias. */
@@ -265,6 +268,7 @@ export class PropertiesService {
       companyId, entity: 'PROPERTY', entityId: id, action: 'PUBLISH',
       before: { published: p.published, status: p.status }, after: { published: true, status: updated.status }, ctx,
     });
+    if (!p.published) await this.events.emitAsync(PropertyEvents.Published, { companyId, propertyId: id, userId: ctx.user.id }).catch(() => undefined); // quem reage nunca derruba a publicação
     return this.out(updated, ctx.user);
   }
 

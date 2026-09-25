@@ -16,11 +16,17 @@ export const INSTAGRAM_CAROUSEL_MAX = 10;
 export const SOCIAL_MAX_DAYS_AHEAD = 180;
 
 export const socialAppSchema = z.object({
+  name: z.string().trim().min(2, 'Dê um nome ao aplicativo').max(60),
   appId: z.string().trim().regex(/^\d{5,32}$/, 'O ID do app tem só números'),
   // Em branco = manter a chave já salva (ela nunca volta para a tela).
   appSecret: z.string().trim().min(16, 'Chave secreta inválida').max(128).optional(),
 });
+export const updateSocialAppSchema = socialAppSchema.partial();
 export type SocialAppInput = z.infer<typeof socialAppSchema>;
+export type UpdateSocialAppInput = z.infer<typeof updateSocialAppSchema>;
+export const connectSocialSchema = z.object({ appId: z.string().uuid().or(z.literal('server')).optional() }).default({});
+export type ConnectSocialInput = z.infer<typeof connectSocialSchema>;
+export interface SocialAppDto { id: string; name: string; appId: string; source: 'company' | 'server'; accountCount: number }
 
 export const activateAccountsSchema = z.object({ accountIds: z.array(z.string().uuid()).max(50) });
 
@@ -46,6 +52,9 @@ export const listSocialPostsSchema = z.object({
 
 export interface SocialAccountDto {
   id: string;
+  appName: string | null;
+  /** Cadastro do app pelo qual a conta entrou (null = app padrão do servidor ou app removido). */
+  appRef: string | null;
   provider: SocialProvider;
   externalId: string;
   name: string;

@@ -10,3 +10,4 @@ export * from './whatsapp';
 export * from './marketing';
 export * from './social';
 export * from './commercial';
+export * from './intelligence';

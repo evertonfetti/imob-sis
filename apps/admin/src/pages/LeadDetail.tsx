@@ -1,11 +1,12 @@
 import { LEAD_STATUS_LABELS, PROPOSAL_STATUS_LABELS, PURPOSE_LABELS, TASK_TYPE_LABELS, VISIT_STATUS_LABELS, type LeadStatus, type Paginated } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, ArrowRightLeft, CalendarDays, Check, CheckCircle2, Circle, ClipboardList, FileSignature, Mail, MessageCircle, Pencil, Phone, Plus, Sparkles, StickyNote, Trash2, UserCheck,
+  ArrowLeft, ArrowRightLeft, CalendarDays, Flame, Check, CheckCircle2, Circle, ClipboardList, FileSignature, Mail, MessageCircle, Pencil, Phone, Plus, Sparkles, StickyNote, Trash2, UserCheck,
 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PROPOSAL_TONE, ProposalDetail, ProposalModal, VISIT_TONE, VisitModal, type ProposalRow, type VisitRow } from '../components/commercial';
+import { LeadMatches, ScoreBadge, ScoreModal } from '../components/intelligence';
 import { LostModal, StagePill, searchProperties, sourceLabel, useBrokers, usePipeline } from '../components/crm';
 import { SearchPicker } from '../components/SearchPicker';
 import { TaskModal, type TaskRow } from '../components/TaskModal';
@@ -16,7 +17,7 @@ import { dateTime, dueLabel, formatPhone, timeAgo } from '../lib/format';
 import { MoneyInput, brl } from '../lib/money';
 
 interface Lead {
-  id: string; source: string; status: LeadStatus; notes: string | null; createdAt: string; stageEnteredAt: string; lostReason: string | null; closedAt: string | null;
+  id: string; score: number; source: string; status: LeadStatus; notes: string | null; createdAt: string; stageEnteredAt: string; lostReason: string | null; closedAt: string | null;
   budgetMin: number | null; budgetMax: number | null; purpose: keyof typeof PURPOSE_LABELS | null; city: string | null; neighborhood: string | null; bedrooms: number | null; purchaseTimeline: string | null;
   customer: { id: string; name: string; phone: string | null; email: string | null };
   property: { id: string; code: string; title: string; status: string; purpose: string; salePrice: number | null; rentPrice: number | null; city: string | null; neighborhood: string | null } | null;
@@ -30,7 +31,7 @@ interface Lead {
 
 const STATUS_TONE: Record<LeadStatus, 'ok' | 'warn' | 'danger' | 'accent' | undefined> = { NEW: 'accent', CONTACTED: 'warn', QUALIFIED: 'warn', WON: 'ok', LOST: 'danger' };
 const TL_ICON: Record<string, ReactNode> = {
-  LEAD_CREATED: <Sparkles />, STAGE_CHANGED: <ArrowRightLeft />, LEAD_ASSIGNED: <UserCheck />, LEAD_UPDATED: <Pencil />, NOTE_ADDED: <StickyNote />, TASK_CREATED: <ClipboardList />, TASK_COMPLETED: <CheckCircle2 />, VISIT_CREATED: <CalendarDays />, VISIT_COMPLETED: <CheckCircle2 />, VISIT_CANCELLED: <CalendarDays />, PROPOSAL_CREATED: <FileSignature />, PROPOSAL_UPDATED: <FileSignature />, WHATSAPP_RECEIVED: <MessageCircle />, WHATSAPP_SENT: <MessageCircle />,
+  LEAD_CREATED: <Sparkles />, STAGE_CHANGED: <ArrowRightLeft />, LEAD_ASSIGNED: <UserCheck />, LEAD_UPDATED: <Pencil />, NOTE_ADDED: <StickyNote />, TASK_CREATED: <ClipboardList />, TASK_COMPLETED: <CheckCircle2 />, SCORE_HOT: <Flame />, PROPERTY_MATCH: <Sparkles />, VISIT_CREATED: <CalendarDays />, VISIT_COMPLETED: <CheckCircle2 />, VISIT_CANCELLED: <CalendarDays />, PROPOSAL_CREATED: <FileSignature />, PROPOSAL_UPDATED: <FileSignature />, WHATSAPP_RECEIVED: <MessageCircle />, WHATSAPP_SENT: <MessageCircle />,
 };
 
 export function LeadDetail() {
@@ -45,13 +46,14 @@ export function LeadDetail() {
   const [lost, setLost] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<TaskRow | 'new' | null>(null);
   const [editing, setEditing] = useState(false);
+  const [scoreOpen, setScoreOpen] = useState(false);
   const [visitModal, setVisitModal] = useState<VisitRow | 'new' | null>(null);
   const [proposalModal, setProposalModal] = useState<'new' | string | null>(null);
 
   const q = useQuery({ queryKey: ['lead', id], queryFn: () => api<Lead>(`/leads/${id}`) });
   const visits = useQuery({ queryKey: ['visits', 'lead', id], queryFn: () => api<Paginated<VisitRow>>(`/visits?leadId=${id}&pageSize=50`), enabled: can('visit.view') });
   const proposals = useQuery({ queryKey: ['proposals', 'lead', id], queryFn: () => api<Paginated<ProposalRow>>(`/proposals?leadId=${id}&pageSize=50`), enabled: can('proposal.view') });
-  const refresh = () => { for (const k of ['lead', 'board', 'leads', 'tasks', 'visits', 'proposals']) qc.invalidateQueries({ queryKey: [k] }); };
+  const refresh = () => { for (const k of ['lead', 'board', 'leads', 'tasks', 'visits', 'proposals', 'lead-matches', 'lead-score']) qc.invalidateQueries({ queryKey: [k] }); };
   const onError = (e: unknown) => toast.show(errorMessage(e));
 
   const stage = useMutation({
@@ -86,6 +88,7 @@ export function LeadDetail() {
             {phone && <a href={`tel:+55${phone}`}><Phone size={14} style={{ verticalAlign: -2 }} /> {formatPhone(phone)}</a>}
             {l.customer.email && <a href={`mailto:${l.customer.email}`}><Mail size={14} style={{ verticalAlign: -2 }} /> {l.customer.email}</a>}
             <Badge tone={STATUS_TONE[l.status]}>{LEAD_STATUS_LABELS[l.status]}</Badge>
+            <ScoreBadge score={l.score} onClick={() => setScoreOpen(true)} />
             <span className="card-sub">Criado {timeAgo(l.createdAt)}</span>
           </div>
         </div>
@@ -201,6 +204,8 @@ export function LeadDetail() {
             </section>
           )}
 
+          {l.status !== 'WON' && l.status !== 'LOST' && <LeadMatches leadId={l.id} />}
+
           <section className="card">
             <div className="card-head"><div className="card-title">Interesse</div>{can('lead.edit') && <Button variant="ghost" onClick={() => setEditing(true)}><Pencil /> Editar</Button>}</div>
             <div className="section-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
@@ -240,6 +245,7 @@ export function LeadDetail() {
       {visitModal && <VisitModal visit={visitModal === 'new' ? null : visitModal} leadId={l.id} property={l.property ? { id: l.property.id, label: `${l.property.code} · ${l.property.title}` } : null} onClose={() => setVisitModal(null)} onSaved={() => { setVisitModal(null); toast.show('Visita salva.'); }} />}
       {proposalModal === 'new' && <ProposalModal leadId={l.id} property={l.property ? { id: l.property.id, label: `${l.property.code} · ${l.property.title}` } : null} onClose={() => setProposalModal(null)} onSaved={(p) => setProposalModal(p.id)} />}
       {proposalModal && proposalModal !== 'new' && <ProposalDetail id={proposalModal} onClose={() => setProposalModal(null)} />}
+      {scoreOpen && <ScoreModal leadId={l.id} onClose={() => setScoreOpen(false)} />}
       {editing && <EditInterest lead={l} onClose={() => setEditing(false)} onSaved={(nl) => { qc.setQueryData(['lead', id], nl); refresh(); setEditing(false); toast.show('Dados atualizados.'); }} />}
       {toast.node}
     </>

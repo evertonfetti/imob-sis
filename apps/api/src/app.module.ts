@@ -11,6 +11,7 @@ import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
 import { CommercialModule } from './commercial/commercial.module';
+import { IntelligenceModule } from './intelligence/intelligence.module';
 import { CrmModule } from './crm/crm.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { MediaModule } from './media/media.module';
@@ -46,6 +47,7 @@ export class AppModule {
         MediaModule,
         CrmModule,
         CommercialModule,
+        IntelligenceModule,
         WhatsappModule,
         MarketingModule,
         SocialModule,

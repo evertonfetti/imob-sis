@@ -7,10 +7,11 @@ import { NewLeadModal, StagePill, useBrokers, usePipeline } from '../components/
 import { useAuth } from '../lib/auth';
 import { Badge, Button, Empty, Input, PageHeader, Select, SkeletonRows } from '../components/ui';
 import { api } from '../lib/api';
+import { ScoreBadge } from '../components/intelligence';
 import { formatPhone as fmtPhone, timeAgo } from '../lib/format';
 
 interface Lead {
-  id: string; source: LeadSource; status: LeadStatus; notes: string | null; createdAt: string;
+  id: string; score: number; source: LeadSource; status: LeadStatus; notes: string | null; createdAt: string;
   stage: { id: string; name: string; color: string } | null;
   customer: { id: string; name: string; phone: string | null; email: string | null };
   property: { id: string; code: string; title: string } | null;
@@ -66,7 +67,7 @@ export function Leads() {
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Contato</th><th>Imóvel de interesse</th><th>Origem</th><th>Corretor</th><th>Etapa</th><th>Recebido</th><th /></tr></thead>
+              <thead><tr><th>Contato</th><th>Imóvel de interesse</th><th>Origem</th><th>Corretor</th><th>Etapa</th><th>Score</th><th>Recebido</th><th /></tr></thead>
               <tbody>
                 {d.items.map((l) => (
                   <tr key={l.id} className="row-link" onClick={() => nav(`/leads/${l.id}`)}>
@@ -78,6 +79,7 @@ export function Leads() {
                       {(l.attribution?.utmCampaign || l.attribution?.utmSource) && <div className="card-sub" style={{ marginTop: 4 }}>{[l.attribution.utmSource, l.attribution.utmCampaign].filter(Boolean).join(' · ')}</div>}</td>
                     <td className="card-sub">{l.broker?.name ?? 'Sem corretor'}</td>
                     <td><StagePill stage={l.stage} /></td>
+                    <td><ScoreBadge score={l.score} /></td>
                     <td className="card-sub" style={{ whiteSpace: 'nowrap' }}>{timeAgo(l.createdAt)}</td>
                     <td className="actions">
                       {l.customer.phone && (

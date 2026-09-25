@@ -2,7 +2,10 @@ import type { Paginated } from '@imob/types';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, CircleDollarSign, FileSignature, Home, MessageCircleWarning, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { BarList, Funnel, LineChart } from '../components/charts';
+import { AttentionCard } from '../components/intelligence';
 import { PageHeader } from '../components/ui';
+import { Panel, propertyRows, rangeOf, sourceRows, useOverview } from './Reports';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { timeAgo } from '../lib/format';
@@ -48,6 +51,8 @@ export function Dashboard() {
     queryFn: () => api<{ visitsToday: number; visitsWeek: number; openProposals: { count: number; value: number }; acceptedProposals: { count: number; value: number } }>('/commercial/summary'),
     enabled: can('visit.view'),
   });
+  const overview = useOverview(rangeOf(30));
+  const ov = overview.data;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
@@ -99,7 +104,20 @@ export function Dashboard() {
         ))}
       </div>
 
+      {can('lead.view') && (
+        <>
+          <div className="section-line"><span>Últimos 30 dias</span><Link to="/relatorios">Ver relatórios</Link></div>
+          <div className="charts">
+            <Panel title="Leads por período" sub={ov ? `${ov.kpis.newLeads} no total` : undefined}>{ov ? <LineChart points={ov.byDay.map((x) => ({ date: x.date, value: x.leads }))} /> : <div className="skeleton" style={{ height: 130 }} />}</Panel>
+            <Panel title="Leads por origem">{ov ? <BarList rows={sourceRows(ov)} /> : <div className="skeleton" style={{ height: 130 }} />}</Panel>
+            <Panel title="Conversão do funil">{ov ? <Funnel steps={ov.funnel.map((f) => ({ key: f.stageId, ...f }))} /> : <div className="skeleton" style={{ height: 130 }} />}</Panel>
+            <Panel title="Imóveis mais procurados">{ov ? <BarList rows={propertyRows(ov)} empty="Nenhum lead com imóvel de interesse." /> : <div className="skeleton" style={{ height: 130 }} />}</Panel>
+          </div>
+        </>
+      )}
+
       <div className="two-col">
+        {can('lead.view') ? <AttentionCard /> : <div />}
         <section className="card">
           <div className="card-head"><div><div className="card-title">Atividade recente</div><div className="card-sub">Últimas ações registradas no sistema</div></div>
             {canAudit && <Link to="/auditoria" className="btn btn-ghost">Ver tudo</Link>}
@@ -120,6 +138,7 @@ export function Dashboard() {
             )}
         </section>
 
+        {leads.data?.total === 0 && (
         <section className="card">
           <div className="card-head"><div><div className="card-title">Primeiros passos</div><div className="card-sub">Configure a base da operação</div></div></div>
           <ol className="steps">
@@ -129,6 +148,7 @@ export function Dashboard() {
             {can('property.create') && <li className="step"><span className="step-n">4</span><div><Link to="/imoveis/novo" className="step-t">Cadastrar o primeiro imóvel</Link><div className="step-d">Dados, valores, endereço e características.</div></div></li>}
           </ol>
         </section>
+        )}
       </div>
     </>
   );

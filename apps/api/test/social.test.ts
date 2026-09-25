@@ -116,55 +116,77 @@ describe('conexão com o Facebook', () => {
     expect((await call('POST', '/social/connect', 'manager')).statusCode).toBe(403); // gerente só visualiza marketing
   });
 
-  it('cada empresa cadastra o próprio app da Meta (segredo criptografado, nunca devolvido); sem o cadastro, cai no padrão do servidor', async () => {
+  it('cada empresa cadastra vários apps da Meta (segredo criptografado, nunca devolvido) e escolhe qual usar ao conectar; sem cadastro, cai no padrão do servidor', async () => {
     const plain = await bootApp({ API_PUBLIC_URL: 'https://api.teste.com.br', SITE_URL: 'https://site.teste.com.br', SOCIAL_POLL_MS: '1' });
     try {
       const a = (await login(plain, 'admin.a@teste.com')).body.accessToken;
       const b = (await login(plain, 'admin.b@teste.com')).body.accessToken;
-      const put = (t: string, payload: unknown) => plain.inject({ method: 'PUT', url: '/api/v1/social/app', headers: auth(t), payload: payload as never });
+      const req = (method: 'POST' | 'PATCH' | 'DELETE' | 'GET', url: string, t: string, payload?: unknown) => plain.inject({ method, url: `/api/v1${url}`, headers: auth(t), payload: payload as never });
+      const okApp = { name: 'App Imobiliária', appId: '111222333', appSecret: 'segredo-empresa-a-0123456789' };
 
       // validações e permissão
-      expect((await put(a, { appId: 'abc', appSecret: 'x'.repeat(32) })).statusCode).toBe(400);
-      expect((await put(a, { appId: '111222333' })).statusCode).toBe(400); // primeira vez exige a chave
-      expect((await plain.inject({ method: 'PUT', url: '/api/v1/social/app', headers: auth(tk.broker!), payload: { appId: '111222333', appSecret: 'x'.repeat(32) } })).statusCode).toBe(403);
+      expect((await req('POST', '/social/apps', a, { ...okApp, appId: 'abc' })).statusCode).toBe(400);
+      expect((await req('POST', '/social/apps', a, { ...okApp, name: '' })).statusCode).toBe(400);
+      expect((await req('POST', '/social/apps', a, { name: 'Sem chave', appId: '111222333' })).statusCode).toBe(400);
+      expect((await req('POST', '/social/apps', tk.broker!, okApp)).statusCode).toBe(403);
 
       // a Meta recusa o par → não salva
       fail = [{ match: /oauth\/access_token/, times: 1, status: 400, code: 101, message: 'Invalid app secret' }];
-      const bad = await put(a, { appId: '111222333', appSecret: 'segredo-invalido-0123456789' });
-      expect(bad.statusCode).toBe(400);
+      const bad = await req('POST', '/social/apps', a, { ...okApp, appSecret: 'segredo-invalido-0123456789' });
       expect(bad.json().code).toBe('SOCIAL_APP_INVALID');
-      expect((await plain.inject({ method: 'GET', url: '/api/v1/social/accounts', headers: auth(a) })).json().configured).toBe(false);
+      expect((await req('GET', '/social/accounts', a)).json().configured).toBe(false);
 
-      // salva na empresa A
-      const ok = await put(a, { appId: '111222333', appSecret: 'segredo-empresa-a-0123456789' });
-      expect(ok.statusCode).toBe(200);
-      expect(ok.json().configured).toBe(true);
-      expect(ok.json().app).toEqual({ appId: '111222333', source: 'company' });
-      expect(JSON.stringify(ok.json())).not.toContain('segredo-empresa-a');
-      const row = await prisma.integration.findFirstOrThrow({ where: { provider: 'META_APP' } });
-      expect(row.externalId).toBe('111222333');
-      expect(row.secrets).not.toContain('segredo-empresa-a'); // criptografado no banco
+      // salva o primeiro: segredo criptografado e não devolvido
+      const one = await req('POST', '/social/apps', a, okApp);
+      expect(one.statusCode).toBe(201);
+      expect(one.json().apps).toMatchObject([{ name: 'App Imobiliária', appId: '111222333', source: 'company', accountCount: 0 }]);
+      expect(JSON.stringify(one.json())).not.toContain('segredo-empresa-a');
+      const row = await prisma.socialApp.findFirstOrThrow({ where: { appId: '111222333' } });
+      expect(row.secrets).not.toContain('segredo-empresa-a');
+      expect((await req('POST', '/social/apps', a, okApp)).json().code).toBe('SOCIAL_APP_DUPLICATE');
 
-      // o login usa o app da empresa A; a empresa B continua sem app
-      const url = new URL((await plain.inject({ method: 'POST', url: '/api/v1/social/connect', headers: auth(a) })).json().url);
-      expect(url.searchParams.get('client_id')).toBe('111222333');
-      expect((await plain.inject({ method: 'POST', url: '/api/v1/social/connect', headers: auth(b) })).json().code).toBe('SOCIAL_NOT_CONFIGURED');
+      // com um só app, conectar não exige escolha; a empresa B continua sem app
+      const url1 = new URL((await req('POST', '/social/connect', a)).json().url);
+      expect(url1.searchParams.get('client_id')).toBe('111222333');
+      expect((await req('POST', '/social/connect', b)).json().code).toBe('SOCIAL_NOT_CONFIGURED');
+
+      // segundo app: agora é preciso escolher
+      const two = await req('POST', '/social/apps', a, { name: 'App Marketing', appId: '444555666', appSecret: 'segredo-marketing-0123456789' });
+      const apps = two.json().apps as { id: string; name: string }[];
+      expect(apps.map((x) => x.name)).toEqual(['App Imobiliária', 'App Marketing']);
+      expect((await req('POST', '/social/connect', a)).json().code).toBe('SOCIAL_APP_REQUIRED');
+      expect((await req('POST', '/social/connect', b, { appId: apps[0]!.id })).statusCode).toBe(400); // app de outra empresa
+      expect((await req('POST', '/social/connect', a, { appId: '00000000-0000-4000-8000-000000000000' })).json().code).toBe('SOCIAL_APP_REQUIRED');
+
+      // o login e a troca do código usam o app escolhido, e a conta guarda por qual app entrou
+      const url2 = new URL((await req('POST', '/social/connect', a, { appId: apps[1]!.id })).json().url);
+      expect(url2.searchParams.get('client_id')).toBe('444555666');
       calls.length = 0;
-      const cb = await plain.inject({ method: 'GET', url: `/api/v1/social/oauth/callback?code=C1&state=${encodeURIComponent(url.searchParams.get('state')!)}` });
+      const cb = await plain.inject({ method: 'GET', url: `/api/v1/social/oauth/callback?code=C1&state=${encodeURIComponent(url2.searchParams.get('state')!)}` });
       expect(cb.headers.location).toContain('status=connected');
-      const exch = graph(/GET oauth\/access_token/);
-      expect(exch.length).toBe(2);
-      for (const e of exch) { expect(e.query.get('client_id')).toBe('111222333'); expect(e.query.get('client_secret')).toBe('segredo-empresa-a-0123456789'); }
+      for (const e of graph(/GET oauth\/access_token/)) { expect(e.query.get('client_id')).toBe('444555666'); expect(e.query.get('client_secret')).toBe('segredo-marketing-0123456789'); }
+      const listed = (await req('GET', '/social/accounts', a)).json();
+      expect(listed.pending.every((x: { appName: string }) => x.appName === 'App Marketing')).toBe(true);
+      expect(listed.apps.find((x: { name: string }) => x.name === 'App Marketing').accountCount).toBeGreaterThan(0);
 
-      // trocar só o ID mantém a chave; remover volta ao padrão (sem env aqui = não configurado)
-      expect((await put(a, { appId: '444555666' })).json().app.appId).toBe('444555666');
-      expect((await plain.inject({ method: 'DELETE', url: '/api/v1/social/app', headers: auth(a) })).statusCode).toBe(204);
-      expect((await plain.inject({ method: 'GET', url: '/api/v1/social/accounts', headers: auth(a) })).json().configured).toBe(false);
+      // editar (só o nome mantém a chave), trocar ID revalida, remover não apaga as contas
+      const ren = await req('PATCH', `/social/apps/${apps[1]!.id}`, a, { name: 'Marketing 2' });
+      expect(ren.json().apps.map((x: { name: string }) => x.name)).toContain('Marketing 2');
+      expect((await req('PATCH', `/social/apps/${apps[1]!.id}`, b, { name: 'xx' })).statusCode).toBe(404);
+      expect((await req('PATCH', `/social/apps/${apps[1]!.id}`, a, { appId: '111222333' })).json().code).toBe('SOCIAL_APP_DUPLICATE');
+      expect((await req('DELETE', `/social/apps/${apps[1]!.id}`, b)).statusCode).toBe(404);
+      expect((await req('DELETE', `/social/apps/${apps[1]!.id}`, a)).statusCode).toBe(204);
+      const after = (await req('GET', '/social/accounts', a)).json();
+      expect(after.apps).toHaveLength(1);
+      expect(after.pending.length).toBeGreaterThan(0);
+      expect(after.pending[0].appName).toBeNull();
+      expect((await req('DELETE', `/social/apps/${apps[0]!.id}`, a)).statusCode).toBe(204); // deixa a empresa A sem app próprio para os demais testes
+      await prisma.socialAccount.deleteMany({ where: { status: 'PENDING' } });
     } finally { await plain.close(); }
 
-    // com env no servidor, a empresa sem cadastro usa o padrão e a que cadastrou usa o seu
+    // com env no servidor, a empresa B usa o padrão (app virtual "server")
     const withEnv = (await call('GET', '/social/accounts', 'adminB')).json();
-    expect(withEnv.app).toEqual({ appId: '1234567890', source: 'server' });
+    expect(withEnv.apps).toMatchObject([{ id: 'server', appId: '1234567890', source: 'server' }]);
   });
 
   it('monta a URL do diálogo com escopos e redirect, guarda as Páginas/Instagram como pendentes (token criptografado) e ativa só as escolhidas', async () => {

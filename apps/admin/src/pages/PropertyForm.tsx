@@ -12,6 +12,7 @@ import { useAuth } from '../lib/auth';
 import { dateTime } from '../lib/format';
 import { MoneyInput } from '../lib/money';
 import { Gallery } from '../components/Gallery';
+import { PropertyMatches } from '../components/intelligence';
 import { OwnerModal, type Owner } from './Owners';
 import { statusBadge } from './Properties';
 
@@ -329,6 +330,8 @@ export function PropertyForm() {
                   </div>
                 </section>
               )}
+
+              {!isNew && p.published && p.status === 'AVAILABLE' && can('lead.view') && <PropertyMatches propertyId={id!} />}
 
               {!isNew && (can('property.archive') || can('property.delete')) && (
                 <section className="card">

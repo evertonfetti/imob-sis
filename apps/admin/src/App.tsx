@@ -20,6 +20,7 @@ import { MarketingConversions } from './pages/MarketingConversions';
 import { Owners } from './pages/Owners';
 import { Properties } from './pages/Properties';
 import { Proposals } from './pages/Proposals';
+import { Reports } from './pages/Reports';
 import { PropertyForm } from './pages/PropertyForm';
 import { Roles } from './pages/Roles';
 import { SocialComposer } from './pages/SocialComposer';
@@ -65,6 +66,7 @@ export function App() {
           <Route path="clientes" element={<Guard perm="lead.view"><Customers /></Guard>} />
           <Route path="agenda" element={<Guard perm="visit.view"><Agenda /></Guard>} />
           <Route path="propostas" element={<Guard perm="proposal.view"><Proposals /></Guard>} />
+          <Route path="relatorios" element={<Guard perm="lead.view"><Reports /></Guard>} />
           <Route path="tarefas" element={<Guard perm="lead.view"><Tasks /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />
           <Route path="catalogo" element={<Guard perm="property.edit"><Catalog /></Guard>} />

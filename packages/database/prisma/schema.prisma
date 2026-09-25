@@ -236,6 +236,7 @@ model Company {
   messages           Message[]
   marketingEvents    MarketingEvent[]
   socialAccounts     SocialAccount[]
+  socialApps         SocialApp[]
   socialPosts        SocialPost[]
 
   visits    Visit[]
@@ -605,6 +606,8 @@ model Lead {
   source LeadSource @default(MANUAL)
   status LeadStatus @default(NEW)
   score  Int        @default(0)
+  // Quando o score foi calculado pela última vez (null = ainda não calculado; o agendador preenche).
+  scoreUpdatedAt DateTime?
 
   budgetMin        Decimal?         @db.Decimal(14, 2)
   budgetMax        Decimal?         @db.Decimal(14, 2)
@@ -642,6 +645,7 @@ model Lead {
   @@index([companyId, status])
   @@index([companyId, stageId])
   @@index([companyId, brokerId])
+  @@index([companyId, score])
   @@index([customerId])
   @@index([propertyId])
   @@map("leads")
@@ -929,6 +933,25 @@ model MarketingEvent {
 
 // Página do Facebook ou conta do Instagram conectada via login com o Facebook.
 // O token de acesso (da Página) fica criptografado em `secrets` e nunca volta pela API.
+// Aplicativos da Meta (login com o Facebook) cadastrados pela empresa; pode haver vários.
+model SocialApp {
+  id          String   @id @default(uuid(7))
+  companyId   String
+  name        String
+  appId       String
+  // { appSecret } criptografado (AES-256-GCM).
+  secrets     String
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company         @relation(fields: [companyId], references: [id])
+  accounts SocialAccount[]
+
+  @@unique([companyId, appId])
+  @@map("social_apps")
+}
+
 model SocialAccount {
   id            String              @id @default(uuid(7))
   companyId     String
@@ -942,10 +965,13 @@ model SocialAccount {
   status        SocialAccountStatus @default(PENDING)
   secrets       String
   connectedById String?
+  // App da Meta pelo qual a conta foi conectada (null = app padrão do servidor ou app removido).
+  socialAppId   String?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
   company Company            @relation(fields: [companyId], references: [id])
+  app     SocialApp?         @relation(fields: [socialAppId], references: [id], onDelete: SetNull)
   targets SocialPostTarget[]
 
   @@unique([companyId, provider, externalId])

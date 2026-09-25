@@ -1,17 +1,17 @@
 import {
   SOCIAL_POST_STATUS_LABELS, SOCIAL_PROVIDER_LABELS,
-  type Paginated, type SocialAccountDto, type SocialPostDto, type SocialPostStatus,
+  type Paginated, type SocialAccountDto, type SocialAppDto, type SocialPostDto, type SocialPostStatus,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, Check, Facebook, Image as ImageIcon, Instagram, Plus, RotateCw, Send, Share2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
+import { Badge, Button, Empty, Field, Input, Modal, PageHeader, Select, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dateTime } from '../lib/format';
 
-interface Accounts { configured: boolean; app: { appId: string | null; source: 'company' | 'server' | null }; redirectUri: string; accounts: SocialAccountDto[]; pending: SocialAccountDto[] }
+interface Accounts { configured: boolean; apps: SocialAppDto[]; redirectUri: string; accounts: SocialAccountDto[]; pending: SocialAccountDto[] }
 
 const STATUS_TONE: Record<SocialPostStatus, 'ok' | 'warn' | 'danger' | 'accent' | undefined> = {
   SCHEDULED: 'accent', PUBLISHING: 'warn', PUBLISHED: 'ok', PARTIAL: 'warn', FAILED: 'danger', CANCELLED: undefined,
@@ -132,8 +132,11 @@ function AccountsTab({ status }: { status: string | null }) {
     if (msg) toast.show(msg);
   }, [status]); // eslint-disable-line
 
+  const [appPick, setAppPick] = useState('');
+  const apps = s?.apps ?? [];
+  const chosen = apps.some((a) => a.id === appPick) ? appPick : apps[0]?.id;
   const connect = useMutation({
-    mutationFn: () => api<{ url: string }>('/social/connect', { method: 'POST' }),
+    mutationFn: (appId?: string | null) => api<{ url: string }>('/social/connect', { method: 'POST', body: { appId: appId ?? chosen } }),
     onSuccess: (r) => { window.location.href = r.url; },
     onError: (e) => toast.show(errorMessage(e)),
   });
@@ -144,23 +147,28 @@ function AccountsTab({ status }: { status: string | null }) {
   if (q.isLoading) return <div className="card"><SkeletonRows rows={4} /></div>;
   return (
     <>
-      {manage && <AppCard s={s} onSaved={refresh} />}
+      {manage && <AppsCard s={s} onSaved={refresh} />}
       <section className="card">
         <div className="card-head">
           <div><div className="card-title">Facebook e Instagram</div><div className="card-sub">Entre com o Facebook e escolha quais Páginas e contas do Instagram usar.</div></div>
-          {manage && <Button variant="primary" onClick={() => connect.mutate()} disabled={!s?.configured || connect.isPending}><Facebook /> {s?.accounts.length ? 'Conectar mais contas' : 'Entrar com o Facebook'}</Button>}
+          {manage && (
+            <div className="toolbar">
+              {apps.length > 1 && <Select style={{ width: 200 }} value={chosen} onChange={(e) => setAppPick(e.target.value)} aria-label="Aplicativo da Meta">{apps.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select>}
+              <Button variant="primary" onClick={() => connect.mutate(undefined)} disabled={!s?.configured || connect.isPending}><Facebook /> {s?.accounts.length ? 'Conectar mais contas' : 'Entrar com o Facebook'}</Button>
+            </div>
+          )}
         </div>
         {!s?.accounts.length ? <Empty icon={<Share2 />} title="Nenhuma conta conectada" hint="O Instagram precisa ser uma conta profissional ligada a uma Página do Facebook." /> : s.accounts.map((a) => (
           <div key={a.id} className="acc">
             <div className="acc-pic">{a.pictureUrl ? <img src={a.pictureUrl} alt="" /> : <Icon provider={a.provider} />}</div>
             <div className="acc-info">
               <strong>{a.provider === 'INSTAGRAM' && a.username ? `@${a.username}` : a.name}</strong>
-              <span className="card-sub">{SOCIAL_PROVIDER_LABELS[a.provider]}{a.linkedPageName ? ` · ligada à Página ${a.linkedPageName}` : ''}</span>
+              <span className="card-sub">{SOCIAL_PROVIDER_LABELS[a.provider]}{apps.length > 1 && a.appName ? ` · via ${a.appName}` : ''}{a.linkedPageName ? ` · ligada à Página ${a.linkedPageName}` : ''}</span>
             </div>
             <Badge tone={a.status === 'ACTIVE' ? 'ok' : 'danger'}>{a.status === 'ACTIVE' ? 'Ativa' : 'Expirada'}</Badge>
             {manage && (
               <div className="toolbar">
-                {a.status === 'EXPIRED' ? <Button onClick={() => connect.mutate()}>Reconectar</Button> : <Button variant="ghost" onClick={() => check.mutate(a.id)} disabled={check.isPending}>Verificar</Button>}
+                {a.status === 'EXPIRED' ? <Button onClick={() => connect.mutate(a.appRef ?? undefined)}>Reconectar</Button> : <Button variant="ghost" onClick={() => check.mutate(a.id)} disabled={check.isPending}>Verificar</Button>}
                 <Button variant="ghost" className="btn-danger" onClick={() => confirm(`Desconectar ${a.name}? Publicações agendadas só para esta conta serão canceladas.`) && remove.mutate(a.id)}>Desconectar</Button>
               </div>
             )}
@@ -196,22 +204,25 @@ function ChooseModal({ pending, onClose, onDone }: { pending: SocialAccountDto[]
   );
 }
 
-/** Aplicativo da Meta desta empresa: o ID e a chave secreta ficam no banco (criptografados) e valem só para ela. */
-function AppCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void }) {
+/** Aplicativos da Meta desta empresa (pode haver vários): o ID e a chave secreta ficam no banco, criptografados. */
+function AppsCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void }) {
   const toast = useToast();
-  const own = s?.app.source === 'company';
-  const [open, setOpen] = useState(false);
-  const [f, setF] = useState({ appId: '', appSecret: '' });
+  const apps = s?.apps ?? [];
+  const [form, setForm] = useState<{ id: string | null; name: string; appId: string; appSecret: string } | null>(null);
   const [err, setErr] = useState<unknown>(null);
   const fe = fieldErrors(err);
-  const editing = open || !s?.configured;
+  const editing = form?.id ? apps.find((a) => a.id === form.id) : null;
+  const open = (a?: SocialAppDto) => { setErr(null); setForm(a ? { id: a.id, name: a.name, appId: a.appId, appSecret: '' } : { id: null, name: '', appId: '', appSecret: '' }); };
   const save = useMutation({
-    mutationFn: () => api('/social/app', { method: 'PUT', body: { appId: f.appId || s?.app.appId, ...(f.appSecret && { appSecret: f.appSecret }) } }),
-    onSuccess: () => { onSaved(); setOpen(false); setF({ appId: '', appSecret: '' }); setErr(null); toast.show('Aplicativo da Meta salvo.'); },
+    mutationFn: () => {
+      const body = { name: form!.name, appId: form!.appId, ...(form!.appSecret && { appSecret: form!.appSecret }) };
+      return form!.id ? api(`/social/apps/${form!.id}`, { method: 'PATCH', body }) : api('/social/apps', { method: 'POST', body });
+    },
+    onSuccess: () => { onSaved(); setForm(null); setErr(null); toast.show('Aplicativo salvo.'); },
     onError: setErr,
   });
   const remove = useMutation({
-    mutationFn: () => api('/social/app', { method: 'DELETE' }),
+    mutationFn: (id: string) => api(`/social/apps/${id}`, { method: 'DELETE' }),
     onSuccess: () => { onSaved(); toast.show('Aplicativo removido.'); },
     onError: (e) => toast.show(errorMessage(e)),
   });
@@ -219,41 +230,48 @@ function AppCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void 
   return (
     <section className="card" style={{ marginBottom: 20 }}>
       <div className="card-head">
-        <div><div className="card-title">Aplicativo da Meta</div><div className="card-sub">Cada empresa usa o próprio app: é ele que autoriza o login com o Facebook.</div></div>
-        <div className="toolbar">
-          <Badge tone={s?.configured ? 'ok' : 'warn'}>{s?.configured ? (own ? 'Configurado' : 'Padrão do servidor') : 'Não configurado'}</Badge>
-          {s?.configured && !editing && <Button onClick={() => setOpen(true)}>{own ? 'Alterar' : 'Usar outro app'}</Button>}
+        <div><div className="card-title">Aplicativos da Meta</div><div className="card-sub">Cadastre um ou mais apps: cada um autoriza o login com o Facebook de contas diferentes.</div></div>
+        <Button variant={apps.length ? 'default' : 'primary'} onClick={() => open()}><Plus /> Adicionar aplicativo</Button>
+      </div>
+      {apps.length > 0 && apps.map((a) => (
+        <div key={a.id} className="acc">
+          <div className="acc-info">
+            <strong>{a.name}</strong>
+            <span className="card-sub">ID {a.appId} · {a.accountCount} {a.accountCount === 1 ? 'conta conectada' : 'contas conectadas'}{a.source === 'server' ? ' · configurado no servidor' : ''}</span>
+          </div>
+          {a.source === 'company' && (
+            <div className="toolbar">
+              <Button variant="ghost" onClick={() => open(a)}>Editar</Button>
+              <Button variant="ghost" className="btn-danger" onClick={() => confirm(`Remover “${a.name}”? As contas já conectadas continuam publicando, mas novos logins por este app deixam de funcionar.`) && remove.mutate(a.id)}>Remover</Button>
+            </div>
+          )}
         </div>
-      </div>
-      <div className="section-body">
-        {s?.configured && !editing ? (
-          <>
-            <div className="kvrow"><span>ID do app</span><span>{s.app.appId}</span></div>
-            <div className="kvrow"><span>Chave secreta</span><span>•••••••• (salva, criptografada)</span></div>
-            {own && <div className="toolbar" style={{ marginTop: 12 }}><Button variant="ghost" className="btn-danger" onClick={() => confirm('Remover o aplicativo? As contas já conectadas continuam, mas novos logins ficam bloqueados até cadastrar outro app.') && remove.mutate()}>Remover aplicativo</Button></div>}
-          </>
-        ) : (
-          <form onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
-            <ol className="steps-list">
-              <li>Em <strong>developers.facebook.com</strong>, crie um aplicativo do tipo <em>Empresa</em> e adicione o produto <strong>Login do Facebook</strong>.</li>
-              <li>Em “URIs de redirecionamento do OAuth válidos”, cadastre: <code style={{ overflowWrap: 'anywhere' }}>{s?.redirectUri}</code></li>
-              <li>Em <em>Configurações → Básico</em>, copie o <strong>ID do app</strong> e a <strong>chave secreta</strong> e cole abaixo.</li>
-              <li>Enquanto o app estiver em <em>modo de desenvolvimento</em>, só quem tem função no app consegue entrar. Para liberar a todos, envie o app para <strong>revisão da Meta</strong>.</li>
-            </ol>
-            {err != null && !Object.keys(fe).length && <div className="alert" style={{ margin: '12px 0' }}>{errorMessage(err)}</div>}
-            <div className="form-grid" style={{ marginTop: 12 }}>
-              <Field label="ID do app" error={fe.appId} hint="Só números, no topo das configurações do app."><Input required inputMode="numeric" value={f.appId || s?.app.appId || ''} onChange={(e) => setF({ ...f, appId: e.target.value })} placeholder="123456789012345" /></Field>
-              <Field label="Chave secreta do app" error={fe.appSecret} hint={own ? 'Já salva. Preencha somente para trocar.' : 'Fica criptografada e nunca é exibida de volta.'}>
-                <Input type="password" autoComplete="off" required={!own} value={f.appSecret} onChange={(e) => setF({ ...f, appSecret: e.target.value })} placeholder={own ? '•••••••• (salva)' : ''} />
-              </Field>
-            </div>
-            <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
-              {s?.configured && <Button type="button" variant="ghost" onClick={() => { setOpen(false); setErr(null); }}>Cancelar</Button>}
-              <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Validando com a Meta…' : 'Salvar aplicativo'}</Button>
-            </div>
-          </form>
-        )}
-      </div>
+      ))}
+      {!apps.length && !form && (
+        <div className="section-body"><div className="card-sub">Nenhum aplicativo cadastrado. Adicione o primeiro para poder entrar com o Facebook.</div></div>
+      )}
+      {form && (
+        <form className="section-body" style={{ borderTop: apps.length ? '1px solid var(--line)' : undefined }} onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
+          <ol className="steps-list">
+            <li>Em <strong>developers.facebook.com</strong>, crie um aplicativo do tipo <em>Empresa</em> e adicione o produto <strong>Login do Facebook</strong>.</li>
+            <li>Em “URIs de redirecionamento do OAuth válidos”, cadastre: <code style={{ overflowWrap: 'anywhere' }}>{s?.redirectUri}</code></li>
+            <li>Em <em>Configurações → Básico</em>, copie o <strong>ID do app</strong> e a <strong>chave secreta</strong> e cole abaixo.</li>
+            <li>Enquanto o app estiver em <em>modo de desenvolvimento</em>, só quem tem função no app consegue entrar. Para liberar a todos, envie o app para <strong>revisão da Meta</strong>.</li>
+          </ol>
+          {err != null && !Object.keys(fe).length && <div className="alert" style={{ margin: '12px 0' }}>{errorMessage(err)}</div>}
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <Field label="Nome" error={fe.name} className="span-2" hint="Só para você reconhecer, ex.: “App da matriz” ou “App do João”."><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={60} /></Field>
+            <Field label="ID do app" error={fe.appId} hint="Só números, no topo das configurações do app."><Input required inputMode="numeric" value={form.appId} onChange={(e) => setForm({ ...form, appId: e.target.value })} placeholder="123456789012345" /></Field>
+            <Field label="Chave secreta do app" error={fe.appSecret} hint={editing ? 'Já salva. Preencha somente para trocar.' : 'Fica criptografada e nunca é exibida de volta.'}>
+              <Input type="password" autoComplete="off" required={!editing} value={form.appSecret} onChange={(e) => setForm({ ...form, appSecret: e.target.value })} placeholder={editing ? '•••••••• (salva)' : ''} />
+            </Field>
+          </div>
+          <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => { setForm(null); setErr(null); }}>Cancelar</Button>
+            <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Validando com a Meta…' : 'Salvar aplicativo'}</Button>
+          </div>
+        </form>
+      )}
       {toast.node}
     </section>
   );
