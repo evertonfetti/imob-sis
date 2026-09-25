@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { ConversationDto, MessageDto, MessageStatus, SendMessageInput } from '@imob/types';
+import { resolveAgentSettings, type ConversationDto, type MessageDto, type MessageStatus, type SendMessageInput } from '@imob/types';
 import { AppException, notFound } from '../common/app-exception';
 import type { AuthedCtx, AuthedUser } from '../common/request-context';
 import { normalizePhone } from '../common/util';
@@ -154,8 +154,12 @@ export class WhatsappService {
           await tx.lead.update({ where: { id: lead.id }, data: { propertyId: property.id } });
         }
 
-        // Conversa encerrada que volta a falar: o atendimento recomeça com o agente de IA.
-        const reopened = conv?.status === 'CLOSED';
+        // Volta para o agente de IA quando: a conversa estava encerrada, ou uma pessoa atendia e a conversa ficou parada além do prazo configurado.
+        let reopened = conv?.status === 'CLOSED';
+        if (!reopened && conv?.handler === 'HUMAN' && conv.lastMessageAt) {
+          const cfg = resolveAgentSettings((await tx.company.findUnique({ where: { id: companyId }, select: { agentSettings: true } }))?.agentSettings);
+          reopened = cfg.enabled && cfg.returnToBotAfterHours > 0 && at.getTime() - conv.lastMessageAt.getTime() > cfg.returnToBotAfterHours * 3_600_000;
+        }
         const sessionStart = !conv?.lastInboundAt || at.getTime() - conv.lastInboundAt.getTime() > SESSION_GAP_MS;
         const convData = {
           leadId: lead.id, customerId: customer.id, contactName: profileName ?? conv?.contactName ?? customer.name, status: 'OPEN' as const,

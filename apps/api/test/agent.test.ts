@@ -395,6 +395,69 @@ describe('atendimento pelo WhatsApp', () => {
     expect((await call('POST', `/conversations/${c.id}/reopen`, 'admin')).json()).toMatchObject({ status: 'OPEN' });
   });
 
+  it('lead fechado/perdido finaliza a conversa: quando o cliente volta (como lead novo), o assistente atende sem ninguém devolver', async () => {
+    const FROM = '5511911110020';
+    llm = () => ({ out: { reply: 'Oi! Como posso ajudar?', actions: [] } });
+    await say(FROM, 'Olá, quero um apartamento');
+    const c = await conv(FROM);
+    const firstLead = await prisma.lead.findFirstOrThrow({ where: { customer: { phone: FROM.replace(/^55/, '') } } });
+    await call('POST', `/conversations/${c.id}/takeover`, 'admin'); // uma pessoa assumiu e conduziu a negociação
+    expect(await conv(FROM)).toMatchObject({ handler: 'HUMAN', status: 'OPEN' });
+    const stages = (await call('GET', '/pipeline', 'admin')).json().stages as { id: string; name: string }[];
+    expect((await call('POST', `/leads/${firstLead.id}/change-stage`, 'admin', { stageId: stages.find((x) => x.name === 'Fechado')!.id })).statusCode).toBe(200);
+    expect(await conv(FROM)).toMatchObject({ status: 'CLOSED' }); // finalizada automaticamente
+
+    sent.length = 0;
+    llm = () => ({ out: { reply: 'Que bom te ver de novo! Do que você precisa?', actions: [] } });
+    await say(FROM, 'Oi, voltei! Quero outro imóvel');
+    expect(await conv(FROM)).toMatchObject({ status: 'OPEN', handler: 'BOT', handoffReason: null });
+    expect(sentTo(FROM).map((o) => o.text)).toEqual(['Que bom te ver de novo! Do que você precisa?']);
+    const leads = await prisma.lead.findMany({ where: { customer: { phone: FROM.replace(/^55/, '') } } });
+    expect(leads).toHaveLength(2); // o cliente voltou como um lead novo
+    expect((await conv(FROM)).leadId).toBe(leads.find((l) => l.id !== firstLead.id)!.id);
+
+    // lead perdido também finaliza
+    const second = leads.find((l) => l.id !== firstLead.id)!;
+    await call('POST', `/conversations/${(await conv(FROM)).id}/takeover`, 'admin');
+    await call('POST', `/leads/${second.id}/change-stage`, 'admin', { stageId: stages.find((x) => x.name === 'Perdido')!.id, lostReason: 'Desistiu da compra' });
+    expect(await conv(FROM)).toMatchObject({ status: 'CLOSED' });
+  });
+
+  it('devolve ao assistente após inatividade (configurável): dentro do prazo continua com a pessoa; com 0 nunca devolve sozinho', async () => {
+    const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000);
+    const mk = async (from: string) => {
+      llm = () => ({ out: { reply: 'Olá!', actions: [] } });
+      await say(from, 'Oi');
+      const c = await conv(from);
+      await call('POST', `/conversations/${c.id}/takeover`, 'admin');
+      return c.id;
+    };
+    const A = '5511911110021'; const B = '5511911110022'; const C = '5511911110023';
+    const [ia, ib, ic] = [await mk(A), await mk(B), await mk(C)];
+
+    // desligado (0): mesmo parada há dias, continua com a pessoa
+    await prisma.conversation.update({ where: { id: ia }, data: { lastMessageAt: hoursAgo(72) } });
+    sent.length = 0;
+    await say(A, 'Alguém aí?');
+    expect(await conv(A)).toMatchObject({ handler: 'HUMAN' });
+    expect(sent).toHaveLength(0);
+
+    // 2 horas: parada há 3 h volta ao assistente; parada há 30 min continua com a pessoa
+    expect((await call('PUT', '/agent/settings', 'admin', { returnToBotAfterHours: 2 })).json().settings.returnToBotAfterHours).toBe(2);
+    await prisma.conversation.update({ where: { id: ib }, data: { lastMessageAt: hoursAgo(3) } });
+    await prisma.conversation.update({ where: { id: ic }, data: { lastMessageAt: new Date(Date.now() - 30 * 60_000) } });
+    llm = () => ({ out: { reply: 'Estou de volta! Como posso ajudar?', actions: [] } });
+    sent.length = 0;
+    await say(B, 'Voltei, e o valor?');
+    expect(await conv(B)).toMatchObject({ handler: 'BOT', handoffReason: null });
+    expect(sentTo(B).map((o) => o.text)).toEqual(['Estou de volta! Como posso ajudar?']);
+    await say(C, 'E aí, alguma novidade?');
+    expect(await conv(C)).toMatchObject({ handler: 'HUMAN' });
+    expect(sentTo(C)).toHaveLength(0);
+    expect((await call('PUT', '/agent/settings', 'admin', { returnToBotAfterHours: 800 })).statusCode).toBe(400);
+    await call('PUT', '/agent/settings', 'admin', { returnToBotAfterHours: 0 });
+  });
+
   it('não deixa o cliente no vazio: IA fora do ar, resposta fora do formato, só arquivo/áudio, limite de respostas e pessoa que assumiu durante a resposta', async () => {
     // IA indisponível → mensagem padrão + transferência + execução registrada como erro
     const A = '5511911110006';

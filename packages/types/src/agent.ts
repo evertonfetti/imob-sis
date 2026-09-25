@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ---------- Agente de atendimento por IA ----------
-export const AGENT_LIMITS = { maxReplies: [1, 200], maxPhotos: [0, 8], replyDelaySec: [0, 30] } as const;
+export const AGENT_LIMITS = { maxReplies: [1, 200], maxPhotos: [0, 8], replyDelaySec: [0, 30], returnToBotAfterHours: [0, 720] } as const;
 export const DEFAULT_AGENT_SETTINGS = {
   enabled: false,
   name: 'Assistente virtual',
@@ -16,6 +16,8 @@ export const DEFAULT_AGENT_SETTINGS = {
   maxPhotos: 4,
   /** Espera antes de responder (junta mensagens seguidas e parece mais natural). */
   replyDelaySec: 4,
+  /** Conversa com uma pessoa parada há mais que isso volta ao assistente na próxima mensagem do cliente (0 = só quando alguém devolver ou finalizar). */
+  returnToBotAfterHours: 0,
 };
 export type AgentSettings = typeof DEFAULT_AGENT_SETTINGS;
 export const agentSettingsSchema = z.object({
@@ -27,6 +29,7 @@ export const agentSettingsSchema = z.object({
   maxReplies: z.number().int().min(AGENT_LIMITS.maxReplies[0]).max(AGENT_LIMITS.maxReplies[1]),
   maxPhotos: z.number().int().min(AGENT_LIMITS.maxPhotos[0]).max(AGENT_LIMITS.maxPhotos[1]),
   replyDelaySec: z.number().int().min(AGENT_LIMITS.replyDelaySec[0]).max(AGENT_LIMITS.replyDelaySec[1]),
+  returnToBotAfterHours: z.number().int().min(AGENT_LIMITS.returnToBotAfterHours[0]).max(AGENT_LIMITS.returnToBotAfterHours[1]),
 }).partial();
 export type UpdateAgentSettingsInput = z.infer<typeof agentSettingsSchema>;
 export function resolveAgentSettings(saved: unknown): AgentSettings {

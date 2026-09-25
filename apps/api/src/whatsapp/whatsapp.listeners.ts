@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { CrmEvents, type LeadStageChangedEvent } from '../crm/crm.events';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappEvents, type WhatsappEvent } from './whatsapp.events';
 
@@ -19,4 +20,11 @@ export class WhatsappTimelineListener {
 
   @OnEvent(WhatsappEvents.Sent)
   async sent(e: WhatsappEvent) { if (e.sessionStart) await this.add(e, 'WHATSAPP_SENT', 'Mensagem enviada pelo WhatsApp'); }
+
+  /** Lead fechado (ganho ou perdido): a conversa é finalizada. Se o cliente voltar a escrever, ela reabre com o assistente de IA. */
+  @OnEvent(CrmEvents.LeadStageChanged)
+  async leadClosed(e: LeadStageChangedEvent) {
+    if (e.toType !== 'WON' && e.toType !== 'LOST') return;
+    await this.prisma.conversation.updateMany({ where: { companyId: e.companyId, leadId: e.leadId, status: 'OPEN' }, data: { status: 'CLOSED', unreadCount: 0 } });
+  }
 }

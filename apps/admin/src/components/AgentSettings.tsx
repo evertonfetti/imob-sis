@@ -29,7 +29,7 @@ export function AgentCard({ onGoToAccounts }: { onGoToAccounts: () => void }) {
   if (!q.data || !f) return <div className="card"><SkeletonRows rows={5} /></div>;
   const d = q.data;
   const changed = JSON.stringify(f) !== JSON.stringify(d.settings);
-  const num = (k: 'maxReplies' | 'maxPhotos' | 'replyDelaySec') => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value === '' ? ('' as never) : Number(e.target.value) });
+  const num = (k: 'maxReplies' | 'maxPhotos' | 'replyDelaySec' | 'returnToBotAfterHours') => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value === '' ? ('' as never) : Number(e.target.value) });
 
   return (
     <form className="card" onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
@@ -61,6 +61,9 @@ export function AgentCard({ onGoToAccounts }: { onGoToAccounts: () => void }) {
           <Field label="Máx. de respostas por conversa" hint={`De ${AGENT_LIMITS.maxReplies[0]} a ${AGENT_LIMITS.maxReplies[1]}. Depois disso, transfere para uma pessoa.`}><Input type="number" min={AGENT_LIMITS.maxReplies[0]} max={AGENT_LIMITS.maxReplies[1]} value={f.maxReplies} onChange={num('maxReplies')} /></Field>
           <Field label="Fotos por envio" hint="0 desliga o envio de fotos."><Input type="number" min={AGENT_LIMITS.maxPhotos[0]} max={AGENT_LIMITS.maxPhotos[1]} value={f.maxPhotos} onChange={num('maxPhotos')} /></Field>
           <Field label="Espera antes de responder (segundos)" hint="Junta mensagens seguidas e parece mais natural."><Input type="number" min={AGENT_LIMITS.replyDelaySec[0]} max={AGENT_LIMITS.replyDelaySec[1]} value={f.replyDelaySec} onChange={num('replyDelaySec')} /></Field>
+          <Field label="Devolver ao assistente após inatividade (horas)" className="span-2" hint="Se uma pessoa atendeu e a conversa ficou parada por esse tempo, o assistente volta a responder quando o cliente escrever de novo. 0 = só volta quando você devolver ou finalizar. Conversas de leads fechados ou perdidos são finalizadas automaticamente.">
+            <Input type="number" min={AGENT_LIMITS.returnToBotAfterHours[0]} max={AGENT_LIMITS.returnToBotAfterHours[1]} value={f.returnToBotAfterHours} onChange={num('returnToBotAfterHours')} style={{ maxWidth: 140 }} />
+          </Field>
           <div className="field"><label>Neste mês</label><div><strong style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 500 }}>{d.usage.replies}</strong> <span className="card-sub">atendimentos · {d.usage.handoffs} transferências · ≈ US$ {d.usage.costUsd.toFixed(2)}</span></div></div>
         </div>
         <div className="card-sub" style={{ marginTop: 12 }}>Como funciona: o assistente só atende conversas “com o robô”. Quando o cliente pede um atendente, ou o assistente não sabe responder, a conversa passa para uma pessoa e ele para de responder. Você pode assumir ou devolver ao robô a qualquer momento em <strong>Conversas</strong>; conversas finalizadas voltam ao assistente se o cliente escrever de novo.</div>
