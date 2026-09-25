@@ -58,6 +58,18 @@ export class ConversationsController {
 
   @Post(':id/messages') @RequirePermissions('lead.edit')
   send(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string, @Body(new ZodPipe(sendMessageSchema)) body: SendMessageInput): Promise<unknown> { return this.wa.send(c(ctx), id, body); }
+
+  @Post(':id/takeover') @HttpCode(200) @RequirePermissions('lead.edit')
+  takeover(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.wa.takeover(ctx as AuthedCtx, id); }
+
+  @Post(':id/return-to-bot') @HttpCode(200) @RequirePermissions('lead.edit')
+  returnToBot(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.wa.returnToBot(ctx as AuthedCtx, id); }
+
+  @Post(':id/close') @HttpCode(200) @RequirePermissions('lead.edit')
+  close(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.wa.close(ctx as AuthedCtx, id); }
+
+  @Post(':id/reopen') @HttpCode(200) @RequirePermissions('lead.edit')
+  reopen(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.wa.reopen(ctx as AuthedCtx, id); }
 }
 
 @Controller('messages')

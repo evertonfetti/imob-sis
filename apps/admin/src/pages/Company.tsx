@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Plus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
-import { AiProviderCard, WatermarkCard } from '../components/ImagesAiSettings';
+import { AgentActivityCard, AgentCard, KnowledgeCard, AgentTestCard } from '../components/AgentSettings';
+import { AiAccountsCard, AiDefaultsCard } from '../components/AiAccounts';
+import { WatermarkCard } from '../components/ImagesAiSettings';
 import { IntelligenceSettingsCard } from '../components/IntelligenceSettings';
 import { api } from '../lib/api';
 
@@ -14,7 +16,7 @@ interface Branch {
 }
 
 export function CompanyPage() {
-  const [tab, setTab] = useState<'company' | 'branches' | 'alerts' | 'images'>('company');
+  const [tab, setTab] = useState<'company' | 'branches' | 'alerts' | 'images' | 'agent'>('company');
   return (
     <>
       <PageHeader title="Empresa e filiais" subtitle="Dados institucionais e unidades de atendimento." />
@@ -23,8 +25,9 @@ export function CompanyPage() {
         <button className={`tab ${tab === 'branches' ? 'active' : ''}`} role="tab" onClick={() => setTab('branches')}>Filiais</button>
         <button className={`tab ${tab === 'alerts' ? 'active' : ''}`} role="tab" onClick={() => setTab('alerts')}>Alertas e automações</button>
         <button className={`tab ${tab === 'images' ? 'active' : ''}`} role="tab" onClick={() => setTab('images')}>Imagens e IA</button>
+        <button className={`tab ${tab === 'agent' ? 'active' : ''}`} role="tab" onClick={() => setTab('agent')}>Agente de atendimento</button>
       </div>
-      {tab === 'company' ? <CompanyForm /> : tab === 'branches' ? <Branches /> : tab === 'alerts' ? <IntelligenceSettingsCard /> : <div className="stack"><WatermarkCard /><AiProviderCard /></div>}
+      {tab === 'company' ? <CompanyForm /> : tab === 'branches' ? <Branches /> : tab === 'alerts' ? <IntelligenceSettingsCard /> : tab === 'images' ? <div className="stack"><AiAccountsCard /><AiDefaultsCard /><WatermarkCard /></div> : <div className="stack"><AgentCard onGoToAccounts={() => setTab('images')} /><KnowledgeCard /><AgentTestCard /><AgentActivityCard /></div>}
     </>
   );
 }

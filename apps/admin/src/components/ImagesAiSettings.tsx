@@ -1,6 +1,6 @@
 import {
-  AI_PROVIDER_INFO, WATERMARK_POSITION_LABELS,
-  type AiProviderId, type AiSettingsDto, type WatermarkDto, type WatermarkPosition, type WatermarkSettings,
+  WATERMARK_POSITION_LABELS,
+  type WatermarkDto, type WatermarkPosition, type WatermarkSettings,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, Trash2 } from 'lucide-react';
@@ -111,51 +111,5 @@ export function WatermarkCard() {
       </div>
       {toast.node}
     </section>
-  );
-}
-
-export function AiProviderCard() {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const q = useQuery({ queryKey: ['ai-settings'], queryFn: () => api<AiSettingsDto>('/ai/settings') });
-  const [f, setF] = useState<{ provider: AiProviderId; model: string; apiKey: string; monthlyLimit: number } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (q.data) setF({ provider: q.data.provider, model: q.data.provider === 'local' ? '' : (q.data.model ?? ''), apiKey: '', monthlyLimit: q.data.monthlyLimit }); }, [q.data]);
-  const save = useMutation({
-    mutationFn: () => api<AiSettingsDto>('/ai/settings', { method: 'PUT', body: { provider: f!.provider, ...(f!.provider !== 'local' && { model: f!.model || null }), ...(f!.apiKey && { apiKey: f!.apiKey }), monthlyLimit: Number(f!.monthlyLimit) } }),
-    onSuccess: (d) => { qc.setQueryData(['ai-settings'], d); qc.invalidateQueries({ queryKey: ['ai-status'] }); setErr(null); toast.show('Configuração de IA salva.'); },
-    onError: (e) => setErr(errorMessage(e)),
-  });
-  if (!q.data || !f) return <div className="card"><SkeletonRows rows={4} /></div>;
-  const info = AI_PROVIDER_INFO[f.provider];
-  const keyAlreadySet = q.data.provider === f.provider && q.data.keySet;
-  return (
-    <form className="card" onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
-      <div className="card-head"><div><div className="card-title">IA para editar fotos</div><div className="card-sub">Melhorar, remover objetos, esvaziar e decorar ambientes. Cada edição vira uma versão que você aprova antes de publicar.</div></div></div>
-      <div className="section-body">
-        {err && <div className="alert" style={{ marginBottom: 14 }}>{err}</div>}
-        <div className="form-grid">
-          <Field label="Provedor" className="span-2" hint={info.note}>
-            <Select value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value as AiProviderId, model: '', apiKey: '' })}>
-              {q.data.providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </Select>
-          </Field>
-          {f.provider !== 'local' && (
-            <>
-              <Field label="Chave de acesso (API key)" hint={keyAlreadySet ? 'Já salva. Preencha somente para trocar.' : 'Fica criptografada e nunca é exibida de volta. Validada antes de salvar.'}>
-                <Input type="password" autoComplete="off" required={!keyAlreadySet} value={f.apiKey} onChange={(e) => setF({ ...f, apiKey: e.target.value })} placeholder={keyAlreadySet ? '•••••••• (salva)' : ''} />
-              </Field>
-              <Field label="Modelo" hint={`Padrão: ${info.defaultModel}. Só mude se souber o que está fazendo.`}><Input value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder={info.defaultModel ?? ''} /></Field>
-              <Field label="Limite de edições por mês" hint="Protege contra gasto acidental. O provedor cobra por edição (≈ US$ 0,04 a 0,08)."><Input type="number" min={1} max={10000} required value={f.monthlyLimit} onChange={(e) => setF({ ...f, monthlyLimit: Number(e.target.value) })} style={{ maxWidth: 140 }} /></Field>
-              <div className="field"><label>Consumo neste mês</label><div><strong style={{ fontFamily: 'var(--serif)', fontSize: 22, fontWeight: 500 }}>{q.data.usage.generations}</strong> <span className="card-sub">edições · ≈ US$ {q.data.usage.cost.toFixed(2)} (estimativa)</span></div></div>
-            </>
-          )}
-        </div>
-        <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
-          <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Validando…' : 'Salvar'}</Button>
-        </div>
-      </div>
-      {toast.node}
-    </form>
   );
 }

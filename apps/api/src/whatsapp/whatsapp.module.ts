@@ -9,5 +9,6 @@ import { WhatsappService } from './whatsapp.service';
   imports: [CrmModule],
   controllers: [WhatsappWebhookController, ConversationsController, MessagesController, IntegrationsController],
   providers: [WhatsappService, IntegrationsService, WhatsappTimelineListener],
+  exports: [WhatsappService, IntegrationsService],
 })
 export class WhatsappModule {}

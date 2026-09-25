@@ -44,6 +44,8 @@ export interface MessageDto {
   status: MessageStatus;
   error: string | null;
   sentBy: string | null;
+  /** Enviada pelo agente de IA. */
+  sentByBot: boolean;
   createdAt: string;
   sentAt: string | null;
   deliveredAt: string | null;
@@ -55,6 +57,9 @@ export interface ConversationDto {
   contactName: string | null;
   phone: string;
   status: 'OPEN' | 'CLOSED';
+  /** Quem atende: o robô ou uma pessoa. Com HUMAN o agente de IA não responde. */
+  handler: 'BOT' | 'HUMAN';
+  handoffReason: string | null;
   unreadCount: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;

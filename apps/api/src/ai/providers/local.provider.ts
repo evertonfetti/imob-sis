@@ -23,8 +23,8 @@ export class LocalProvider implements AIImageProvider {
     return { image, model: 'local-sharp', costUsd: 0 };
   }
 
-  removeObject = async () => unsupported() as never;
-  removeFurniture = async () => unsupported() as never;
-  virtualStage = async () => unsupported() as never;
-  replaceSky = async () => unsupported() as never;
+  removeObject = async (_i: AiEditInput): Promise<AiEditResult> => unsupported();
+  removeFurniture = async (_i: AiEditInput): Promise<AiEditResult> => unsupported();
+  virtualStage = async (_i: AiEditInput): Promise<AiEditResult> => unsupported();
+  replaceSky = async (_i: AiEditInput): Promise<AiEditResult> => unsupported();
 }

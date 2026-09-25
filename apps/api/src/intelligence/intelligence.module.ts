@@ -13,5 +13,6 @@ import { ReportsService } from './reports.service';
   imports: [CrmModule],
   controllers: [IntelligenceController],
   providers: [IntelligenceSettingsService, LeadScoreService, MatchingService, ReportsService, AlertsService, IntelligenceListener, IntelligenceScheduler],
+  exports: [MatchingService],
 })
 export class IntelligenceModule {}

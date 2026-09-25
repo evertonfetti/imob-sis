@@ -3,7 +3,7 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import sharp from 'sharp';
 import {
-  AI_GENERATIVE_ONLY, type AiOperation, type AiProviderId, type CreateGenerationInput, type MediaGenerationDto, type MediaVersionsDto,
+  AI_GENERATIVE_ONLY, type AiOperation, type CreateGenerationInput, type MediaGenerationDto, type MediaVersionsDto,
 } from '@imob/types';
 import { AuditService } from '../audit/audit.service';
 import { AppException, notFound } from '../common/app-exception';
@@ -60,10 +60,10 @@ export class AiImagesService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ---------- DTOs ----------
-  private dto(g: Gen, activeId: string | null): MediaGenerationDto {
+  private dto(g: Gen, activeId: string | null, accounts: Map<string, string>): MediaGenerationDto {
     const url = (k: string | null) => (k ? this.storage.publicUrl(k) : null);
     return {
-      id: g.id, mediaId: g.mediaId, parentId: g.parentId, operation: g.operation, status: g.status, provider: g.provider, model: g.model, prompt: g.prompt,
+      id: g.id, mediaId: g.mediaId, parentId: g.parentId, operation: g.operation, status: g.status, provider: g.provider, model: g.model, accountName: g.accountId ? (accounts.get(g.accountId) ?? null) : null, prompt: g.prompt,
       style: ((g.options ?? {}) as { style?: string }).style ?? null, outputUrl: url(g.outputKey), thumbUrl: url(g.thumbKey), cost: g.cost == null ? null : Number(g.cost),
       error: g.error, durationMs: g.durationMs, active: g.id === activeId, approvedAt: g.approvedAt?.toISOString() ?? null, createdAt: g.createdAt.toISOString(),
     };
@@ -78,7 +78,9 @@ export class AiImagesService implements OnModuleInit, OnModuleDestroy {
   async versions(user: AuthedUser, mediaId: string): Promise<MediaVersionsDto> {
     const m = await this.loadMedia(user.companyId, mediaId);
     const gens = await this.prisma.mediaGeneration.findMany({ where: { mediaId }, orderBy: { createdAt: 'asc' } });
-    return { mediaId, originalUrl: this.storage.publicUrl(m.originalKey), activeGenerationId: m.activeGenerationId, generations: gens.map((g) => this.dto(g, m.activeGenerationId)) };
+    const ids = [...new Set(gens.map((g) => g.accountId).filter((x): x is string => !!x))];
+    const accounts = new Map((ids.length ? await this.prisma.aiAccount.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : []).map((a) => [a.id, a.name]));
+    return { mediaId, originalUrl: this.storage.publicUrl(m.originalKey), activeGenerationId: m.activeGenerationId, generations: gens.map((g) => this.dto(g, m.activeGenerationId, accounts)) };
   }
 
   // ---------- Pedido ----------
@@ -96,26 +98,27 @@ export class AiImagesService implements OnModuleInit, OnModuleDestroy {
       inputKey = parent.outputKey;
     }
 
-    const { id: providerId, model, provider } = await this.settings.resolve(companyId);
-    if (!provider.supports(op)) throw new AppException('AI_OPERATION_UNSUPPORTED', 400);
+    const chosen = await this.settings.resolve(companyId, op, input.modelId);
+    if (!chosen.provider.supports(op)) throw new AppException('AI_OPERATION_UNSUPPORTED', 400);
 
     // Uma edição por foto de cada vez (evita gastar duas vezes no mesmo clique).
     const busy = await this.prisma.mediaGeneration.findFirst({ where: { mediaId, status: { in: ['QUEUED', 'PROCESSING'] }, createdAt: { gte: new Date(Date.now() - STALE_MS) } } });
     if (busy) throw new AppException('AI_GENERATION_BUSY', 409);
     await this.prisma.mediaGeneration.updateMany({ where: { mediaId, status: { in: ['QUEUED', 'PROCESSING'] }, createdAt: { lt: new Date(Date.now() - STALE_MS) } }, data: { status: 'FAILED', error: 'A edição não terminou e foi cancelada.' } });
 
-    if (providerId !== 'local') {
+    if (chosen.providerId !== 'local') {
       const [usage, limit] = await Promise.all([this.settings.usage(companyId), this.settings.monthlyLimit(companyId)]);
       if (usage.generations >= limit) throw new AppException('AI_LIMIT_REACHED', 429);
     }
 
     const gen = await this.prisma.mediaGeneration.create({
       data: {
-        companyId, propertyId: m.propertyId, mediaId, userId: ctx.user.id, parentId: input.parentId ?? null, operation: op, provider: providerId, model,
-        prompt: input.prompt?.trim() || null, options: input.style ? { style: input.style } : undefined, inputKey,
+        companyId, propertyId: m.propertyId, mediaId, userId: ctx.user.id, parentId: input.parentId ?? null, operation: op, provider: chosen.providerId, model: chosen.model,
+        accountId: chosen.accountId, modelId: chosen.providerId === 'local' ? null : chosen.id,
+        prompt: input.prompt?.trim() || null, options: { ...(input.style && { style: input.style }), costUsd: chosen.costUsd }, inputKey,
       },
     });
-    await this.audit.record({ companyId, entity: 'PROPERTY', entityId: m.propertyId, action: 'AI_GENERATE', after: { mediaId, operation: op, provider: providerId, generationId: gen.id }, ctx });
+    await this.audit.record({ companyId, entity: 'PROPERTY', entityId: m.propertyId, action: 'AI_GENERATE', after: { mediaId, operation: op, provider: chosen.providerId, model: chosen.model, account: chosen.accountName, generationId: gen.id }, ctx });
     await this.dispatch(gen.id);
     return this.versions(ctx.user, mediaId);
   }
@@ -127,7 +130,7 @@ export class AiImagesService implements OnModuleInit, OnModuleDestroy {
     const g = await this.prisma.mediaGeneration.findUniqueOrThrow({ where: { id } });
     const started = Date.now();
     try {
-      const provider = await this.settings.resolveById(g.companyId, g.provider as AiProviderId);
+      const provider = await this.settings.forGeneration(g);
       const src = await this.storage.read(g.inputKey);
       const prepared = await sharp(src).rotate().resize({ width: INPUT_MAX, height: INPUT_MAX, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer({ resolveWithObject: true });
       const style = ((g.options ?? {}) as { style?: string }).style ?? null;

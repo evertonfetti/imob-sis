@@ -1,6 +1,6 @@
 import type { ConversationDto, MessageDto, Paginated } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, CheckCheck, Clock, FileText, MessageCircle, Search, Send } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Clock, FileText, MessageCircle, Search, Send, Bot, UserRound, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StagePill } from '../components/crm';
@@ -46,7 +46,7 @@ export function Conversations() {
               <div key={c.id} className={`conv ${c.id === id ? 'active' : ''}`} role="button" tabIndex={0} onClick={() => nav(`/conversas/${c.id}`)} onKeyDown={(e) => e.key === 'Enter' && nav(`/conversas/${c.id}`)}>
                 <div className="avatar">{initials(c.contactName ?? c.phone)}</div>
                 <div className="conv-body">
-                  <div className="conv-top"><span className="conv-name">{c.contactName ?? phoneOf(c.phone)}</span><span className="conv-time">{c.lastMessageAt ? timeAgo(c.lastMessageAt) : ''}</span></div>
+                  <div className="conv-top"><span className="conv-name">{c.contactName ?? phoneOf(c.phone)}{c.status === 'OPEN' && c.handler === 'BOT' && <Bot size={12} style={{ marginLeft: 6, verticalAlign: -1, color: 'var(--accent)' }} aria-label="Atendido pelo assistente de IA" />}</span><span className="conv-time">{c.lastMessageAt ? timeAgo(c.lastMessageAt) : ''}</span></div>
                   <div className="conv-prev"><span>{c.lastMessagePreview ?? '—'}</span>{c.unreadCount > 0 && <span className="unread">{c.unreadCount}</span>}</div>
                   {c.lead && <div className="card-sub" style={{ marginTop: 3, fontSize: 12 }}><StagePill stage={c.lead.stage} />{c.lead.property ? ` · ${c.lead.property.code}` : ''}</div>}
                 </div>
@@ -82,6 +82,12 @@ function ThreadView({ id }: { id: string }) {
     onSuccess: () => { setText(''); setTpl(false); setT({ name: '', language: 'pt_BR', params: '' }); refresh(); },
     onError: (e) => { toast.show(errorMessage(e)); refresh(); },
   });
+  // Quem atende: assumir (robô sai), devolver (robô volta na próxima mensagem do cliente), finalizar/reabrir.
+  const control = useMutation({
+    mutationFn: (action: 'takeover' | 'return-to-bot' | 'close' | 'reopen') => api(`/conversations/${id}/${action}`, { method: 'POST' }),
+    onSuccess: (_r, action) => { refresh(); toast.show(action === 'takeover' ? 'Você assumiu a conversa. O assistente não responde mais.' : action === 'return-to-bot' ? 'Devolvida ao assistente: ele volta a responder na próxima mensagem do cliente.' : action === 'close' ? 'Conversa finalizada. Se o cliente escrever de novo, o assistente atende.' : 'Conversa reaberta.'); },
+    onError: (e) => toast.show(errorMessage(e)),
+  });
   const retry = useMutation({ mutationFn: (mid: string) => api(`/messages/${mid}/retry`, { method: 'POST' }), onSuccess: refresh, onError: (e) => { toast.show(errorMessage(e)); refresh(); } });
 
   if (q.isLoading) return <div className="thread"><div style={{ padding: 20 }}><SkeletonRows rows={6} /></div></div>;
@@ -103,6 +109,15 @@ function ThreadView({ id }: { id: string }) {
           <div className="avatar">{initials(c.contactName ?? c.phone)}</div>
           <div style={{ minWidth: 0 }}><strong>{c.contactName ?? phoneOf(c.phone)}</strong><div className="card-sub">{phoneOf(c.phone)}</div></div>
         </div>
+        <div className="toolbar" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {c.status === 'CLOSED' ? <Badge plain>Finalizada</Badge> : <Badge tone={c.handler === 'BOT' ? 'accent' : 'ok'}>{c.handler === 'BOT' ? <><Bot size={12} style={{ marginRight: 4, verticalAlign: -1 }} />Assistente IA</> : <><UserRound size={12} style={{ marginRight: 4, verticalAlign: -1 }} />Atendimento humano</>}</Badge>}
+          {canSend && c.status === 'OPEN' && (c.handler === 'BOT'
+            ? <Button className="btn-sm" onClick={() => control.mutate('takeover')} disabled={control.isPending}><UserRound /> Assumir</Button>
+            : <Button className="btn-sm" onClick={() => control.mutate('return-to-bot')} disabled={control.isPending} title="O assistente volta a responder na próxima mensagem do cliente"><RotateCcw /> Devolver ao robô</Button>)}
+          {canSend && (c.status === 'OPEN'
+            ? <Button className="btn-sm" variant="ghost" onClick={() => confirm('Finalizar esta conversa? Se o cliente escrever de novo, ela reabre e o assistente volta a atender.') && control.mutate('close')} disabled={control.isPending}><CheckCircle2 /> Finalizar</Button>
+            : <Button className="btn-sm" variant="ghost" onClick={() => control.mutate('reopen')} disabled={control.isPending}>Reabrir</Button>)}
+        </div>
         {c.lead && (
           <div className="toolbar">
             <StagePill stage={c.lead.stage} />
@@ -112,6 +127,7 @@ function ThreadView({ id }: { id: string }) {
         )}
       </div>
 
+      {c.status === 'OPEN' && (c.handler === 'HUMAN' ? c.handoffReason && <div className="handler-banner human"><UserRound size={14} /> Com uma pessoa · {c.handoffReason}</div> : <div className="handler-banner"><Bot size={14} /> O assistente de IA está atendendo. Se você responder, assume a conversa.</div>)}
       <div className="thread-msgs">
         {c.messages.map((m) => {
           const day = dayLabel(m.createdAt);
@@ -173,6 +189,7 @@ function Bubble({ m, onRetry, canRetry }: { m: MessageDto; onRetry: () => void; 
       {m.hasMedia && <Media m={m} />}
       {showText && <div className="bubble-text">{m.content}</div>}
       <div className="bubble-meta">
+        {out && m.sentByBot && <span><Bot size={11} style={{ verticalAlign: -1 }} /> Assistente IA ·</span>}
         {out && m.sentBy && <span>{m.sentBy} ·</span>}
         <span>{time(m.createdAt)}</span>
         {out && m.status === 'QUEUED' && <Clock />}

@@ -30,6 +30,15 @@ export class MetaClient {
     return r.messages[0]!.id;
   }
 
+  /** Imagem por link público (o WhatsApp baixa o arquivo); a legenda é opcional. */
+  async sendImage(to: string, link: string, caption?: string): Promise<string> {
+    const r = await this.request<{ messages: { id: string }[] }>(`${this.cfg.phoneNumberId}/messages`, {
+      method: 'POST',
+      body: { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'image', image: { link, ...(caption && { caption }) } },
+    });
+    return r.messages[0]!.id;
+  }
+
   async sendTemplate(to: string, name: string, language: string, params: string[] = []): Promise<string> {
     const r = await this.request<{ messages: { id: string }[] }>(`${this.cfg.phoneNumberId}/messages`, {
       method: 'POST',

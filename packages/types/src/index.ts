@@ -12,3 +12,4 @@ export * from './social';
 export * from './commercial';
 export * from './intelligence';
 export * from './ai';
+export * from './agent';

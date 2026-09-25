@@ -10,6 +10,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
+import { AgentModule } from './agent/agent.module';
 import { AiModule } from './ai/ai.module';
 import { CommercialModule } from './commercial/commercial.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
@@ -47,6 +48,7 @@ export class AppModule {
         CatalogModule,
         MediaModule,
         AiModule,
+        AgentModule,
         CrmModule,
         CommercialModule,
         IntelligenceModule,

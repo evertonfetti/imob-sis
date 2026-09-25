@@ -1,12 +1,12 @@
 import {
-  AI_GENERATIVE_ONLY, AI_OPERATIONS, AI_OPERATION_HINTS, AI_OPERATION_LABELS, STAGING_STYLES, STAGING_STYLE_LABELS,
-  type AiOperation, type AiSettingsDto, type MediaGenerationDto, type MediaItem, type MediaVersionsDto,
+  AI_OPERATIONS, AI_OPERATION_HINTS, AI_OPERATION_LABELS, AI_TIER_LABELS, STAGING_STYLES, STAGING_STYLE_LABELS,
+  type AiOperation, type AiStatusDto, type MediaGenerationDto, type MediaItem, type MediaVersionsDto,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Armchair, Check, Eraser, ImageDown, Lightbulb, Sparkles, Sun, Trash2, Undo2, Wand2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
-import { Badge, Button, Input, Modal, Select, Spinner, errorMessage } from './ui';
+import { Badge, Button, Field, Input, Modal, Select, Spinner, errorMessage } from './ui';
 
 const ICONS: Record<AiOperation, ReactNode> = {
   ENHANCE: <Wand2 />, LIGHTING: <Lightbulb />, REMOVE_OBJECT: <Eraser />, REMOVE_FURNITURE: <ImageDown />, VIRTUAL_STAGE: <Armchair />, SKY_REPLACEMENT: <Sun />,
@@ -35,9 +35,10 @@ export function AiStudio({ media, onClose }: { media: MediaItem; onClose: () => 
   const [style, setStyle] = useState<(typeof STAGING_STYLES)[number]>('moderno');
   const [selected, setSelected] = useState<string | 'original' | null>(null);
   const [from, setFrom] = useState<string | null>(null); // versão usada como ponto de partida (null = original)
+  const [modelId, setModelId] = useState(''); // '' = automático (padrão da operação / da empresa)
   const [error, setError] = useState<string | null>(null);
 
-  const status = useQuery({ queryKey: ['ai-status'], queryFn: () => api<AiSettingsDto>('/ai/status') });
+  const status = useQuery({ queryKey: ['ai-status'], queryFn: () => api<AiStatusDto>('/ai/status') });
   const versions = useQuery({
     queryKey: ['media-versions', media.id],
     queryFn: () => api<MediaVersionsDto>(`/media/${media.id}/versions`),
@@ -51,7 +52,7 @@ export function AiStudio({ media, onClose }: { media: MediaItem; onClose: () => 
   const fail = (e: unknown) => setError(errorMessage(e));
 
   const create = useMutation({
-    mutationFn: () => api<MediaVersionsDto>(`/media/${media.id}/generations`, { method: 'POST', body: { operation: op, prompt: prompt.trim() || null, ...(op === 'VIRTUAL_STAGE' && { style }), parentId: from } }),
+    mutationFn: () => api<MediaVersionsDto>(`/media/${media.id}/generations`, { method: 'POST', body: { operation: op, prompt: prompt.trim() || null, ...(op === 'VIRTUAL_STAGE' && { style }), parentId: from, ...(modelId && { modelId }) } }),
     onSuccess: (d) => { done(d); setPrompt(''); const last = d.generations.at(-1); if (last) setSelected(last.id); },
     onError: fail,
   });
@@ -62,10 +63,14 @@ export function AiStudio({ media, onClose }: { media: MediaItem; onClose: () => 
   const sel: MediaGenerationDto | null = gens.find((g) => g.id === (selected ?? v?.activeGenerationId ?? gens.filter((x) => x.status === 'READY').at(-1)?.id)) ?? null;
   const showing = selected === 'original' ? null : sel;
   const base = showing?.parentId ? gens.find((g) => g.id === showing.parentId)?.outputUrl ?? v?.originalUrl : v?.originalUrl;
-  const local = status.data?.provider === 'local';
-  const blocked = local && AI_GENERATIVE_ONLY.includes(op);
+  const choices = status.data?.choices ?? [];
+  const chosen = choices.find((c) => c.id === modelId) ?? null;
+  const anySupports = (o: AiOperation) => choices.some((c) => c.operations.includes(o));
+  const blocked = chosen ? !chosen.operations.includes(op) : !anySupports(op);
+  const autoModel = choices.find((c) => c.id === (status.data?.operationDefaults[op] ?? status.data?.defaultModelId)) ?? null;
   const needsPrompt = op === 'REMOVE_OBJECT';
-  const limitReached = !!status.data && status.data.provider !== 'local' && status.data.usage.generations >= status.data.monthlyLimit;
+  const paid = chosen ? chosen.id !== 'local' : autoModel ? autoModel.id !== 'local' : choices.length > 1;
+  const limitReached = !!status.data && paid && status.data.usage.generations >= status.data.monthlyLimit;
 
   return (
     <Modal title="Editar foto com IA" onClose={onClose} wide>
@@ -113,9 +118,9 @@ export function AiStudio({ media, onClose }: { media: MediaItem; onClose: () => 
           <div className="chip-label">O que fazer com a foto?</div>
           <div className="ai-ops">
             {AI_OPERATIONS.map((o) => {
-              const off = local && AI_GENERATIVE_ONLY.includes(o);
+              const off = !anySupports(o);
               return (
-                <button type="button" key={o} className={`ai-op ${op === o ? 'on' : ''} ${off ? 'off' : ''}`} onClick={() => setOp(o)} title={off ? 'Precisa de um provedor de IA configurado' : undefined}>
+                <button type="button" key={o} className={`ai-op ${op === o ? 'on' : ''} ${off ? 'off' : ''}`} onClick={() => setOp(o)} title={off ? 'Precisa de um modelo de IA de imagem configurado' : undefined}>
                   {ICONS[o]}<span><strong>{AI_OPERATION_LABELS[o]}</strong><small>{AI_OPERATION_HINTS[o]}</small></span>
                 </button>
               );
@@ -129,7 +134,19 @@ export function AiStudio({ media, onClose }: { media: MediaItem; onClose: () => 
               <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Pedido extra (opcional)" maxLength={500} />
             </div>
           )}
-          {blocked && <div className="alert">Esta edição precisa de um provedor de IA (Google Gemini ou OpenAI). Peça a quem administra a empresa para configurar em <strong>Empresa → Imagens e IA</strong>.</div>}
+          {blocked && <div className="alert">{chosen ? 'O modelo escolhido não faz esta edição.' : 'Esta edição precisa de um modelo de IA de imagem (Google Gemini ou OpenAI).'} Peça a quem administra a empresa para configurar em <strong>Empresa → Imagens e IA</strong>.</div>}
+          {choices.length > 1 && (
+            <Field label="Modelo de IA">
+              <Select value={modelId} onChange={(e) => setModelId(e.target.value)}>
+                <option value="">Automático{autoModel ? ` · ${autoModel.label}` : ''}</option>
+                {(['ECONOMIC', 'STANDARD', 'PREMIUM'] as const).map((t) => {
+                  const list = choices.filter((c) => c.tier === t);
+                  return list.length ? <optgroup key={t} label={AI_TIER_LABELS[t]}>{list.map((c) => <option key={c.id} value={c.id}>{c.label} · {c.accountName} · ≈ US$ {c.costUsd.toFixed(2)}</option>)}</optgroup> : null;
+                })}
+                <option value="local">Básico (servidor, sem custo)</option>
+              </Select>
+            </Field>
+          )}
           {error && <div className="alert">{error}</div>}
           {from && <div className="card-sub">Partindo da versão {gens.findIndex((g) => g.id === from) + 1}. <button type="button" className="linklike" onClick={() => setFrom(null)}>Usar o original</button></div>}
           <Button variant="primary" block onClick={() => { setError(null); create.mutate(); }} disabled={create.isPending || busy || blocked || limitReached || (needsPrompt && !prompt.trim())}>
@@ -137,7 +154,7 @@ export function AiStudio({ media, onClose }: { media: MediaItem; onClose: () => 
           </Button>
           {status.data && (
             <div className="card-sub">
-              {status.data.provider === 'local' ? 'Modo básico: sem custo.' : `${status.data.usage.generations} de ${status.data.monthlyLimit} edições neste mês · ≈ US$ ${status.data.usage.cost.toFixed(2)}`}
+              {choices.length <= 1 ? 'Modo básico: sem custo.' : `${status.data.usage.generations} de ${status.data.monthlyLimit} edições neste mês · ≈ US$ ${status.data.usage.cost.toFixed(2)}`}
               {limitReached && <strong style={{ color: 'var(--danger)' }}> Limite mensal atingido.</strong>}
             </div>
           )}

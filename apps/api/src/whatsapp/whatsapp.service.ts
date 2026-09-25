@@ -154,10 +154,13 @@ export class WhatsappService {
           await tx.lead.update({ where: { id: lead.id }, data: { propertyId: property.id } });
         }
 
+        // Conversa encerrada que volta a falar: o atendimento recomeça com o agente de IA.
+        const reopened = conv?.status === 'CLOSED';
         const sessionStart = !conv?.lastInboundAt || at.getTime() - conv.lastInboundAt.getTime() > SESSION_GAP_MS;
         const convData = {
           leadId: lead.id, customerId: customer.id, contactName: profileName ?? conv?.contactName ?? customer.name, status: 'OPEN' as const,
           lastMessageAt: at, lastInboundAt: at, lastMessagePreview: preview(parsed.content),
+          ...(reopened && { handler: 'BOT' as const, botReplies: 0, handoffReason: null, handlerChangedAt: at }),
         };
         conv = conv
           ? await tx.conversation.update({ where: { id: conv.id }, data: { ...convData, unreadCount: { increment: 1 } } })
@@ -218,7 +221,7 @@ export class WhatsappService {
     const last = c.lastInboundAt as Date | null;
     const open = !!last && Date.now() - last.getTime() < WINDOW_MS;
     return {
-      id: c.id, contactName: c.contactName, phone: c.externalId, status: c.status, unreadCount: c.unreadCount,
+      id: c.id, contactName: c.contactName, phone: c.externalId, status: c.status, handler: c.handler, handoffReason: c.handoffReason ?? null, unreadCount: c.unreadCount,
       lastMessageAt: c.lastMessageAt?.toISOString() ?? null, lastMessagePreview: c.lastMessagePreview,
       windowOpen: open, windowClosesAt: open && last ? new Date(last.getTime() + WINDOW_MS).toISOString() : null,
       lead: c.lead ? { id: c.lead.id, stage: c.lead.stage ?? null, broker: c.lead.broker ?? null, property: c.lead.property ?? null } : null,
@@ -264,7 +267,7 @@ export class WhatsappService {
     return rows.map((m) => ({
       id: m.id, direction: m.direction, type: m.type, content: m.content, hasMedia: !!m.mediaId || !!m.mediaKey, mediaMime: m.mediaMime,
       mediaUrl: m.mediaKey ? this.storage.publicUrl(m.mediaKey) : null, status: m.status, error: m.error,
-      sentBy: m.sentByUserId ? (names.get(m.sentByUserId) ?? null) : null,
+      sentBy: m.sentByUserId ? (names.get(m.sentByUserId) ?? null) : null, sentByBot: !!m.sentByBot,
       createdAt: m.createdAt.toISOString(), sentAt: m.sentAt?.toISOString() ?? null, deliveredAt: m.deliveredAt?.toISOString() ?? null, readAt: m.readAt?.toISOString() ?? null,
     }));
   }
@@ -296,6 +299,8 @@ export class WhatsappService {
       const last = c.lastInboundAt;
       if (!last || Date.now() - last.getTime() > WINDOW_MS) throw new AppException('WHATSAPP_WINDOW_CLOSED', 422);
     }
+    // Quando uma pessoa responde, o robô sai da conversa (até alguém devolver ou a conversa ser encerrada).
+    if (c.handler === 'BOT') await this.setHandler(c.id, 'HUMAN', `${ctx.user.name ?? 'Um corretor'} assumiu a conversa`);
     const isTemplate = !!input.template;
     const msg = await this.prisma.message.create({
       data: {
@@ -304,7 +309,7 @@ export class WhatsappService {
         payload: isTemplate ? input.template : undefined,
       },
     });
-    return this.deliver(ctx.user, c, msg);
+    return this.deliver(ctx.user.companyId, ctx.user.id, c, msg);
   }
 
   async retry(ctx: AuthedCtx, messageId: string) {
@@ -314,27 +319,78 @@ export class WhatsappService {
     const c = await this.load(ctx.user, msg.conversationId);
     if (msg.type === 'text' && (!c.lastInboundAt || Date.now() - c.lastInboundAt.getTime() > WINDOW_MS)) throw new AppException('WHATSAPP_WINDOW_CLOSED', 422);
     await this.prisma.message.update({ where: { id: msg.id }, data: { status: 'QUEUED', error: null } });
-    return this.deliver(ctx.user, c, msg);
+    return this.deliver(ctx.user.companyId, ctx.user.id, c, msg);
   }
 
-  private async deliver(user: AuthedUser, c: Row, msg: Row) {
-    const client = await this.integrations.clientFor(user.companyId);
+  private async deliver(companyId: string, userId: string | null, c: Row, msg: Row) {
+    const client = await this.integrations.clientFor(companyId);
     try {
       const tpl = msg.type === 'template' ? (msg.payload as { name: string; language: string; params?: string[] }) : null;
-      const wamid = tpl ? await client.sendTemplate(c.externalId, tpl.name, tpl.language, tpl.params) : await client.sendText(c.externalId, msg.content);
+      const wamid = tpl ? await client.sendTemplate(c.externalId, tpl.name, tpl.language, tpl.params)
+        : msg.type === 'image' ? await client.sendImage(c.externalId, (msg.payload as { link: string }).link, msg.content ?? undefined)
+        : await client.sendText(c.externalId, msg.content);
       const now = new Date();
       const updated = await this.prisma.message.update({ where: { id: msg.id }, data: { externalId: wamid, status: 'SENT', sentAt: now, error: null } });
       await this.prisma.conversation.update({ where: { id: c.id }, data: { lastMessageAt: now, lastMessagePreview: preview(msg.content) } });
       if (c.leadId) {
         const recentOut = await this.prisma.message.count({ where: { conversationId: c.id, direction: 'OUTBOUND', id: { not: msg.id }, createdAt: { gte: new Date(Date.now() - SESSION_GAP_MS) } } });
-        await this.emit(WhatsappEvents.Sent, { companyId: user.companyId, leadId: c.leadId, userId: user.id, conversationId: c.id, preview: preview(msg.content), sessionStart: recentOut === 0 });
+        await this.emit(WhatsappEvents.Sent, { companyId, leadId: c.leadId, userId, conversationId: c.id, preview: preview(msg.content), sessionStart: recentOut === 0 });
       }
-      return (await this.messageDtos(user.companyId, [updated]))[0]!;
+      return (await this.messageDtos(companyId, [updated]))[0]!;
     } catch (e) {
       const reason = e instanceof MetaApiError ? e.message : 'Erro de conexão com a Meta';
       await this.prisma.message.update({ where: { id: msg.id }, data: { status: 'FAILED', error: preview(reason, 300) } });
       throw new AppException('WHATSAPP_SEND_FAILED', 502, `Não foi possível enviar: ${reason}`);
     }
+  }
+
+  // ====================================================================
+  // Quem atende (robô ou pessoa)
+  // ====================================================================
+  private setHandler(id: string, handler: 'BOT' | 'HUMAN', reason: string | null) {
+    return this.prisma.conversation.update({ where: { id }, data: { handler, handoffReason: handler === 'HUMAN' ? reason : null, handlerChangedAt: new Date(), ...(handler === 'BOT' && { botReplies: 0 }) } });
+  }
+
+  /** Uma pessoa assume: o agente de IA deixa de responder. */
+  async takeover(ctx: AuthedCtx, id: string) {
+    const c = await this.load(ctx.user, id);
+    if (c.handler !== 'HUMAN') await this.setHandler(id, 'HUMAN', `${ctx.user.name ?? 'Um corretor'} assumiu a conversa`);
+    return this.get(ctx.user, id);
+  }
+
+  /** Devolve ao agente: ele volta a responder na próxima mensagem do cliente (não puxa assunto sozinho). */
+  async returnToBot(ctx: AuthedCtx, id: string) {
+    const c = await this.load(ctx.user, id);
+    if (c.handler !== 'BOT') await this.setHandler(id, 'BOT', null);
+    return this.get(ctx.user, id);
+  }
+
+  /** Marca a conversa como finalizada. Se o cliente escrever de novo, ela reabre e o agente volta a atender. */
+  async close(ctx: AuthedCtx, id: string) {
+    await this.load(ctx.user, id);
+    await this.prisma.conversation.update({ where: { id }, data: { status: 'CLOSED', unreadCount: 0 } });
+    return this.get(ctx.user, id);
+  }
+
+  async reopen(ctx: AuthedCtx, id: string) {
+    await this.load(ctx.user, id);
+    await this.prisma.conversation.update({ where: { id }, data: { status: 'OPEN' } });
+    return this.get(ctx.user, id);
+  }
+
+  /** Envio feito pelo agente de IA (texto ou foto por link). Não muda quem atende. Falha de envio só é registrada. */
+  async sendAsBot(companyId: string, conversationId: string, m: { text?: string; image?: { url: string; caption?: string; mediaKey?: string | null }; ai?: object }): Promise<boolean> {
+    const c = await this.prisma.conversation.findFirst({ where: { id: conversationId, companyId } });
+    if (!c) return false;
+    const isImage = !!m.image;
+    const msg = await this.prisma.message.create({
+      data: {
+        companyId, conversationId, direction: 'OUTBOUND', type: isImage ? 'image' : 'text', status: 'QUEUED', sentByBot: true,
+        content: isImage ? (m.image!.caption ?? '[Imagem]') : m.text, mediaKey: m.image?.mediaKey ?? null, mediaMime: isImage ? 'image/webp' : null,
+        payload: { ...(isImage && { link: m.image!.url }), ai: m.ai ?? {} } as never,
+      },
+    });
+    try { await this.deliver(companyId, null, c, msg); return true; } catch { return false; }
   }
 
   // ====================================================================
