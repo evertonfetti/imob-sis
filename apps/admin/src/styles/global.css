@@ -664,3 +664,46 @@ table.table { width: 100%; border-collapse: collapse; }
 @media (max-width: 520px) { .funnel-row { grid-template-columns: 90px 1fr 60px; } }
 .section-line { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0 12px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
 .section-line a { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--accent); }
+
+/* ---------- IA de imagens e marca d'água ---------- */
+.modal.modal-wide { width: min(1080px, 96vw); max-width: none; }
+.ai-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.55fr) minmax(280px, 1fr); }
+.ai-main { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.ai-stage { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-2); min-height: 200px; }
+.ai-single { width: 100%; display: block; }
+.compare { position: relative; user-select: none; line-height: 0; }
+.compare img { width: 100%; display: block; }
+.compare-top { position: absolute; inset: 0; }
+.compare-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); pointer-events: none; }
+.compare-range { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: ew-resize; margin: 0; }
+.compare-tag { position: absolute; top: 10px; padding: 3px 9px; font-size: 11px; line-height: 1.4; border-radius: 999px; background: rgba(20,24,22,.62); color: #fff; }
+.compare-tag.left { left: 10px; } .compare-tag.right { right: 10px; }
+.ai-versions { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.ai-ver { flex: none; width: 104px; display: grid; gap: 4px; padding: 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: left; cursor: pointer; position: relative; }
+.ai-ver.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ai-ver.bad { border-color: var(--danger); }
+.ai-ver img, .ai-ver-ph { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 5px; background: var(--surface-2); display: grid; place-items: center; }
+.ai-ver span { font-size: 11.5px; line-height: 1.25; color: var(--ink-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ai-ver i { position: absolute; top: 9px; left: 9px; font-style: normal; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.ai-selected { display: grid; gap: 10px; }
+.ai-side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.ai-ops { display: grid; gap: 6px; }
+.ai-op { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: left; cursor: pointer; }
+.ai-op:hover { border-color: var(--faint); }
+.ai-op.on { border-color: var(--accent); background: var(--accent-soft); }
+.ai-op.off { opacity: .55; }
+.ai-op svg { flex: none; width: 18px; height: 18px; margin-top: 2px; color: var(--accent); }
+.ai-op span { display: grid; gap: 1px; min-width: 0; }
+.ai-op strong { font-weight: 550; font-size: 13.5px; }
+.ai-op small { color: var(--muted); font-size: 12px; }
+.linklike { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+.pill.ai { left: auto; right: 8px; background: var(--accent); color: var(--accent-ink); }
+.wm-preview { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: linear-gradient(135deg, #c9d3cc, #e9e4d8 55%, #b9c4bd); aspect-ratio: 3 / 2; }
+.wm-preview > img.bg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wm-preview > img.mark { position: absolute; height: auto; pointer-events: none; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 34px); gap: 4px; }
+.pos-grid button { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); cursor: pointer; }
+.pos-grid button.on { background: var(--accent); border-color: var(--accent); }
+.pos-grid button:disabled { visibility: hidden; }
+input[type=range].slider { width: 100%; accent-color: var(--accent); }
+@media (max-width: 900px) { .ai-grid { grid-template-columns: 1fr; } }

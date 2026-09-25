@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Plus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
+import { AiProviderCard, WatermarkCard } from '../components/ImagesAiSettings';
 import { IntelligenceSettingsCard } from '../components/IntelligenceSettings';
 import { api } from '../lib/api';
 
@@ -13,7 +14,7 @@ interface Branch {
 }
 
 export function CompanyPage() {
-  const [tab, setTab] = useState<'company' | 'branches' | 'alerts'>('company');
+  const [tab, setTab] = useState<'company' | 'branches' | 'alerts' | 'images'>('company');
   return (
     <>
       <PageHeader title="Empresa e filiais" subtitle="Dados institucionais e unidades de atendimento." />
@@ -21,8 +22,9 @@ export function CompanyPage() {
         <button className={`tab ${tab === 'company' ? 'active' : ''}`} role="tab" onClick={() => setTab('company')}>Empresa</button>
         <button className={`tab ${tab === 'branches' ? 'active' : ''}`} role="tab" onClick={() => setTab('branches')}>Filiais</button>
         <button className={`tab ${tab === 'alerts' ? 'active' : ''}`} role="tab" onClick={() => setTab('alerts')}>Alertas e automações</button>
+        <button className={`tab ${tab === 'images' ? 'active' : ''}`} role="tab" onClick={() => setTab('images')}>Imagens e IA</button>
       </div>
-      {tab === 'company' ? <CompanyForm /> : tab === 'branches' ? <Branches /> : <IntelligenceSettingsCard />}
+      {tab === 'company' ? <CompanyForm /> : tab === 'branches' ? <Branches /> : tab === 'alerts' ? <IntelligenceSettingsCard /> : <div className="stack"><WatermarkCard /><AiProviderCard /></div>}
     </>
   );
 }

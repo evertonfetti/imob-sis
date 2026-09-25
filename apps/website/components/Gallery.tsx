@@ -30,6 +30,7 @@ export function Gallery({ media, title }: { media: PublicMedia[]; title: string 
       <div className="gallery">
         <button type="button" className="g-main" onClick={() => setOpen(0)} aria-label={`Ampliar fotos de ${title}`}>
           <img src={media[0]!.url} alt={media[0]!.caption ?? title} fetchPriority="high" />
+          {media[0]!.aiModified && <span className="g-ai">Imagem editada digitalmente</span>}
           {n > 1 && <span className="g-count"><Images />{n} fotos</span>}
         </button>
         {strip.length > 0 && (
@@ -52,7 +53,7 @@ export function Gallery({ media, title }: { media: PublicMedia[]; title: string 
             <img src={media[open]!.url} alt={media[open]!.caption ?? `${title} — foto ${open + 1}`} />
             {n > 1 && <button className="lb-btn lb-next" onClick={() => go(1)} aria-label="Próxima foto"><ChevronRight /></button>}
           </div>
-          <div className="lb-cap">{media[open]!.caption ?? ''}</div>
+          <div className="lb-cap">{media[open]!.caption ?? ''}{media[open]!.aiModified && <em className="lb-ai">{media[open]!.caption ? ' · ' : ''}Imagem editada digitalmente</em>}</div>
         </div>
       )}
     </>

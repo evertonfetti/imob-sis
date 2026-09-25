@@ -204,6 +204,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .g-main img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .g-count { position: absolute; right: 16px; bottom: 16px; display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; background: rgb(255 255 255 / .94); font-weight: 550; font-size: 14px; }
 .g-count svg { width: 16px; height: 16px; }
+.g-ai { position: absolute; left: 16px; bottom: 16px; padding: 6px 12px; border-radius: 999px; background: rgb(20 24 22 / .68); color: #fff; font-size: 12.5px; }
+.lb-ai { font-style: normal; opacity: .85; }
 .g-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .g-thumb { position: relative; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 0; padding: 0; cursor: pointer; background: var(--sunken); }
 .g-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }

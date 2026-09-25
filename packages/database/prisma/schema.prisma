@@ -107,6 +107,7 @@ enum IntegrationProvider {
   WHATSAPP
   META_CAPI
   META_APP
+  AI_IMAGE
 }
 
 enum ConversationChannel {
@@ -213,6 +214,10 @@ model Company {
   leadDistribution LeadDistribution @default(MANUAL)
   // Limites de alertas e automações comerciais (JSON; o que faltar usa o padrão do sistema).
   intelligenceSettings Json?
+  // Marca d'água nas fotos: { enabled, position, opacity, scale, margin }. A logo enviada fica em logoKey.
+  watermarkSettings Json?
+  watermarkRevision Int     @default(0)
+  logoKey           String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -239,6 +244,7 @@ model Company {
   marketingEvents    MarketingEvent[]
   socialAccounts     SocialAccount[]
   socialApps         SocialApp[]
+  mediaGenerations   MediaGeneration[]
   socialPosts        SocialPost[]
 
   visits    Visit[]
@@ -560,12 +566,18 @@ model PropertyMedia {
   position   Int     @default(0)
   isCover    Boolean @default(false)
   aiModified Boolean @default(false)
+  // Versão de IA aprovada e publicada (null = a foto original). O original nunca é substituído.
+  activeGenerationId String?
+  renderedGenerationId String?
+  // Revisão da marca d'água aplicada na versão publicada (null = sem marca).
+  watermarkRevision Int?
 
   processingError String?
   createdAt       DateTime @default(now())
 
-  company  Company  @relation(fields: [companyId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company     Company           @relation(fields: [companyId], references: [id])
+  property    Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  generations MediaGeneration[]
 
   @@index([propertyId, position])
   @@index([companyId])
@@ -1112,4 +1124,57 @@ model ProposalRevision {
 
   @@index([proposalId, createdAt])
   @@map("proposal_revisions")
+}
+
+// ---------- Bloco 8 — IA de imagens ----------
+enum AiOperation {
+  ENHANCE
+  LIGHTING
+  REMOVE_OBJECT
+  REMOVE_FURNITURE
+  VIRTUAL_STAGE
+  SKY_REPLACEMENT
+}
+
+enum AiGenerationStatus {
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
+// Cada edição por IA é uma versão nova (original → geração 1 → geração 2…). O usuário aprova qual publicar.
+model MediaGeneration {
+  id         String @id @default(uuid(7))
+  companyId  String
+  propertyId String
+  mediaId    String
+  userId     String?
+  // Geração usada como ponto de partida (null = a foto original).
+  parentId   String?
+
+  operation AiOperation
+  provider  String
+  model     String?
+  prompt    String?
+  options   Json?
+
+  inputKey  String
+  outputKey String?
+  thumbKey  String?
+
+  status     AiGenerationStatus @default(QUEUED)
+  error      String?
+  // Estimativa em USD (tabela do provedor); 0 quando o processamento é local.
+  cost       Decimal?           @db.Decimal(10, 4)
+  durationMs Int?
+  approvedAt DateTime?
+  createdAt  DateTime           @default(now())
+
+  company Company       @relation(fields: [companyId], references: [id])
+  media   PropertyMedia @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([mediaId, createdAt])
+  @@index([companyId, createdAt])
+  @@map("media_generations")
 }

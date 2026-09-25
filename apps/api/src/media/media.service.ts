@@ -33,6 +33,7 @@ export class MediaService {
     return {
       id: m.id, propertyId: m.propertyId, type: m.type, filename: m.filename, contentType: m.contentType, sizeBytes: m.sizeBytes,
       width: m.width, height: m.height, caption: m.caption, position: m.position, isCover: m.isCover, aiModified: m.aiModified,
+      activeGenerationId: m.activeGenerationId, renderedGenerationId: m.renderedGenerationId,
       status: m.status, processingError: m.processingError,
       originalUrl: this.storage.publicUrl(m.originalKey),
       // Vídeos/PDFs não passam pelo pipeline: a versão publicada é o próprio arquivo.
@@ -152,6 +153,7 @@ export class MediaService {
   async remove(ctx: AuthedCtx, id: string) {
     const { companyId } = ctx.user;
     const m = await this.load(companyId, id);
+    const gens = await this.prisma.mediaGeneration.findMany({ where: { mediaId: id }, select: { outputKey: true, thumbKey: true } });
     await this.prisma.$transaction(async (tx) => {
       await tx.propertyMedia.delete({ where: { id } });
       if (m.isCover) {
@@ -161,7 +163,7 @@ export class MediaService {
       }
       await this.normalize(tx, m.propertyId);
     });
-    await this.deleteFiles([m]);
+    await this.deleteFiles([m], gens);
     await this.audit.record({ companyId, entity: 'PROPERTY', entityId: m.propertyId, action: 'MEDIA_REMOVED', before: { mediaId: id, type: m.type, filename: m.filename }, ctx });
   }
 
@@ -173,14 +175,15 @@ export class MediaService {
     return this.serialize(await this.load(ctx.user.companyId, id));
   }
 
-  private async deleteFiles(rows: Pick<Row, 'originalKey' | 'processedKey' | 'thumbnailKey'>[]) {
-    const keys = rows.flatMap((r) => [r.originalKey, r.processedKey, r.thumbnailKey]).filter((k): k is string => !!k);
+  private async deleteFiles(rows: Pick<Row, 'originalKey' | 'processedKey' | 'thumbnailKey' | 'socialKey'>[], gens: { outputKey: string | null; thumbKey: string | null }[] = []) {
+    const keys = [...rows.flatMap((r) => [r.originalKey, r.processedKey, r.thumbnailKey, r.socialKey]), ...gens.flatMap((g) => [g.outputKey, g.thumbKey])].filter((k): k is string => !!k);
     await Promise.all(keys.map((k) => this.storage.delete(k)));
   }
 
   /** Usado ao excluir um imóvel (rascunho): as linhas caem em cascata, os arquivos são removidos aqui. */
   async purgeFiles(companyId: string, propertyId: string) {
     const rows = await this.prisma.propertyMedia.findMany({ where: { companyId, propertyId } });
-    await this.deleteFiles(rows);
+    const gens = await this.prisma.mediaGeneration.findMany({ where: { companyId, propertyId }, select: { outputKey: true, thumbKey: true } });
+    await this.deleteFiles(rows, gens);
   }
 }

@@ -2,10 +2,11 @@ import {
   MEDIA_CONTENT_TYPES, MEDIA_MAX_BYTES, MEDIA_TYPE_LABELS, type MediaItem, type MediaType,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Film, ImagePlus, RotateCw, Star, Trash2 } from 'lucide-react';
+import { FileText, Film, ImagePlus, RotateCw, Sparkles, Star, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { AiStudio } from './AiStudio';
 import { Button, Select, SkeletonRows, Spinner, errorMessage, useToast } from './ui';
 
 interface Upload { tempId: string; name: string; preview: string | null; progress: number; error?: string }
@@ -44,12 +45,14 @@ export function Gallery({ propertyId }: { propertyId: string }) {
   const [over, setOver] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [order, setOrder] = useState<string[] | null>(null);
+  const [aiFor, setAiFor] = useState<string | null>(null);
+  const canAi = can('media.ai_edit');
 
   const q = useQuery({
     queryKey: ['media', propertyId],
     queryFn: () => api<MediaItem[]>(`/properties/${propertyId}/media`),
-    // Enquanto houver imagens processando, atualiza sozinho.
-    refetchInterval: (query) => (query.state.data?.some((m) => m.status === 'PENDING' || m.status === 'PROCESSING') ? 2000 : false),
+    // Enquanto houver imagens processando (ou uma versão de IA sendo aplicada), atualiza sozinho.
+    refetchInterval: (query) => (query.state.data?.some((m) => m.status === 'PENDING' || m.status === 'PROCESSING' || m.activeGenerationId !== m.renderedGenerationId) ? 2000 : false),
   });
   const refresh = () => { qc.invalidateQueries({ queryKey: ['media', propertyId] }); qc.invalidateQueries({ queryKey: ['properties'] }); qc.invalidateQueries({ queryKey: ['property-history', propertyId] }); };
 
@@ -153,6 +156,7 @@ export function Gallery({ propertyId }: { propertyId: string }) {
                       <div className="tile-file">{m.type === 'VIDEO' ? <Film /> : <FileText />}<span>{m.filename ?? MEDIA_TYPE_LABELS[m.type]}</span></div>
                     )}
                     {m.isCover && <span className="pill"><Star fill="currentColor" /> Capa</span>}
+                    {m.aiModified && <span className="pill ai"><Sparkles /> IA</span>}
                     {m.type !== 'IMAGE' && <span className="pill type">{MEDIA_TYPE_LABELS[m.type]}</span>}
                     {(m.status === 'PENDING' || m.status === 'PROCESSING') && <div className="tile-over"><Spinner />Processando…</div>}
                     {m.status === 'FAILED' && (
@@ -160,6 +164,7 @@ export function Gallery({ propertyId }: { propertyId: string }) {
                         {canUpload && <Button type="button" onClick={() => retry.mutate(m.id)}><RotateCw /> Tentar novamente</Button>}</div>
                     )}
                     <div className="tile-actions">
+                      {canAi && m.type === 'IMAGE' && m.status === 'READY' && <button type="button" className="tile-btn" title="Editar com IA" aria-label="Editar com IA" onClick={() => setAiFor(m.id)}><Sparkles /></button>}
                       {canUpload && m.type === 'IMAGE' && !m.isCover && m.status === 'READY' && <button type="button" className="tile-btn" title="Definir como capa" aria-label="Definir como capa" onClick={() => setCover.mutate(m.id)}><Star /></button>}
                       {canDelete && <button type="button" className="tile-btn danger" title="Excluir" aria-label="Excluir" onClick={() => confirm('Excluir este arquivo? Esta ação não pode ser desfeita.') && remove.mutate(m.id)}><Trash2 /></button>}
                     </div>
@@ -186,6 +191,7 @@ export function Gallery({ propertyId }: { propertyId: string }) {
           </>
         )}
       </div>
+      {aiFor && items.find((m) => m.id === aiFor) && <AiStudio media={items.find((m) => m.id === aiFor)!} onClose={() => { setAiFor(null); refresh(); }} />}
       {toast.node}
     </section>
   );

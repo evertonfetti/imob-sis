@@ -64,6 +64,9 @@ export interface MediaItem {
   position: number;
   isCover: boolean;
   aiModified: boolean;
+  /** Versão de IA aprovada (null = original) e a que já está renderizada na foto publicada. */
+  activeGenerationId: string | null;
+  renderedGenerationId: string | null;
   status: 'PENDING' | 'PROCESSING' | 'READY' | 'FAILED';
   processingError: string | null;
   originalUrl: string;

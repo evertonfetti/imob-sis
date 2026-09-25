@@ -166,6 +166,7 @@ export class PublicService {
           id: m.id, type: m.type, caption: m.caption, width: m.width, height: m.height,
           url: this.storage.publicUrl(m.processedKey ?? m.originalKey),
           thumbnailUrl: m.thumbnailKey ? this.storage.publicUrl(m.thumbnailKey) : null,
+          aiModified: m.aiModified,
         })),
       broker: p.broker,
       similar: similar.map((s) => this.card(s)),

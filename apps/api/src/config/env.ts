@@ -19,6 +19,9 @@ const schema = z.object({
   // Espera entre as tentativas de envio à Meta (cresce exponencialmente). Configurável para testes.
   MARKETING_RETRY_DELAY_MS: z.coerce.number().default(5000),
   // Login com o Facebook (publicação em redes sociais). O app da Meta é da plataforma, não de cada empresa.
+  GEMINI_API_URL: z.string().default('https://generativelanguage.googleapis.com/v1beta'),
+  OPENAI_API_URL: z.string().default('https://api.openai.com/v1'),
+  AI_TIMEOUT_MS: z.coerce.number().default(120000),
   INTELLIGENCE_TICK_MS: z.coerce.number().default(600000), // rotinas de score e retomada de leads parados
   COMMERCIAL_TICK_MS: z.coerce.number().default(300000), // frequência da verificação de propostas vencidas
   META_APP_ID: z.string().optional(),

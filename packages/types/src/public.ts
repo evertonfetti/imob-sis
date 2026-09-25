@@ -133,6 +133,8 @@ export interface PublicMedia {
   height: number | null;
   url: string;
   thumbnailUrl: string | null;
+  /** Foto editada por IA: o site avisa o visitante. */
+  aiModified: boolean;
 }
 
 export interface PublicPropertyDetail extends PublicPropertyCard {

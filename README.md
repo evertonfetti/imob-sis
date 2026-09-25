@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 10 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas).
+**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas).
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -112,6 +112,13 @@ No imóvel, **Publicar nas redes** abre a postagem já pronta (fotos com a capa 
 - **Configurável:** em *Empresa e filiais → Alertas e automações* (só quem administra a empresa) você ajusta todos os prazos (horas sem atendimento, dias parado, proposta vencendo/sem movimento…), as notas de compatibilidade e liga/desliga as tarefas automáticas. A tela mostra a mediana e o percentil 80 do tempo que os leads realmente ficam em cada etapa, como régua para achar o valor certo.
 - **Alertas** (*Precisa de atenção* no dashboard): lead sem atendimento, lead parado, tarefas atrasadas, visita sem confirmação ou sem resultado, proposta vencendo ou parada, cliente esperando resposta no WhatsApp. Cada usuário vê só o que é seu.
 - **Relatórios:** período à escolha, conversão, tempo até fechar, volume negociado, leads por origem/dia, funil (quantos leads chegaram a cada etapa ou além), imóveis mais procurados, motivos de perda e desempenho da equipe (só para quem vê todos os leads).
+
+### Imagens: marca d'água e IA
+
+- **Marca d'água (Empresa → Imagens e IA):** envie a logo (PNG transparente, JPG, WebP ou SVG) e escolha posição, tamanho, opacidade e distância da borda, com pré-visualização. A logo é carimbada na foto **publicada** e na miniatura (site, Instagram/Facebook); o **arquivo original nunca recebe a marca**. Fotos novas já saem certas; para as antigas, *Aplicar nas fotos existentes* (a foto não sai do ar durante a troca). Desligar ou remover a logo e reaplicar tira a marca.
+- **IA de fotos:** no imóvel, o botão ✨ de cada foto abre o estúdio: *melhorar foto*, *iluminação*, *remover objeto*, *esvaziar o ambiente*, *decorar (virtual staging)* e *trocar o céu*. Cada pedido vira uma **versão nova** (original → versão 1 → versão 2…), com comparação antes/depois; você escolhe qual **publicar** e pode voltar ao original a qualquer momento. Versões ficam no histórico (com provedor, modelo, custo estimado e quem pediu).
+- **Provedores** (troca sem mexer no código): **Básico** (no servidor, sem custo e sem chave — melhora foto e iluminação), **Google Gemini** e **OpenAI (gpt-image)**, que fazem todas as operações. A chave é cadastrada no painel, validada e guardada criptografada; há **limite mensal de edições** por empresa (padrão 100) e a tela mostra o consumo. Uma edição por foto de cada vez, sem nova tentativa automática (cada tentativa paga custa).
+- **Transparência:** fotos com versão de IA publicada aparecem no site com o aviso *“Imagem editada digitalmente”*. Revise sempre o resultado antes de publicar: a IA pode errar detalhes do imóvel.
 
 ### Fotos e mídias
 
