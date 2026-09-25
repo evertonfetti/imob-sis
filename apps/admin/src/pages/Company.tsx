@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Plus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
+import { IntelligenceSettingsCard } from '../components/IntelligenceSettings';
 import { api } from '../lib/api';
 
 type Company = Record<string, string | null>;
@@ -12,15 +13,16 @@ interface Branch {
 }
 
 export function CompanyPage() {
-  const [tab, setTab] = useState<'company' | 'branches'>('company');
+  const [tab, setTab] = useState<'company' | 'branches' | 'alerts'>('company');
   return (
     <>
       <PageHeader title="Empresa e filiais" subtitle="Dados institucionais e unidades de atendimento." />
       <div className="tabs" role="tablist">
         <button className={`tab ${tab === 'company' ? 'active' : ''}`} role="tab" onClick={() => setTab('company')}>Empresa</button>
         <button className={`tab ${tab === 'branches' ? 'active' : ''}`} role="tab" onClick={() => setTab('branches')}>Filiais</button>
+        <button className={`tab ${tab === 'alerts' ? 'active' : ''}`} role="tab" onClick={() => setTab('alerts')}>Alertas e automações</button>
       </div>
-      {tab === 'company' ? <CompanyForm /> : <Branches />}
+      {tab === 'company' ? <CompanyForm /> : tab === 'branches' ? <Branches /> : <IntelligenceSettingsCard />}
     </>
   );
 }

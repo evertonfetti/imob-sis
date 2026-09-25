@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type AlertDto } from '@imob/types';
+import { IntelligenceSettingsService } from './settings.service';
 import type { AuthedUser } from '../common/request-context';
 import { canViewAll, leadScope, taskScope } from '../crm/visibility';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,8 +9,6 @@ import { visitScope } from '../commercial/visits.service';
 
 const H = 3_600_000;
 const D = 24 * H;
-/** Limites dos alertas (horas/dias). Fixos por enquanto; viram configuração da empresa se precisar. */
-export const ALERT_LIMITS = { unattendedHours: 2, unattendedHighHours: 24, staleDays: 7, proposalExpiringHours: 48, proposalIdleDays: 5, whatsappWaitingHours: 2, visitUnconfirmedHours: 24 };
 const SEV = { high: 0, medium: 1, low: 2 } as const;
 const ago = (d: Date) => { const h = Math.floor((Date.now() - d.getTime()) / H); return h < 1 ? 'há menos de 1 h' : h < 48 ? `há ${h} h` : `há ${Math.floor(h / 24)} dias`; };
 const when = (d: Date) => d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
@@ -17,11 +16,11 @@ const when = (d: Date) => d.toLocaleString('pt-BR', { day: '2-digit', month: '2-
 /** Situações que pedem ação, calculadas na hora a partir dos dados (nada fica "esquecido" numa tabela de alertas). */
 @Injectable()
 export class AlertsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly settings: IntelligenceSettingsService) {}
 
   async list(user: AuthedUser): Promise<AlertDto[]> {
     const now = Date.now();
-    const L = ALERT_LIMITS;
+    const L = await this.settings.get(user.companyId); // limites da empresa (Configurações → Empresa)
     const lead = leadScope(user);
     const open = { status: { in: ['NEW', 'CONTACTED', 'QUALIFIED'] as ('NEW' | 'CONTACTED' | 'QUALIFIED')[] } };
     const first = await this.prisma.pipelineStage.findFirst({ where: { pipeline: { companyId: user.companyId } }, orderBy: { position: 'asc' }, select: { id: true } });

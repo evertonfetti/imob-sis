@@ -42,8 +42,6 @@ export interface MatchResult<T> {
   criteria: string[];
   insufficientData: boolean;
 }
-export const MATCH_MIN_SCORE = 50;
-export const MATCH_AUTO_TASK_SCORE = 75;
 
 // ---------- Alertas ----------
 export const ALERT_TYPES = [
@@ -77,3 +75,44 @@ export interface ReportOverviewDto {
   lostReasons: { reason: string; count: number }[];
   brokers: { brokerId: string | null; name: string; leads: number; visitsDone: number; proposals: number; won: number; avgScore: number }[] | null;
 }
+
+// ---------- Configurações (por empresa) ----------
+export const INTELLIGENCE_SETTING_LIMITS = {
+  unattendedHours: [1, 168], unattendedHighHours: [2, 720], staleDays: [1, 90], proposalExpiringHours: [1, 720], proposalIdleDays: [1, 60],
+  whatsappWaitingHours: [1, 72], visitUnconfirmedHours: [1, 168], matchMinScore: [30, 100], matchAutoTaskScore: [50, 100],
+} as const;
+export const DEFAULT_INTELLIGENCE_SETTINGS = {
+  unattendedHours: 2, unattendedHighHours: 24, staleDays: 7, proposalExpiringHours: 48, proposalIdleDays: 5, whatsappWaitingHours: 2, visitUnconfirmedHours: 24,
+  matchMinScore: 50, matchAutoTaskScore: 75, autoStaleTasks: true, autoMatchTasks: true,
+};
+export type IntelligenceSettings = typeof DEFAULT_INTELLIGENCE_SETTINGS;
+
+const int = (k: keyof typeof INTELLIGENCE_SETTING_LIMITS) => z.number().int().min(INTELLIGENCE_SETTING_LIMITS[k][0]).max(INTELLIGENCE_SETTING_LIMITS[k][1]);
+// Sem `.default()`: assim `.partial()` não reaplica padrões em edições parciais.
+export const intelligenceSettingsSchema = z.object({
+  unattendedHours: int('unattendedHours'), unattendedHighHours: int('unattendedHighHours'), staleDays: int('staleDays'),
+  proposalExpiringHours: int('proposalExpiringHours'), proposalIdleDays: int('proposalIdleDays'), whatsappWaitingHours: int('whatsappWaitingHours'),
+  visitUnconfirmedHours: int('visitUnconfirmedHours'), matchMinScore: int('matchMinScore'), matchAutoTaskScore: int('matchAutoTaskScore'),
+  autoStaleTasks: z.boolean(), autoMatchTasks: z.boolean(),
+});
+export const updateIntelligenceSettingsSchema = intelligenceSettingsSchema.partial();
+export type UpdateIntelligenceSettingsInput = z.infer<typeof updateIntelligenceSettingsSchema>;
+
+/** Junta o que foi salvo com os padrões; valores inválidos guardados antes são ignorados. */
+export function resolveIntelligenceSettings(saved: unknown): IntelligenceSettings {
+  const parsed = updateIntelligenceSettingsSchema.safeParse(saved && typeof saved === 'object' ? saved : {});
+  return { ...DEFAULT_INTELLIGENCE_SETTINGS, ...(parsed.success ? parsed.data : {}) };
+}
+/** Regras entre campos: o alerta "urgente" vem depois do "atenção"; a tarefa automática exige nota mais alta que a lista. */
+export function settingsConflict(s: IntelligenceSettings): string | null {
+  if (s.unattendedHighHours <= s.unattendedHours) return 'O prazo do alerta urgente deve ser maior que o prazo do primeiro alerta de lead sem atendimento.';
+  if (s.matchAutoTaskScore < s.matchMinScore) return 'A compatibilidade para criar tarefa automática não pode ser menor que a mínima para sugerir imóveis.';
+  return null;
+}
+
+export interface IntelligenceInsights {
+  /** Quanto tempo os leads da sua operação realmente ficam parados (últimos 180 dias). null = poucos dados. */
+  firstStageHours: { median: number; p80: number; samples: number } | null;
+  otherStagesDays: { median: number; p80: number; samples: number } | null;
+}
+export interface IntelligenceSettingsDto { settings: IntelligenceSettings; defaults: IntelligenceSettings; insights: IntelligenceInsights }

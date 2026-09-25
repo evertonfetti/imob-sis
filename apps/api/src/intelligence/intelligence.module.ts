@@ -6,11 +6,12 @@ import { IntelligenceListener } from './intelligence.listeners';
 import { IntelligenceScheduler } from './intelligence.scheduler';
 import { LeadScoreService } from './lead-score.service';
 import { MatchingService } from './matching.service';
+import { IntelligenceSettingsService } from './settings.service';
 import { ReportsService } from './reports.service';
 
 @Module({
   imports: [CrmModule],
   controllers: [IntelligenceController],
-  providers: [LeadScoreService, MatchingService, ReportsService, AlertsService, IntelligenceListener, IntelligenceScheduler],
+  providers: [IntelligenceSettingsService, LeadScoreService, MatchingService, ReportsService, AlertsService, IntelligenceListener, IntelligenceScheduler],
 })
 export class IntelligenceModule {}

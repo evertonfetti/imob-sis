@@ -1,8 +1,9 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
-import { reportQuerySchema, type ReportQuery } from '@imob/types';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { reportQuerySchema, updateIntelligenceSettingsSchema, type ReportQuery, type UpdateIntelligenceSettingsInput } from '@imob/types';
 import { RequirePermissions } from '../common/decorators';
 import { notFound } from '../common/app-exception';
-import { Ctx, ReqCtx } from '../common/request-context';
+import { AuthedCtx, Ctx, ReqCtx } from '../common/request-context';
+import { IntelligenceSettingsService } from './settings.service';
 import { ZodPipe } from '../common/zod.pipe';
 import { leadScope } from '../crm/visibility';
 import { AlertsService } from './alerts.service';
@@ -17,7 +18,7 @@ const uuid = new ParseUUIDPipe();
 export class IntelligenceController {
   constructor(
     private readonly prisma: PrismaService, private readonly score: LeadScoreService, private readonly matching: MatchingService,
-    private readonly reports: ReportsService, private readonly alerts: AlertsService,
+    private readonly reports: ReportsService, private readonly alerts: AlertsService, private readonly settings: IntelligenceSettingsService,
   ) {}
 
   @Get('leads/:id/score') @RequirePermissions('lead.view')
@@ -45,4 +46,13 @@ export class IntelligenceController {
     const items = await this.alerts.list(ctx.user!);
     return { total: items.length, high: items.filter((a) => a.severity === 'high').length, items: items.slice(0, 40) };
   }
+
+  @Get('intelligence/settings') @RequirePermissions('admin.company')
+  getSettings(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.settings.dto(ctx.user!.companyId); }
+
+  @Put('intelligence/settings') @RequirePermissions('admin.company')
+  saveSettings(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(updateIntelligenceSettingsSchema)) body: UpdateIntelligenceSettingsInput): Promise<unknown> { return this.settings.update(ctx as AuthedCtx, body); }
+
+  @Post('intelligence/settings/reset') @RequirePermissions('admin.company')
+  resetSettings(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.settings.update(ctx as AuthedCtx, { reset: true }); }
 }

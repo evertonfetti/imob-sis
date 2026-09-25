@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { MATCH_MIN_SCORE, type LeadMatchDto, type MatchResult, type PropertyMatchDto } from '@imob/types';
+import { type LeadMatchDto, type MatchResult, type PropertyMatchDto } from '@imob/types';
 import type { AuthedUser } from '../common/request-context';
 import { notFound } from '../common/app-exception';
 import { StorageService } from '../storage/storage.service';
+import { IntelligenceSettingsService } from './settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Purpose = 'SALE' | 'RENT' | 'SALE_AND_RENT';
@@ -74,7 +75,7 @@ const candidateSelect = {
 
 @Injectable()
 export class MatchingService {
-  constructor(private readonly prisma: PrismaService, private readonly storage: StorageService) {}
+  constructor(private readonly prisma: PrismaService, private readonly storage: StorageService, private readonly settings: IntelligenceSettingsService) {}
 
   private cover(m?: { thumbnailKey: string | null; processedKey: string | null }) {
     const key = m?.thumbnailKey ?? m?.processedKey ?? null;
@@ -98,6 +99,7 @@ export class MatchingService {
   async matchLeadToProperties(companyId: string, leadId: string, opts: { limit?: number; minScore?: number; scope?: object } = {}): Promise<MatchResult<PropertyMatchDto>> {
     const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId, ...(opts.scope ?? {}) } });
     if (!lead) throw notFound('Lead não encontrado.');
+    const minScore = opts.minScore ?? (await this.settings.get(companyId)).matchMinScore;
     const c = this.criteriaOf(lead, await this.interestOf(companyId, lead.propertyId));
     const purposes = compatiblePurposes(c.purpose);
     const rows = await this.prisma.property.findMany({
@@ -108,7 +110,7 @@ export class MatchingService {
     for (const r of rows) {
       const m = scoreMatch(c, this.candidate(r));
       if (!m) continue;
-      if (m.score >= (opts.minScore ?? MATCH_MIN_SCORE)) {
+      if (m.score >= minScore) {
         const price = c.purpose === 'RENT' ? num(r.rentPrice) : (num(r.salePrice) ?? num(r.rentPrice));
         items.push({ propertyId: r.id, score: m.score, reasons: m.reasons, property: { id: r.id, code: r.code, title: r.title, purpose: r.purpose, city: r.city, neighborhood: r.neighborhood, bedrooms: r.bedrooms, price, coverUrl: this.cover(r.media[0]) } });
       }
@@ -123,6 +125,7 @@ export class MatchingService {
     const p = await this.prisma.property.findFirst({ where: { id: propertyId, companyId: companyId }, select: candidateSelect });
     if (!p) throw notFound('Imóvel não encontrado.');
     const cand = this.candidate(p);
+    const minScore = opts.minScore ?? (await this.settings.get(companyId)).matchMinScore;
     const leads = await this.prisma.lead.findMany({
       where: { companyId: companyId, status: { in: ['NEW', 'CONTACTED', 'QUALIFIED'] }, ...(opts.scope ?? {}) },
       include: { customer: { select: { name: true } }, broker: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 500,
@@ -132,7 +135,7 @@ export class MatchingService {
     for (const l of leads) {
       if (l.propertyId === propertyId) continue;
       const m = scoreMatch(this.criteriaOf(l, l.propertyId ? interests.get(l.propertyId) : null), cand);
-      if (m && m.weight >= ENOUGH_WEIGHT && m.score >= (opts.minScore ?? MATCH_MIN_SCORE)) {
+      if (m && m.weight >= ENOUGH_WEIGHT && m.score >= minScore) {
         items.push({ leadId: l.id, score: m.score, reasons: m.reasons, lead: { id: l.id, customerName: l.customer.name, brokerName: l.broker?.name ?? null, status: l.status, scoreValue: l.score } });
       }
     }

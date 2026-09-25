@@ -211,6 +211,8 @@ model Company {
   status           CompanyStatus    @default(ACTIVE)
   propertySeq      Int              @default(0)
   leadDistribution LeadDistribution @default(MANUAL)
+  // Limites de alertas e automações comerciais (JSON; o que faltar usa o padrão do sistema).
+  intelligenceSettings Json?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

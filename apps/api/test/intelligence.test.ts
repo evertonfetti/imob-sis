@@ -311,3 +311,101 @@ describe('relatórios', () => {
     expect((await call('GET', '/reports/overview', 'adminB')).json().kpis).toMatchObject({ newLeads: 0, wonLeads: 0, dealValue: 0 });
   });
 });
+
+describe('configurações de alertas e automações', () => {
+  const put = (payload: unknown, who = 'admin') => app.inject({ method: 'PUT', url: '/api/v1/intelligence/settings', headers: auth(tk[who]!), payload: payload as never });
+  const reset = () => app.inject({ method: 'POST', url: '/api/v1/intelligence/settings/reset', headers: auth(tk.admin!) });
+
+  it('começa nos padrões; só quem administra a empresa lê/altera; valida faixas e regras entre campos; edição parcial não mexe no resto; cada empresa tem a sua', async () => {
+    const d = (await call('GET', '/intelligence/settings', 'admin')).json();
+    expect(d.settings).toEqual(d.defaults);
+    expect(d.settings).toMatchObject({ staleDays: 7, unattendedHours: 2, matchMinScore: 50, matchAutoTaskScore: 75, autoStaleTasks: true });
+    expect((await call('GET', '/intelligence/settings', 'broker')).statusCode).toBe(403);
+    expect((await put({ staleDays: 3 }, 'broker'))!.statusCode).toBe(403);
+
+    expect((await put({ staleDays: 0 }))!.statusCode).toBe(400);
+    expect((await put({ staleDays: 500 }))!.statusCode).toBe(400);
+    expect((await put({ matchMinScore: 10 }))!.statusCode).toBe(400);
+    expect((await put({ unattendedHours: 30 }))!.json().message).toContain('urgente'); // 30 h >= urgente (24 h)
+    expect((await put({ matchMinScore: 90 }))!.json().message).toContain('compatibilidade'); // > automática (75)
+    expect((await call('GET', '/intelligence/settings', 'admin')).json().settings.unattendedHours).toBe(2); // recusado não grava
+
+    const ok = (await put({ staleDays: 3, autoMatchTasks: false }))!.json();
+    expect(ok.settings).toMatchObject({ staleDays: 3, autoMatchTasks: false, unattendedHours: 2, proposalIdleDays: 5, autoStaleTasks: true }); // o resto ficou como estava
+    expect((await call('GET', '/intelligence/settings', 'adminB')).json().settings.staleDays).toBe(7);
+    expect((await prisma.auditLog.findMany({ where: { entity: 'COMPANY', action: 'UPDATE' } })).some((a) => JSON.stringify(a.after).includes('"staleDays":3'))).toBe(true);
+
+    expect((await reset()).json().settings).toEqual(d.defaults);
+  });
+
+  it('os limites mudam o comportamento: dias parado, lead sem atendimento, tarefas automáticas e nota mínima do matching', async () => {
+    const stages = (await call('GET', '/pipeline', 'admin')).json().stages as { id: string; name: string }[];
+    const stale = await lead({ brokerId: ids.broker });
+    await call('POST', `/leads/${stale.id}/change-stage`, 'admin', { stageId: stages.find((s) => s.name === 'Contato realizado')!.id });
+    await prisma.lead.update({ where: { id: stale.id }, data: { stageEnteredAt: new Date(Date.now() - 4 * 86_400_000) } });
+    const sched = app.get(IntelligenceScheduler);
+    await sched.staleLeads();
+    expect((await tasks(stale.id)).some((t) => t.ref?.startsWith('stale:'))).toBe(false); // 4 dias < 7 (padrão)
+    await put({ staleDays: 3 });
+    await sched.staleLeads();
+    expect((await tasks(stale.id)).filter((t) => t.ref?.startsWith('stale:'))).toHaveLength(1);
+    // desligar a automação: novo lead parado não gera tarefa
+    const stale2 = await lead({ brokerId: ids.broker });
+    await call('POST', `/leads/${stale2.id}/change-stage`, 'admin', { stageId: stages.find((s) => s.name === 'Contato realizado')!.id });
+    await prisma.lead.update({ where: { id: stale2.id }, data: { stageEnteredAt: new Date(Date.now() - 10 * 86_400_000) } });
+    await put({ autoStaleTasks: false });
+    await sched.staleLeads();
+    expect((await tasks(stale2.id)).some((t) => t.ref?.startsWith('stale:'))).toBe(false);
+    await reset();
+
+    // alerta de lead sem atendimento respeita o prazo da empresa (30 h ≥ 24 h padrão urgente)
+    const waiting = await lead({ brokerId: ids.broker });
+    await prisma.lead.update({ where: { id: waiting.id }, data: { stageEnteredAt: new Date(Date.now() - 30 * 3_600_000) } });
+    const ids1 = ((await call('GET', '/alerts', 'admin')).json().items as { id: string }[]).map((a) => a.id);
+    expect(ids1).toContain(`unattended:${waiting.id}`);
+    await put({ unattendedHours: 48, unattendedHighHours: 96 });
+    expect(((await call('GET', '/alerts', 'admin')).json().items as { id: string }[]).map((a) => a.id)).not.toContain(`unattended:${waiting.id}`);
+    await reset();
+
+    // tarefa automática de imóvel novo: desligada não cria; nota mínima da lista muda o resultado
+    const cityLead = await lead({ purpose: 'SALE', budgetMax: 500000, city: 'Marília', bedrooms: 3, brokerId: ids.broker });
+    await put({ autoMatchTasks: false });
+    const p1 = await property({ title: 'Sem tarefa', salePrice: 480000, city: 'Marília', bedrooms: 3 });
+    expect((await tasks(cityLead.id)).some((t) => t.ref === `match:${cityLead.id}:${p1.id}`)).toBe(false);
+    await reset();
+    const near = await property({ title: 'Quase', salePrice: 540000, city: 'Marília', bedrooms: 3 }); // 8% acima: nota < 100 mas ≥ 50
+    const before = ((await call('GET', `/leads/${cityLead.id}/matches`, 'admin')).json().items as { propertyId: string }[]).map((m) => m.propertyId);
+    expect(before).toContain(near.id);
+    await put({ matchMinScore: 95, matchAutoTaskScore: 95 });
+    const strict = ((await call('GET', `/leads/${cityLead.id}/matches`, 'admin')).json().items as { propertyId: string }[]).map((m) => m.propertyId);
+    expect(strict).not.toContain(near.id);
+    expect(strict).toContain(p1.id);
+    await reset();
+  });
+
+  it('mede a operação: mediana e 80% do tempo que os leads ficam nas etapas (só com amostra suficiente)', async () => {
+    const stages = (await prisma.pipelineStage.findMany({ where: { pipeline: { company: { users: { some: { id: ids.broker } } } } }, orderBy: { position: 'asc' } }));
+    const [first, second] = stages;
+    const company = (await prisma.user.findUniqueOrThrow({ where: { id: ids.broker } })).companyId;
+    const empty = (await call('GET', '/intelligence/settings', 'adminB')).json().insights; // outra empresa: sem histórico
+    expect(empty).toEqual({ firstStageHours: null, otherStagesDays: null });
+    const base = Date.now() - 20 * 86_400_000;
+    for (let i = 0; i < 6; i++) {
+      const l = await lead({});
+      await prisma.leadStageHistory.deleteMany({ where: { leadId: l.id } });
+      // permanência de (i+1)*2 h na 1ª etapa e de 2 dias na 2ª
+      const t0 = base + i * 3_600_000;
+      const t1 = t0 + (i + 1) * 2 * 3_600_000;
+      const t2 = t1 + 2 * 86_400_000;
+      await prisma.leadStageHistory.createMany({ data: [
+        { companyId: company, leadId: l.id, toStageId: first!.id, createdAt: new Date(t0) },
+        { companyId: company, leadId: l.id, toStageId: second!.id, createdAt: new Date(t1) },
+        { companyId: company, leadId: l.id, toStageId: stages[2]!.id, createdAt: new Date(t2) },
+      ] });
+    }
+    const ins = (await call('GET', '/intelligence/settings', 'admin')).json().insights;
+    expect(ins.firstStageHours.samples).toBeGreaterThanOrEqual(6);
+    expect(ins.firstStageHours.p80).toBeGreaterThanOrEqual(ins.firstStageHours.median);
+    expect(ins.otherStagesDays.median).toBeCloseTo(2, 0);
+  });
+});

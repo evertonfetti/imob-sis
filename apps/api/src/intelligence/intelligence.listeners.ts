@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { MATCH_AUTO_TASK_SCORE } from '@imob/types';
 import { CrmEvents, type LeadCreatedEvent, type LeadStageChangedEvent, type LeadUpdatedEvent } from '../crm/crm.events';
 import { TasksService } from '../crm/tasks.service';
 import { CommercialEvents, type ProposalEvent, type VisitEvent } from '../commercial/commercial.events';
@@ -8,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappEvents, type WhatsappEvent } from '../whatsapp/whatsapp.events';
 import { PropertyEvents, type PropertyPublishedEvent } from './intelligence.events';
 import { LeadScoreService } from './lead-score.service';
+import { IntelligenceSettingsService } from './settings.service';
 import { MatchingService } from './matching.service';
 
 const HOUR = 3_600_000;
@@ -16,7 +16,7 @@ const HOUR = 3_600_000;
 @Injectable()
 export class IntelligenceListener {
   private readonly log = new Logger('Intelligence');
-  constructor(private readonly prisma: PrismaService, private readonly score: LeadScoreService, private readonly matching: MatchingService, private readonly tasks: TasksService) {}
+  constructor(private readonly prisma: PrismaService, private readonly score: LeadScoreService, private readonly matching: MatchingService, private readonly tasks: TasksService, private readonly settings: IntelligenceSettingsService) {}
 
   private async safe(what: string, fn: () => Promise<unknown>) {
     try { await fn(); } catch (e) { this.log.error(`${what}: ${(e as Error).message}`); } // a inteligência nunca derruba a operação principal
@@ -51,9 +51,11 @@ export class IntelligenceListener {
   @OnEvent(PropertyEvents.Published)
   onPublished(e: PropertyPublishedEvent) {
     return this.safe(`matching do imóvel ${e.propertyId}`, async () => {
+      const cfg = await this.settings.get(e.companyId);
+      if (!cfg.autoMatchTasks) return;
       const prop = await this.prisma.property.findFirst({ where: { id: e.propertyId, companyId: e.companyId, status: 'AVAILABLE' }, select: { code: true } });
       if (!prop) return;
-      const { items } = await this.matching.matchPropertyToLeads(e.companyId, e.propertyId, { minScore: MATCH_AUTO_TASK_SCORE, limit: 15 });
+      const { items } = await this.matching.matchPropertyToLeads(e.companyId, e.propertyId, { minScore: cfg.matchAutoTaskScore, limit: 15 });
       for (const m of items) {
         const lead = await this.prisma.lead.findUnique({ where: { id: m.leadId }, select: { brokerId: true } });
         if (!lead?.brokerId) continue; // sem responsável não há a quem entregar a tarefa
