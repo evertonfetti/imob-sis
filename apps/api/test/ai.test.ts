@@ -162,7 +162,7 @@ describe('descoberta de modelos pela chave', () => {
 describe('contas de IA e modelos por nível', () => {
   it('começa só com o modelo embutido; só quem administra a empresa configura; a chave é validada, criptografada, mascarada e nunca devolvida', async () => {
     expect(await settings()).toMatchObject({ accounts: [], defaultModelId: null, monthlyLimit: 100, usage: { generations: 0, cost: 0 } });
-    expect((await settings()).catalog.map((c: { id: string }) => c.id)).toEqual(['openai', 'gemini']);
+    expect((await settings()).catalog.map((c: { id: string }) => c.id)).toEqual(['openai', 'gemini', 'anthropic', 'groq']);
     const st = (await call('GET', '/ai/status', 'marketing')).json();
     expect(st.choices).toHaveLength(1);
     expect(st).toMatchObject({ defaultModelId: LOCAL, choices: [{ id: LOCAL, tier: null, costUsd: 0 }] });

@@ -10,6 +10,9 @@ const PHONE = '100200300';
 const SECRET = 'segredo-do-app-A-1234567890';
 const TOKEN = 'EAAGtokenDeTesteDaMeta1234567890';
 const KEY = 'sk-agent-test-1234567890';
+const ANT_KEY = 'sk-ant-test-1234567890';
+const GROQ_KEY = 'gsk_test_1234567890';
+const hits: { host: string; headers: Record<string, string>; body: any }[] = [];
 
 let app: NestFastifyApplication;
 const tk: Record<string, string> = {};
@@ -30,6 +33,37 @@ let png: Buffer;
 const fetchStub = vi.fn(async (input: any, init: any = {}) => {
   const url = String(input);
   const json = (d: unknown, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'content-type': 'application/json' } });
+  const hdr = Object.fromEntries(Object.entries(init.headers ?? {}).map(([k, v]) => [k.toLowerCase(), String(v)]));
+  const chatReply = (r: LlmOut) => {
+    const content = typeof r.out === 'string' ? r.out : JSON.stringify(r.out);
+    return content;
+  };
+  if (/api\.anthropic\.com\/v1\/models/.test(url)) {
+    if (hdr['x-api-key'] !== ANT_KEY || hdr['anthropic-version'] !== '2023-06-01') return json({ error: { message: 'bad key' } }, 401);
+    return /after_id=/.test(url)
+      ? json({ data: [{ id: 'claude-haiku-4-5', display_name: 'Claude Haiku 4.5', type: 'model' }], has_more: false, last_id: 'claude-haiku-4-5' })
+      : json({ data: [{ id: 'claude-opus-4-6', display_name: 'Claude Opus 4.6', type: 'model' }, { id: 'claude-sonnet-4-6', display_name: 'Claude Sonnet 4.6', type: 'model' }], has_more: true, last_id: 'claude-sonnet-4-6' });
+  }
+  if (/api\.anthropic\.com\/v1\/messages/.test(url)) {
+    const body = JSON.parse(init.body);
+    hits.push({ host: 'anthropic', headers: hdr, body });
+    llmCalls.push({ system: body.system, messages: body.messages, model: body.model });
+    const r = llm(llmCalls.length);
+    if (r.status && r.status >= 400) return json({ error: { message: 'boom' } }, r.status);
+    return json({ content: [{ type: 'text', text: chatReply(r) }], usage: { input_tokens: 700, output_tokens: 80 } });
+  }
+  if (/api\.groq\.com\/openai\/v1\/models/.test(url)) {
+    if (hdr.authorization !== `Bearer ${GROQ_KEY}`) return json({ error: { message: 'bad key' } }, 401);
+    return json({ data: [{ id: 'llama-3.1-8b-instant', active: true }, { id: 'llama-3.3-70b-versatile', active: true }, { id: 'openai/gpt-oss-120b', active: true }, { id: 'whisper-large-v3', active: true }, { id: 'velho-modelo', active: false }] });
+  }
+  if (/api\.groq\.com\/openai\/v1\/chat\/completions/.test(url)) {
+    const body = JSON.parse(init.body);
+    hits.push({ host: 'groq', headers: hdr, body });
+    llmCalls.push({ system: body.messages[0].content, messages: body.messages.slice(1), model: body.model });
+    const r = llm(llmCalls.length);
+    if (r.status && r.status >= 400) return json({ error: { message: 'boom' } }, r.status);
+    return json({ choices: [{ message: { role: 'assistant', content: chatReply(r) } }], usage: { prompt_tokens: 500, completion_tokens: 50 } });
+  }
   if (/api\.openai\.com\/v1\/models/.test(url)) return json({ data: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-image-1'].map((id) => ({ id })) });
   if (/api\.openai\.com\/v1\/chat\/completions/.test(url)) {
     const body = JSON.parse(init.body);
@@ -436,6 +470,100 @@ describe('atendimento pelo WhatsApp', () => {
     await say(FROM, 'Manda de novo?');
     expect(sent.filter((o) => o.type === 'image')).toHaveLength(0);
     await call('PUT', '/agent/settings', 'admin', { maxPhotos: 4 });
+  });
+});
+
+describe('Anthropic (Claude) e Groq', () => {
+  const discoverP = async (provider: string, apiKey: string) => (await call('POST', '/ai/discover', 'admin', { provider, apiKey })).json() as { model: string; guess: string; tier: string }[];
+  let claudeModel = ''; let groqModel = '';
+
+  it('lista os modelos de cada provedor (com paginação), classifica o nível e recusa chave errada', async () => {
+    for (const [prov, wrong] of [['anthropic', 'sk-ant-errada-1234567890'], ['groq', 'gsk_errada_1234567890']]) {
+      expect((await call('POST', '/ai/discover', 'admin', { provider: prov, apiKey: wrong })).json().code).toBe('AI_KEY_INVALID');
+    }
+    const a = await discoverP('anthropic', ANT_KEY);
+    expect(a.map((m) => m.model).sort()).toEqual(['claude-haiku-4-5', 'claude-opus-4-6', 'claude-sonnet-4-6']); // as duas páginas
+    expect(a.every((m) => m.guess === 'TEXT')).toBe(true);
+    expect(Object.fromEntries(a.map((m) => [m.model, m.tier]))).toEqual({ 'claude-haiku-4-5': 'ECONOMIC', 'claude-sonnet-4-6': 'STANDARD', 'claude-opus-4-6': 'PREMIUM' });
+
+    const g = await discoverP('groq', GROQ_KEY);
+    expect(g.map((m) => m.model)).not.toContain('velho-modelo'); // inativo não é listado
+    expect(g.find((m) => m.model === 'whisper-large-v3')!.guess).toBe('OTHER');
+    expect(g.filter((m) => m.guess === 'TEXT').map((m) => [m.model, m.tier])).toEqual(expect.arrayContaining([['llama-3.1-8b-instant', 'ECONOMIC'], ['llama-3.3-70b-versatile', 'PREMIUM'], ['openai/gpt-oss-120b', 'PREMIUM']]));
+    expect((await call('GET', '/ai/settings', 'admin')).json().catalog.map((c: { id: string }) => c.id)).toEqual(['openai', 'gemini', 'anthropic', 'groq']);
+  });
+
+  it('só geram texto: modelo de imagem é recusado ao cadastrar, adicionar ou editar', async () => {
+    const mk = (m: object) => ({ label: 'Modelo', model: 'x-model', tier: 'STANDARD', costUsd: 0, ...m });
+    expect((await call('POST', '/ai/accounts', 'admin', { name: 'Claude', provider: 'anthropic', apiKey: ANT_KEY, models: [mk({ kind: 'IMAGE' })] })).json().code).toBe('AI_KIND_UNSUPPORTED');
+    const c = await call('POST', '/ai/accounts', 'admin', { name: 'Claude da matriz', provider: 'anthropic', apiKey: ANT_KEY, models: (await discoverP('anthropic', ANT_KEY)).map((m) => ({ label: m.model, model: m.model, kind: 'TEXT', tier: m.tier, costUsd: 0, inputCostPerMTok: 3, outputCostPerMTok: 15 })) });
+    expect(c.statusCode).toBe(201);
+    const acc = c.json().accounts.find((a: { name: string }) => a.name === 'Claude da matriz');
+    expect(acc.providerLabel).toBe('Anthropic (Claude)');
+    expect(acc.models).toHaveLength(3);
+    claudeModel = acc.models.find((m: { model: string }) => m.model === 'claude-sonnet-4-6').id;
+    expect((await call('POST', `/ai/accounts/${acc.id}/models`, 'admin', mk({ kind: 'IMAGE', model: 'outro' }))).json().code).toBe('AI_KIND_UNSUPPORTED');
+    expect((await call('PATCH', `/ai/models/${claudeModel}`, 'admin', { kind: 'IMAGE' })).json().code).toBe('AI_KIND_UNSUPPORTED');
+
+    const g = await call('POST', '/ai/accounts', 'admin', { name: 'Groq rápido', provider: 'groq', apiKey: GROQ_KEY, models: (await discoverP('groq', GROQ_KEY)).filter((m) => m.guess === 'TEXT').map((m) => ({ label: m.model, model: m.model, kind: 'TEXT', tier: m.tier, costUsd: 0, inputCostPerMTok: 0.05, outputCostPerMTok: 0.08 })) });
+    groqModel = g.json().accounts.find((a: { name: string }) => a.name === 'Groq rápido').models.find((m: { model: string }) => m.model === 'llama-3.1-8b-instant').id;
+
+    // não aparecem como opção de edição de fotos, mas sim como modelo de texto do agente
+    const choices = (await call('GET', '/ai/status', 'admin')).json().choices as { id: string }[];
+    expect(choices.some((x) => x.id === claudeModel || x.id === groqModel)).toBe(false);
+    const tm = (await call('GET', '/agent/settings', 'admin')).json().textModels as { model: string; provider: string; priced: boolean }[];
+    expect(tm.filter((m) => m.provider === 'anthropic')).toHaveLength(3);
+    expect(tm.find((m) => m.model === 'llama-3.1-8b-instant')).toMatchObject({ provider: 'groq', priced: true });
+  });
+
+  it('o agente conversa com o Claude (Messages API) e com o Groq (formato OpenAI), registrando modelo, tokens e custo de cada um', async () => {
+    const setModel = (id: string) => call('PUT', '/agent/settings', 'admin', { modelId: id, enabled: true });
+
+    // Claude
+    expect((await setModel(claudeModel)).statusCode).toBe(200);
+    const A = '5511911119001';
+    llm = () => ({ out: { reply: 'Olá! Sou o assistente virtual, como posso ajudar?', actions: [] } });
+    hits.length = 0;
+    await say(A, 'Olá, boa noite');
+    expect(sentTo(A).map((o) => o.text)).toEqual(['Olá! Sou o assistente virtual, como posso ajudar?']);
+    const h = hits.at(-1)!;
+    expect(h.host).toBe('anthropic');
+    expect(h.headers['x-api-key']).toBe(ANT_KEY);
+    expect(h.headers['anthropic-version']).toBe('2023-06-01');
+    expect(h.body.model).toBe('claude-sonnet-4-6');
+    expect(h.body.max_tokens).toBeGreaterThan(0);
+    expect(h.body.system).toContain('assistente virtual de atendimento');
+    expect(h.body.messages[0]).toMatchObject({ role: 'user' }); // começa pelo cliente e alterna
+    const runA = await prisma.aiAgentRun.findFirstOrThrow({ where: { conversationId: (await conv(A)).id } });
+    expect(runA).toMatchObject({ provider: 'anthropic', model: 'claude-sonnet-4-6', inputTokens: 700, outputTokens: 80, outcome: 'REPLIED' });
+    expect(Number(runA.costUsd)).toBeCloseTo((700 * 3 + 80 * 15) / 1e6, 6);
+
+    // conversa com histórico (assistente já falou): a API do Claude exige alternância; mensagens seguidas são unidas
+    await say(A, 'Quero saber do preço'); await say(A, 'e do condomínio');
+    const last = hits.at(-1)!.body.messages as { role: string }[];
+    expect(last.map((m) => m.role)).toEqual(last.map((_, i) => (i % 2 === 0 ? 'user' : 'assistant')));
+
+    // Groq
+    expect((await setModel(groqModel)).statusCode).toBe(200);
+    const B = '5511911119002';
+    llm = () => ({ out: { reply: 'Oi! Tudo bem? Posso te ajudar a achar um imóvel.', actions: [] } });
+    await say(B, 'Oi');
+    const g = hits.at(-1)!;
+    expect(g.host).toBe('groq');
+    expect(g.headers.authorization).toBe(`Bearer ${GROQ_KEY}`);
+    expect(g.body.model).toBe('llama-3.1-8b-instant');
+    expect(g.body.messages[0].role).toBe('system');
+    expect(sentTo(B).map((o) => o.text)).toEqual(['Oi! Tudo bem? Posso te ajudar a achar um imóvel.']);
+    const runB = await prisma.aiAgentRun.findFirstOrThrow({ where: { conversationId: (await conv(B)).id } });
+    expect(runB).toMatchObject({ provider: 'groq', inputTokens: 500, outputTokens: 50 });
+    expect(Number(runB.costUsd)).toBeCloseTo((500 * 0.05 + 50 * 0.08) / 1e6, 8);
+
+    // erro do provedor vira transferência com aviso (como nos demais)
+    const C = '5511911119003';
+    llm = () => ({ status: 500 });
+    await say(C, 'Bom dia');
+    expect(await conv(C)).toMatchObject({ handler: 'HUMAN' });
+    await setModel(agentModelId); // volta ao modelo original para os demais testes
   });
 });
 

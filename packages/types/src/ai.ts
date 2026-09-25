@@ -20,7 +20,7 @@ export const AI_GENERATIVE_ONLY: AiOperation[] = ['REMOVE_OBJECT', 'REMOVE_FURNI
 export const AI_LOCAL_MODEL_ID = 'local';
 export const AI_LOCAL_OPERATIONS: AiOperation[] = ['ENHANCE', 'LIGHTING'];
 
-export const AI_PROVIDERS = ['openai', 'gemini'] as const;
+export const AI_PROVIDERS = ['openai', 'gemini', 'anthropic', 'groq'] as const;
 export type AiProviderId = (typeof AI_PROVIDERS)[number];
 export const AI_MODEL_KINDS = ['IMAGE', 'TEXT'] as const;
 export type AiModelKind = (typeof AI_MODEL_KINDS)[number];
@@ -32,9 +32,13 @@ export const AI_TIER_HINTS: Record<AiTier, string> = { ECONOMIC: 'Mais rápido e
 
 /** Provedores suportados. Os modelos vêm da própria conta (listados pela API do provedor quando a chave é cadastrada). */
 export const AI_PROVIDER_CATALOG: Record<AiProviderId, { label: string; note: string }> = {
-  openai: { label: 'OpenAI (GPT)', note: 'Chave em platform.openai.com → API keys.' },
-  gemini: { label: 'Google Gemini', note: 'Chave em aistudio.google.com → Get API key.' },
+  openai: { label: 'OpenAI (GPT)', note: 'Chave em platform.openai.com → API keys. Texto e edição de imagens.' },
+  gemini: { label: 'Google Gemini', note: 'Chave em aistudio.google.com → Get API key. Texto e edição de imagens.' },
+  anthropic: { label: 'Anthropic (Claude)', note: 'Chave em console.anthropic.com → API keys. Só texto (conversa e textos).' },
+  groq: { label: 'Groq', note: 'Chave em console.groq.com → API Keys. Só texto; respostas muito rápidas e baratas.' },
 };
+/** Provedores que só geram texto: não editam imagens. */
+export const AI_TEXT_ONLY_PROVIDERS: AiProviderId[] = ['anthropic', 'groq'];
 /** Custos conhecidos (estimativa, em US$) para pré-preencher; o usuário confirma ou corrige. Imagem = por imagem; texto = por milhão de tokens. */
 export const AI_KNOWN_COSTS: { match: RegExp; costUsd?: number; inputCostPerMTok?: number; outputCostPerMTok?: number }[] = [
   { match: /^gpt-image-1\.5/, costUsd: 0.13 }, { match: /^gpt-image-1-mini/, costUsd: 0.02 }, { match: /^gpt-image-1/, costUsd: 0.08 },

@@ -13,7 +13,8 @@ export function guessTier(model: string, kind: AiModelKind | 'OTHER'): AiTier {
   const word = (re: string) => new RegExp(`(^|[-_.:/])(${re})($|[-_.:/])`).test(model); // palavra inteira: "gemini" não conta como "mini"
   if (word('mini|nano|lite|haiku|small|flash-lite')) return 'ECONOMIC';
   if (kind === 'IMAGE') return /(^|[-_])(1\.5|pro)($|[-_])|3\.\d-pro/.test(model) ? 'PREMIUM' : 'STANDARD';
-  if (word('pro|opus|ultra|o\\d') || /gpt-5(\.\d+)?$|gpt-4\.5/.test(model)) return 'PREMIUM';
+  if (word('pro|opus|ultra|o\\d') || /gpt-5(\.\d+)?$|gpt-4\.5|(^|[-_])(70b|120b|405b|maverick)/.test(model)) return 'PREMIUM';
+  if (/(^|[-_.])(8b|instant|scout)($|[-_.])/.test(model)) return 'ECONOMIC';
   return 'STANDARD';
 }
 
@@ -52,9 +53,29 @@ async function listGemini(base: string, key: string): Promise<Raw[]> {
   return out;
 }
 
+const GROQ_NOT_TEXT = /(whisper|tts|guard|playai|orpheus|embed|transcri)/;
+
+async function listAnthropic(base: string, key: string): Promise<Raw[]> {
+  const out: Raw[] = [];
+  let after = '';
+  for (let page = 0; page < 5; page++) {
+    const json = await getJson(`${base}/models?limit=100${after ? `&after_id=${encodeURIComponent(after)}` : ''}`, { 'x-api-key': key, 'anthropic-version': '2023-06-01' });
+    for (const m of json?.data ?? []) if (m.id) out.push({ id: m.id, label: m.display_name || m.id, guess: 'TEXT' });
+    if (!json?.has_more || !json?.last_id) break;
+    after = json.last_id;
+  }
+  return out;
+}
+
+async function listGroq(base: string, key: string): Promise<Raw[]> {
+  const json = await getJson(`${base}/models`, { authorization: `Bearer ${key}` });
+  return (json?.data ?? []).filter((m: { id?: string; active?: boolean }) => m.id && m.active !== false)
+    .map((m: { id: string }): Raw => ({ id: m.id, label: m.id, guess: GROQ_NOT_TEXT.test(m.id) ? 'OTHER' : 'TEXT' }));
+}
+
 /** Lista os modelos que a conta pode usar (e, de quebra, prova que a chave vale). */
 export async function discoverModels(provider: AiProviderId, base: string, apiKey: string): Promise<DiscoveredModelDto[]> {
-  const raw = provider === 'gemini' ? await listGemini(base, apiKey) : await listOpenAi(base, apiKey);
+  const raw = provider === 'gemini' ? await listGemini(base, apiKey) : provider === 'anthropic' ? await listAnthropic(base, apiKey) : provider === 'groq' ? await listGroq(base, apiKey) : await listOpenAi(base, apiKey);
   const order = { IMAGE: 0, TEXT: 1, OTHER: 2 } as const;
   return raw
     .sort((a, b) => order[a.guess] - order[b.guess] || a.id.localeCompare(b.id))

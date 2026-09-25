@@ -20,6 +20,8 @@ const schema = z.object({
   MARKETING_RETRY_DELAY_MS: z.coerce.number().default(5000),
   // Login com o Facebook (publicação em redes sociais). O app da Meta é da plataforma, não de cada empresa.
   GEMINI_API_URL: z.string().default('https://generativelanguage.googleapis.com/v1beta'),
+  ANTHROPIC_API_URL: z.string().default('https://api.anthropic.com/v1'),
+  GROQ_API_URL: z.string().default('https://api.groq.com/openai/v1'),
   OPENAI_API_URL: z.string().default('https://api.openai.com/v1'),
   AI_TIMEOUT_MS: z.coerce.number().default(120000),
   INTELLIGENCE_TICK_MS: z.coerce.number().default(600000), // rotinas de score e retomada de leads parados

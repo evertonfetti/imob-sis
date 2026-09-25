@@ -69,6 +69,7 @@ export const ERROR_CODES = {
   AGENT_MODEL_INVALID: 'O modelo escolhido não é um modelo de texto ativo.',
   DOCUMENT_INVALID: 'Não foi possível ler o documento. Envie PDF, DOCX, TXT, MD ou CSV com texto (até 10 MB).',
   DOCUMENT_EMPTY: 'O documento não tem texto legível (talvez seja uma imagem escaneada).',
+  AI_KIND_UNSUPPORTED: 'Este provedor só gera texto: não dá para usá-lo para editar imagens.',
   AI_KEY_INVALID: 'O provedor de IA não aceitou a chave informada.',
   AI_MEDIA_INVALID: 'Só fotos já processadas podem ser editadas por IA.',
   AI_GENERATION_BUSY: 'Esta foto já tem uma edição em andamento. Aguarde terminar.',

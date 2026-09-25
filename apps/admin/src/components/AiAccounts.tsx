@@ -1,5 +1,5 @@
 import {
-  AI_MODEL_KIND_LABELS, AI_OPERATIONS, AI_OPERATION_LABELS, AI_PROVIDERS, AI_TIERS, AI_TIER_LABELS,
+  AI_MODEL_KIND_LABELS, AI_OPERATIONS, AI_OPERATION_LABELS, AI_PROVIDERS, AI_PROVIDER_CATALOG, AI_TEXT_ONLY_PROVIDERS, AI_TIERS, AI_TIER_LABELS,
   type AiAccountDto, type AiModelDto, type AiModelKind, type AiOperation, type AiProviderId, type AiSettingsDto, type AiTier, type DiscoveredModelDto,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -15,13 +15,13 @@ interface Pick { model: string; label: string; kind: AiModelKind; tier: AiTier; 
 const toPick = (m: DiscoveredModelDto): Pick => ({ model: m.model, label: m.label, kind: m.guess === 'OTHER' ? 'TEXT' : m.guess, tier: m.tier, costUsd: m.costUsd, inputCostPerMTok: m.inputCostPerMTok, outputCostPerMTok: m.outputCostPerMTok, on: false, guess: m.guess });
 
 /** Escolha dos modelos que a chave dá acesso: separados por finalidade, com nível e custo editáveis. */
-function ModelPicker({ list, onChange }: { list: Pick[]; onChange: (l: Pick[]) => void }) {
+function ModelPicker({ list, onChange, textOnly = false }: { list: Pick[]; onChange: (l: Pick[]) => void; textOnly?: boolean }) {
   const [filter, setFilter] = useState('');
   const [others, setOthers] = useState(false);
   const set = (model: string, patch: Partial<Pick>) => onChange(list.map((p) => (p.model === model ? { ...p, ...patch } : p)));
   const match = (p: Pick) => !filter.trim() || `${p.model} ${p.label}`.toLowerCase().includes(filter.trim().toLowerCase());
   const groups: { key: string; title: string; hint: string; items: Pick[] }[] = [
-    { key: 'IMAGE', title: 'Editar imagens', hint: 'Melhorar fotos, remover objetos, decorar…', items: list.filter((p) => p.guess === 'IMAGE' && match(p)) },
+    ...(textOnly ? [] : [{ key: 'IMAGE', title: 'Editar imagens', hint: 'Melhorar fotos, remover objetos, decorar…', items: list.filter((p) => p.guess === 'IMAGE' && match(p)) }]),
     { key: 'TEXT', title: 'Gerar texto e conversar', hint: 'Agente de atendimento e textos.', items: list.filter((p) => p.guess === 'TEXT' && match(p)) },
     { key: 'OTHER', title: 'Outros modelos', hint: 'Embeddings, áudio, vídeo… (só adicione se souber que serve).', items: list.filter((p) => p.guess === 'OTHER' && match(p)) },
   ];
@@ -30,7 +30,7 @@ function ModelPicker({ list, onChange }: { list: Pick[]; onChange: (l: Pick[]) =
       <label className="mp-check"><input type="checkbox" checked={p.on} onChange={(e) => set(p.model, { on: e.target.checked })} /><span><strong>{p.label}</strong><small>{p.model}</small></span></label>
       {p.on && (
         <div className="mp-fields">
-          {p.guess === 'OTHER' && <Select value={p.kind} onChange={(e) => set(p.model, { kind: e.target.value as AiModelKind })} aria-label="Finalidade">{(['IMAGE', 'TEXT'] as const).map((k) => <option key={k} value={k}>{AI_MODEL_KIND_LABELS[k]}</option>)}</Select>}
+          {p.guess === 'OTHER' && !textOnly && <Select value={p.kind} onChange={(e) => set(p.model, { kind: e.target.value as AiModelKind })} aria-label="Finalidade">{(['IMAGE', 'TEXT'] as const).map((k) => <option key={k} value={k}>{AI_MODEL_KIND_LABELS[k]}</option>)}</Select>}
           <Select value={p.tier} onChange={(e) => set(p.model, { tier: e.target.value as AiTier })} aria-label="Nível">{AI_TIERS.map((t) => <option key={t} value={t}>{AI_TIER_LABELS[t]}</option>)}</Select>
           {p.kind === 'IMAGE' ? (
             <Input type="number" step="0.01" min={0} value={p.costUsd} onChange={(e) => set(p.model, { costUsd: Number(e.target.value) })} aria-label="Custo por imagem (US$)" title="Custo por imagem, em US$" />
@@ -83,9 +83,9 @@ function AddAccountModal({ onClose, onDone }: { onClose: () => void; onDone: (d:
       <div style={{ display: 'grid', gap: 14 }}>
         {err && <div className="alert">{err}</div>}
         <form className="form-grid" onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); find.mutate(); }}>
-          <Field label="Provedor"><Select value={f.provider} disabled={!!list} onChange={(e) => setF({ ...f, provider: e.target.value as AiProviderId })}>{AI_PROVIDERS.map((p) => <option key={p} value={p}>{p === 'openai' ? 'OpenAI (GPT)' : 'Google Gemini'}</option>)}</Select></Field>
+          <Field label="Provedor"><Select value={f.provider} disabled={!!list} onChange={(e) => setF({ ...f, provider: e.target.value as AiProviderId })}>{AI_PROVIDERS.map((p) => <option key={p} value={p}>{AI_PROVIDER_CATALOG[p].label}</option>)}</Select></Field>
           <Field label="Nome da conta" hint="Para você reconhecer, ex.: “OpenAI da matriz”."><Input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={60} /></Field>
-          <Field label="Chave de acesso (API key)" className="span-2" hint={f.provider === 'openai' ? 'Em platform.openai.com → API keys.' : 'Em aistudio.google.com → Get API key.'}>
+          <Field label="Chave de acesso (API key)" className="span-2" hint={AI_PROVIDER_CATALOG[f.provider].note}>
             <div style={{ display: 'flex', gap: 8 }}>
               <Input type="password" autoComplete="off" required value={f.apiKey} disabled={!!list} onChange={(e) => setF({ ...f, apiKey: e.target.value })} />
               {!list ? <Button variant="primary" disabled={find.isPending || !f.apiKey || !f.name.trim()}>{find.isPending ? 'Buscando…' : 'Buscar modelos'}</Button> : <Button type="button" onClick={() => { setList(null); setErr(null); }}>Trocar chave</Button>}
@@ -95,7 +95,7 @@ function AddAccountModal({ onClose, onDone }: { onClose: () => void; onDone: (d:
         {list && (
           <>
             <div className="card-sub"><strong>{list.length} modelos</strong> disponíveis nesta chave. Marque os que quer usar e ajuste o nível (econômico, padrão, premium).</div>
-            <ModelPicker list={list} onChange={setList} />
+            <ModelPicker list={list} onChange={setList} textOnly={AI_TEXT_ONLY_PROVIDERS.includes(f.provider)} />
           </>
         )}
       </div>
@@ -117,7 +117,7 @@ function MoreModelsModal({ account, onClose, onDone }: { account: AiAccountDto; 
   return (
     <Modal title={`Modelos da conta “${account.name}”`} onClose={onClose} wide footer={<><Button type="button" onClick={onClose}>Cancelar</Button><Button variant="primary" disabled={!n || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Adicionando…' : `Adicionar ${n} ${n === 1 ? 'modelo' : 'modelos'}`}</Button></>}>
       {err && <div className="alert" style={{ marginBottom: 12 }}>{err}</div>}
-      {q.isLoading ? <SkeletonRows rows={5} /> : q.error ? <div className="alert">{errorMessage(q.error)}</div> : !list.length ? <div className="card-sub">Todos os modelos desta conta já foram adicionados.</div> : <ModelPicker list={list} onChange={setEdits} />}
+      {q.isLoading ? <SkeletonRows rows={5} /> : q.error ? <div className="alert">{errorMessage(q.error)}</div> : !list.length ? <div className="card-sub">Todos os modelos desta conta já foram adicionados.</div> : <ModelPicker list={list} onChange={setEdits} textOnly={AI_TEXT_ONLY_PROVIDERS.includes(account.provider)} />}
     </Modal>
   );
 }

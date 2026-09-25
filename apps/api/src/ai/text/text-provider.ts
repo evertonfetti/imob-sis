@@ -52,3 +52,26 @@ export class GeminiText implements AITextProvider {
     return { text, inputTokens: Number(json?.usageMetadata?.promptTokenCount ?? 0), outputTokens: Number(json?.usageMetadata?.candidatesTokenCount ?? 0) };
   }
 }
+
+/** Anthropic (Claude) — Messages API. A resposta vem em blocos de conteúdo; o JSON é pedido no prompt e lido com tolerância. */
+export class AnthropicText implements AITextProvider {
+  readonly id = 'anthropic';
+  constructor(private readonly c: TextConfig) {}
+
+  async chat(i: ChatInput): Promise<ChatResult> {
+    // A API exige que a conversa comece com o cliente e alterne os autores.
+    const msgs: ChatMessage[] = [];
+    for (const m of i.messages) {
+      const last = msgs.at(-1);
+      if (!msgs.length && m.role === 'assistant') continue;
+      if (last && last.role === m.role) last.content += `\n${m.content}`; else msgs.push({ ...m });
+    }
+    const { res, json } = await post(`${this.c.baseUrl}/messages`, { 'x-api-key': this.c.apiKey, 'anthropic-version': '2023-06-01' }, {
+      model: this.c.model, max_tokens: 1024, system: i.system, messages: msgs,
+    }, this.c.timeoutMs);
+    if (!res.ok) throw httpError(res.status, json?.error?.message ?? '');
+    const text = (json?.content ?? []).filter((b: { type?: string }) => b.type === 'text').map((b: { text?: string }) => b.text ?? '').join('');
+    if (!text.trim()) throw new AiProviderError('O provedor não devolveu resposta (pode ter recusado o pedido).', 200, 'refused');
+    return { text, inputTokens: Number(json?.usage?.input_tokens ?? 0), outputTokens: Number(json?.usage?.output_tokens ?? 0) };
+  }
+}

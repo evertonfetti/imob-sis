@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  AI_DEFAULT_MONTHLY_LIMIT, AI_LOCAL_MODEL_ID, AI_LOCAL_OPERATIONS, AI_PROVIDERS, AI_PROVIDER_CATALOG,
+  AI_DEFAULT_MONTHLY_LIMIT, AI_LOCAL_MODEL_ID, AI_LOCAL_OPERATIONS, AI_PROVIDERS, AI_PROVIDER_CATALOG, AI_TEXT_ONLY_PROVIDERS,
   type AiAccountDto, type AiAccountInput, type AiChoiceDto, type AiModelDto, type AiModelInput, type AiOperation, type AiProviderId,
   type AiSettingsDto, type AiSettingsInput, type AiStatusDto, type DiscoveredModelDto, type UpdateAiAccountInput, type UpdateAiModelInput,
 } from '@imob/types';
@@ -15,7 +15,7 @@ import { LocalProvider } from './providers/local.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { discoverModels } from './providers/discovery';
 import { AiProviderError, type AIImageProvider } from './providers/provider';
-import { GeminiText, OpenAiText, type AITextProvider } from './text/text-provider';
+import { AnthropicText, GeminiText, OpenAiText, type AITextProvider } from './text/text-provider';
 
 interface Stored { monthlyLimit?: number; defaultModelId?: string | null; operationDefaults?: Partial<Record<AiOperation, string | null>> }
 export interface ResolvedModel {
@@ -42,7 +42,8 @@ export class AiSettingsService {
 
   // ---------- Construção dos provedores ----------
   private build(provider: AiProviderId, model: string, apiKey: string, costUsd: number): AIImageProvider {
-    const cfg: HttpConfig = { baseUrl: (provider === 'gemini' ? this.env.GEMINI_API_URL : this.env.OPENAI_API_URL).replace(/\/$/, ''), apiKey, model, timeoutMs: this.env.AI_TIMEOUT_MS, costUsd };
+    if (AI_TEXT_ONLY_PROVIDERS.includes(provider)) throw new AppException('AI_KIND_UNSUPPORTED', 400);
+    const cfg: HttpConfig = { baseUrl: this.baseUrl(provider), apiKey, model, timeoutMs: this.env.AI_TIMEOUT_MS, costUsd };
     return provider === 'gemini' ? new GeminiProvider(cfg) : new OpenAiProvider(cfg);
   }
   private apiKey(secrets: string) { return decryptJson<{ apiKey: string }>(secrets, this.key).apiKey; }
@@ -137,7 +138,15 @@ export class AiSettingsService {
   }
 
   // ---------- Contas ----------
-  private baseUrl(provider: AiProviderId) { return (provider === 'gemini' ? this.env.GEMINI_API_URL : this.env.OPENAI_API_URL).replace(/\/$/, ''); }
+  private baseUrl(provider: AiProviderId) {
+    const url = { openai: this.env.OPENAI_API_URL, gemini: this.env.GEMINI_API_URL, anthropic: this.env.ANTHROPIC_API_URL, groq: this.env.GROQ_API_URL }[provider];
+    return url.replace(/\/$/, '');
+  }
+
+  /** Provedores só de texto não podem ter modelos de imagem. */
+  private assertKind(provider: string, kind: string) {
+    if (kind === 'IMAGE' && AI_TEXT_ONLY_PROVIDERS.includes(provider as AiProviderId)) throw new AppException('AI_KIND_UNSUPPORTED', 400);
+  }
 
   /** Lista os modelos da conta na API do provedor; falha se a chave não valer. */
   async discover(provider: AiProviderId, apiKey: string): Promise<DiscoveredModelDto[]> {
@@ -156,6 +165,7 @@ export class AiSettingsService {
   async createAccount(ctx: AuthedCtx, input: AiAccountInput) {
     const { companyId } = ctx.user;
     await this.discover(input.provider, input.apiKey); // prova que a chave vale antes de guardar
+    for (const m of input.models) this.assertKind(input.provider, m.kind);
     const seen = new Set<string>();
     const models = input.models.filter((m) => !seen.has(m.model) && !!seen.add(m.model));
     const acc = await this.prisma.aiAccount.create({
@@ -194,7 +204,8 @@ export class AiSettingsService {
   // ---------- Modelos ----------
   async addModel(ctx: AuthedCtx, accountId: string, input: AiModelInput) {
     const { companyId } = ctx.user;
-    await this.account(companyId, accountId);
+    const acc = await this.account(companyId, accountId);
+    this.assertKind(acc.provider, input.kind);
     if (await this.prisma.aiModel.findUnique({ where: { accountId_model: { accountId, model: input.model } } })) throw new AppException('AI_ACCOUNT_DUPLICATE', 409);
     await this.prisma.aiModel.create({ data: { companyId, accountId, label: input.label, model: input.model, kind: input.kind, tier: input.tier, costUsd: input.costUsd, inputCostPerMTok: input.inputCostPerMTok ?? null, outputCostPerMTok: input.outputCostPerMTok ?? null } });
     await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: accountId, action: 'UPDATE', after: { provider: 'AI_ACCOUNT', addedModel: input.model, tier: input.tier }, ctx });
@@ -210,6 +221,7 @@ export class AiSettingsService {
   async updateModel(ctx: AuthedCtx, id: string, input: UpdateAiModelInput) {
     const { companyId } = ctx.user;
     const m = await this.model(companyId, id);
+    if (input.kind) this.assertKind((await this.account(companyId, m.accountId)).provider, input.kind);
     if (input.model && input.model !== m.model && (await this.prisma.aiModel.findUnique({ where: { accountId_model: { accountId: m.accountId, model: input.model } } }))) throw new AppException('AI_ACCOUNT_DUPLICATE', 409);
     await this.prisma.aiModel.update({ where: { id }, data: input });
     await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: m.accountId, action: 'UPDATE', after: { provider: 'AI_ACCOUNT', model: input.model ?? m.model, ...input }, ctx });
@@ -235,7 +247,7 @@ export class AiSettingsService {
     const m = await this.prisma.aiModel.findFirst({ where: { id, companyId, kind: 'TEXT', enabled: true, account: { active: true } }, include: { account: true } });
     if (!m || !isProvider(m.account.provider)) return null;
     const cfg = { baseUrl: this.baseUrl(m.account.provider), apiKey: this.apiKey(m.account.secrets), model: m.model, timeoutMs: this.env.AI_TIMEOUT_MS };
-    return { id: m.id, providerId: m.account.provider, model: m.model, label: m.label, provider: m.account.provider === 'gemini' ? new GeminiText(cfg) : new OpenAiText(cfg), inputCostPerMTok: num(m.inputCostPerMTok), outputCostPerMTok: num(m.outputCostPerMTok) };
+    return { id: m.id, providerId: m.account.provider, model: m.model, label: m.label, provider: m.account.provider === 'gemini' ? new GeminiText(cfg) : m.account.provider === 'anthropic' ? new AnthropicText(cfg) : new OpenAiText(cfg) /* Groq usa o mesmo formato da OpenAI */, inputCostPerMTok: num(m.inputCostPerMTok), outputCostPerMTok: num(m.outputCostPerMTok) };
   }
 
   // ---------- Padrões ----------
