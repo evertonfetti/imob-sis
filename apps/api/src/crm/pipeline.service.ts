@@ -61,9 +61,12 @@ export class PipelineService {
       }),
     );
 
-    // Tarefas atrasadas por lead (indicador no cartão).
+    // Tarefas atrasadas e mensagens não lidas por lead (indicadores no cartão).
     const ids = columns.flatMap((c) => c.leads.map((l) => l.id));
     if (ids.length) {
+      const unread = await this.prisma.conversation.groupBy({ by: ['leadId'], where: { leadId: { in: ids }, unreadCount: { gt: 0 } }, _sum: { unreadCount: true } });
+      const unreadMap = new Map(unread.map((u) => [u.leadId, u._sum.unreadCount ?? 0]));
+      for (const c of columns) for (const l of c.leads) l.unreadMessages = unreadMap.get(l.id) ?? 0;
       const overdue = await this.prisma.task.groupBy({
         by: ['leadId'], where: { leadId: { in: ids }, status: 'OPEN', dueAt: { lt: new Date() } }, _count: true,
       });
@@ -76,7 +79,7 @@ export class PipelineService {
   private card(r: { id: string; source: string; stageEnteredAt: Date; createdAt: Date; customer: { id: string; name: string; phone: string | null }; property: { id: string; code: string; title: string } | null; broker: { id: string; name: string } | null }): BoardCard {
     return {
       id: r.id, customer: r.customer, property: r.property, broker: r.broker, source: r.source,
-      stageEnteredAt: r.stageEnteredAt.toISOString(), createdAt: r.createdAt.toISOString(), overdueTasks: 0,
+      stageEnteredAt: r.stageEnteredAt.toISOString(), createdAt: r.createdAt.toISOString(), overdueTasks: 0, unreadMessages: 0,
     };
   }
 

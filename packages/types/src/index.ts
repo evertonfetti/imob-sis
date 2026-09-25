@@ -6,3 +6,4 @@ export * from './utils';
 export * from './media';
 export * from './public';
 export * from './crm';
+export * from './whatsapp';

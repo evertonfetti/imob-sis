@@ -1,7 +1,7 @@
 import type { BoardColumn, StageDto } from '@imob/types';
 import { LEAD_SOURCES, LEAD_SOURCE_LABELS } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlarmClock, Building2, Plus, Search, Settings2 } from 'lucide-react';
+import { AlarmClock, Building2, MessageCircle, Plus, Search, Settings2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LostModal, NewLeadModal, sourceLabel, useBrokers, usePipeline } from '../components/crm';
@@ -119,6 +119,7 @@ export function Pipeline() {
                       <div className="lcard-meta">
                         {l.property && <span className="mini"><Building2 />{l.property.code}</span>}
                         <span className="mini">{sourceLabel(l.source)}</span>
+                        {l.unreadMessages > 0 && <span className="mini" style={{ background: 'var(--accent)', color: 'var(--accent-ink)', borderColor: 'transparent' }} title="Mensagens não lidas no WhatsApp"><MessageCircle />{l.unreadMessages}</span>}
                         {l.overdueTasks > 0 && <span className="mini danger" title="Tarefas atrasadas"><AlarmClock />{l.overdueTasks}</span>}
                       </div>
                       <div className="lcard-foot"><span title={`Entrou na etapa em ${new Date(l.stageEnteredAt).toLocaleString('pt-BR')}`}>na etapa {timeAgo(l.stageEnteredAt)}</span></div>

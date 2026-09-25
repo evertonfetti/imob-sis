@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 5 concluídos — a primeira versão interna está completa: fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público e CRM (funil, kanban, timeline, tarefas, distribuição de leads).
+**Status:** Blocos 1 a 6 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM (funil, kanban, timeline, tarefas, distribuição) e WhatsApp (API oficial da Meta).
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -67,6 +67,16 @@ cada clique no WhatsApp também é registrado. O número do WhatsApp e a cor da 
 - **Distribuição de leads** (*Empresa e filiais*): **Manual** ou **Rodízio** entre corretores. O corretor responsável por um imóvel recebe os leads dele quando é um corretor; caso contrário vale a distribuição configurada.
 - **Quem vê o quê:** só quem tem a permissão `lead.view_all` (administrador, gerente, atendimento, marketing) vê os leads de todos; o corretor vê os que estão atribuídos a ele.
 - Todo lead novo com responsável ganha a tarefa *"Fazer o primeiro contato"* (prazo de 30 min). Cada movimento gera histórico (tempo por etapa) e registro na timeline.
+
+### WhatsApp (API oficial da Meta)
+
+Conecte em **Integrações → WhatsApp** (ID do número, token permanente e segredo do app). A tela mostra a **URL do webhook**
+(`https://SUA-API/webhooks/meta/whatsapp`) e o **token de verificação** para colar na Meta (WhatsApp → Configuração → Webhook, campo `messages`).
+Os segredos ficam criptografados no banco (AES-256-GCM) e nunca voltam pela API.
+
+- **Recebimento:** toda mensagem valida a assinatura `X-Hub-Signature-256`. O cliente é reconhecido pelo telefone; se não houver lead aberto, um lead novo (origem WhatsApp) entra no funil, com o imóvel identificado pelo código (ex.: `IM0012`) e a campanha do clique no site.
+- **Envio:** dentro de 24 h da última mensagem do cliente vale texto livre; depois disso, só **modelos aprovados** na Meta. Falhas ficam visíveis e podem ser reenviadas.
+- Cada empresa usa o seu número: o webhook é roteado pelo `phone_number_id`.
 
 ### Fotos e mídias
 

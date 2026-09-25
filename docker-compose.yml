@@ -56,6 +56,15 @@ services:
       DATABASE_URL: postgresql://imob:${POSTGRES_PASSWORD}@postgres:5432/imob
       JWT_ACCESS_SECRET: "${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET (32+ caracteres)}"
       ADMIN_URL: "${ADMIN_URL:?defina ADMIN_URL (URL pública do painel)}"
+      SITE_URL: "${SITE_URL:?defina SITE_URL (ex. https://www.seudominio.com.br)}"
+      # URL pública da API, sem barra no final e sem /api/v1. Usada nos links dos arquivos enviados.
+      API_PUBLIC_URL: "${API_PUBLIC_URL:?defina API_PUBLIC_URL (ex. https://api.seudominio.com.br)}"
+      REDIS_URL: redis://redis:6379
+      # Sem S3_* preenchido, as mídias ficam neste volume (faça backup dele).
+      LOCAL_STORAGE_DIR: /data/uploads
+      # Opcional: chave (32+ caracteres) que criptografa o token do WhatsApp guardado no banco.
+      # Sem ela, usa-se o JWT_ACCESS_SECRET: trocá-lo depois obriga a reconectar o WhatsApp.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       SEED_COMPANY_NAME: ${SEED_COMPANY_NAME:-}

@@ -24,11 +24,12 @@ interface Lead {
   attribution: { utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmContent: string | null; utmTerm: string | null; fbclid: string | null; gclid: string | null; landingPage: string | null; referrer: string | null } | null;
   timeline: { id: string; type: string; title: string; description: string | null; createdAt: string; userName: string | null }[];
   tasks: TaskRow[];
+  conversation: { id: string; unreadCount: number; lastMessageAt: string | null; lastMessagePreview: string | null } | null;
 }
 
 const STATUS_TONE: Record<LeadStatus, 'ok' | 'warn' | 'danger' | 'accent' | undefined> = { NEW: 'accent', CONTACTED: 'warn', QUALIFIED: 'warn', WON: 'ok', LOST: 'danger' };
 const TL_ICON: Record<string, ReactNode> = {
-  LEAD_CREATED: <Sparkles />, STAGE_CHANGED: <ArrowRightLeft />, LEAD_ASSIGNED: <UserCheck />, LEAD_UPDATED: <Pencil />, NOTE_ADDED: <StickyNote />, TASK_CREATED: <ClipboardList />, TASK_COMPLETED: <CheckCircle2 />,
+  LEAD_CREATED: <Sparkles />, STAGE_CHANGED: <ArrowRightLeft />, LEAD_ASSIGNED: <UserCheck />, LEAD_UPDATED: <Pencil />, NOTE_ADDED: <StickyNote />, TASK_CREATED: <ClipboardList />, TASK_COMPLETED: <CheckCircle2 />, WHATSAPP_RECEIVED: <MessageCircle />, WHATSAPP_SENT: <MessageCircle />,
 };
 
 export function LeadDetail() {
@@ -137,6 +138,16 @@ export function LeadDetail() {
               <div className="kvrow"><span>Etapa</span><span><StagePill stage={l.stage} /></span></div>
             </div>
           </section>
+
+          {l.conversation && (
+            <section className="card">
+              <div className="card-head"><div className="card-title">WhatsApp</div>{l.conversation.unreadCount > 0 && <span className="unread">{l.conversation.unreadCount}</span>}</div>
+              <div className="section-body" style={{ display: 'grid', gap: 10 }}>
+                <div className="card-sub" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.conversation.lastMessagePreview ?? 'Conversa iniciada'}{l.conversation.lastMessageAt ? ` · ${timeAgo(l.conversation.lastMessageAt)}` : ''}</div>
+                <Link className="btn btn-primary" to={`/conversas/${l.conversation.id}`}><MessageCircle /> Abrir conversa</Link>
+              </div>
+            </section>
+          )}
 
           <section className="card">
             <div className="card-head"><div className="card-title">Tarefas</div>{can('lead.edit') && <Button variant="ghost" onClick={() => setTaskModal('new')}><Plus /> Nova</Button>}</div>

@@ -48,6 +48,14 @@ export const ERROR_CODES = {
   LEAD_BROKER_INVALID: 'O corretor informado não existe ou está inativo.',
   LEAD_NO_BROKER_AVAILABLE: 'Não há corretores ativos para receber o lead.',
   TASK_INVALID: 'A tarefa informada não existe ou já foi concluída.',
+  WEBHOOK_SIGNATURE_INVALID: 'Assinatura do webhook inválida.',
+  WHATSAPP_NOT_CONFIGURED: 'O WhatsApp ainda não foi conectado. Configure em Integrações.',
+  WHATSAPP_WINDOW_CLOSED: 'Passaram mais de 24 horas desde a última mensagem do cliente. Envie um modelo de mensagem aprovado.',
+  WHATSAPP_SEND_FAILED: 'Não foi possível enviar a mensagem pelo WhatsApp.',
+  WHATSAPP_PHONE_IN_USE: 'Este número do WhatsApp já está conectado a outra empresa.',
+  WHATSAPP_TEST_FAILED: 'Não foi possível validar as credenciais com a Meta.',
+  WHATSAPP_MEDIA_UNAVAILABLE: 'Não foi possível baixar o arquivo desta mensagem.',
+  MESSAGE_NOT_RETRYABLE: 'Somente mensagens enviadas que falharam podem ser reenviadas.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

@@ -19,6 +19,7 @@ import { PublicModule } from './public/public.module';
 import { RolesController } from './roles/roles.controller';
 import { StorageModule } from './storage/storage.module';
 import { UsersModule } from './users/users.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({})
 export class AppModule {
@@ -41,6 +42,7 @@ export class AppModule {
         CatalogModule,
         MediaModule,
         CrmModule,
+        WhatsappModule,
         PublicModule,
         PropertiesModule,
       ],

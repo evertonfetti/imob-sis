@@ -164,5 +164,6 @@ export interface BoardCard {
   stageEnteredAt: string;
   createdAt: string;
   overdueTasks: number;
+  unreadMessages: number;
 }
 export interface BoardColumn { stage: StageDto; total: number; leads: BoardCard[] }

@@ -225,12 +225,13 @@ export class LeadsService {
 
   async get(user: AuthedUser, id: string) {
     const lead = await this.load(user, id);
-    const [timeline, tasks] = await Promise.all([
+    const [timeline, tasks, conversation] = await Promise.all([
       this.prisma.timelineEvent.findMany({ where: { leadId: id }, orderBy: { createdAt: 'desc' }, take: 200 }),
       this.prisma.task.findMany({
         where: { leadId: id, status: 'OPEN' }, orderBy: [{ dueAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
         include: { assignedUser: { select: { id: true, name: true } } },
       }),
+      this.prisma.conversation.findFirst({ where: { leadId: id, companyId: user.companyId }, select: { id: true, unreadCount: true, lastMessageAt: true, lastMessagePreview: true } }),
     ]);
     const userIds = [...new Set(timeline.map((t) => t.userId).filter((x): x is string => !!x))];
     const users = await this.prisma.user.findMany({ where: { id: { in: userIds }, companyId: user.companyId }, select: { id: true, name: true } });
@@ -240,6 +241,7 @@ export class LeadsService {
       property: lead.property ? { ...lead.property, salePrice: num(lead.property.salePrice), rentPrice: num(lead.property.rentPrice) } : null,
       timeline: timeline.map((t) => ({ ...t, userName: t.userId ? (names.get(t.userId) ?? null) : null })),
       tasks,
+      conversation,
     };
   }
 

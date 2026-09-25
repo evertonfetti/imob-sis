@@ -14,6 +14,10 @@ const schema = z.object({
   REFRESH_TTL_DAYS: z.coerce.number().default(30),
   API_PUBLIC_URL: z.string().optional(),
   SITE_URL: z.string().optional(),
+  // Chave para criptografar credenciais de integrações. Sem ela, deriva-se do JWT_ACCESS_SECRET.
+  ENCRYPTION_KEY: z.string().min(32, 'ENCRYPTION_KEY precisa ter 32+ caracteres').optional(),
+  WHATSAPP_GRAPH_URL: z.string().default('https://graph.facebook.com'),
+  WHATSAPP_API_VERSION: z.string().default('v22.0'),
   PUBLIC_COMPANY_ID: z.string().uuid().optional(),
   REDIS_URL: z.string().optional(),
   STORAGE_DRIVER: z.enum(['local', 's3']).optional(),

@@ -20,7 +20,7 @@ const ACTIONS: Record<string, string> = {
   LOGIN: 'entrou no sistema', LOGOUT: 'saiu do sistema', CREATE: 'criou', UPDATE: 'atualizou', DEACTIVATE: 'desativou',
   ROLE_CHANGE: 'alterou o papel de', STAGE_CHANGE: 'moveu no funil', ASSIGN: 'atribuiu', PUBLISH: 'publicou', MEDIA_ADDED: 'adicionou arquivo em', MEDIA_REMOVED: 'removeu arquivo de', COVER_CHANGED: 'alterou a capa de', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
 };
-const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', LEAD: 'um lead', CUSTOMER: 'um cliente', PIPELINE_STAGE: 'uma etapa do funil', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
+const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', LEAD: 'um lead', CUSTOMER: 'um cliente', INTEGRATION: 'uma integração', PIPELINE_STAGE: 'uma etapa do funil', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
 
 interface AuditItem { id: string; action: string; entity: string; userName: string | null; createdAt: string }
 

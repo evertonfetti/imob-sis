@@ -11,7 +11,8 @@ import { StorageService } from './storage.service';
 
 const MIME: Record<string, string> = {
   '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.avif': 'image/avif',
-  '.mp4': 'video/mp4', '.webm': 'video/webm', '.pdf': 'application/pdf',
+  '.mp4': 'video/mp4', '.webm': 'video/webm', '.pdf': 'application/pdf', '.3gp': 'video/3gpp',
+  '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.amr': 'audio/amr',
 };
 
 /** Endpoints do driver "local": recebe uploads assinados e serve os arquivos publicados. */

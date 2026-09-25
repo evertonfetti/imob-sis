@@ -7,6 +7,7 @@ import {
 import { LeadsService } from '../crm/leads.service';
 import { AppException, notFound } from '../common/app-exception';
 import type { ReqCtx } from '../common/request-context';
+import { normalizePhone } from '../common/util';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { PublicCompanyService } from './public-company.service';
@@ -16,13 +17,6 @@ const LISTED = ['AVAILABLE', 'RESERVED'] as const;
 
 const num = (v: unknown) => (v == null ? null : Number(v));
 const clean = (v: string | null | undefined) => (v && v.trim() ? v.trim().slice(0, 500) : null);
-
-/** Telefone só com dígitos e sem o código do país (55). */
-export function normalizePhone(v: string) {
-  let d = v.replace(/\D/g, '');
-  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) d = d.slice(2);
-  return d;
-}
 
 const coverInclude = {
   type: { select: { name: true } },

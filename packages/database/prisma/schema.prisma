@@ -103,6 +103,33 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum IntegrationProvider {
+  WHATSAPP
+}
+
+enum ConversationChannel {
+  WHATSAPP
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  RECEIVED
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -145,6 +172,9 @@ model Company {
   leadStageHistories LeadStageHistory[]
   timelineEvents     TimelineEvent[]
   tasks              Task[]
+  integrations       Integration[]
+  conversations      Conversation[]
+  messages           Message[]
 
   @@map("companies")
 }
@@ -482,8 +512,9 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id])
-  leads   Lead[]
+  company       Company        @relation(fields: [companyId], references: [id])
+  leads         Lead[]
+  conversations Conversation[]
 
   @@index([companyId, phone])
   @@index([companyId, email])
@@ -519,15 +550,16 @@ model Lead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company      Company            @relation(fields: [companyId], references: [id])
-  customer     Customer           @relation(fields: [customerId], references: [id])
-  property     Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  broker       User?              @relation(fields: [brokerId], references: [id])
-  stage        PipelineStage?     @relation(fields: [stageId], references: [id])
-  attribution  LeadAttribution?
-  timeline     TimelineEvent[]
-  stageHistory LeadStageHistory[]
-  tasks        Task[]
+  company       Company            @relation(fields: [companyId], references: [id])
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  property      Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  broker        User?              @relation(fields: [brokerId], references: [id])
+  stage         PipelineStage?     @relation(fields: [stageId], references: [id])
+  attribution   LeadAttribution?
+  timeline      TimelineEvent[]
+  stageHistory  LeadStageHistory[]
+  tasks         Task[]
+  conversations Conversation[]
 
   @@index([companyId, createdAt])
   @@index([companyId, status])
@@ -581,6 +613,7 @@ model WhatsAppClick {
   gclid       String?
   landingPage String?
   referrer    String?
+  leadId      String?
   createdAt   DateTime @default(now())
 
   company  Company   @relation(fields: [companyId], references: [id])
@@ -685,4 +718,86 @@ model Task {
   @@index([assignedUserId, status])
   @@index([leadId])
   @@map("tasks")
+}
+
+// ---------- Bloco 6 — WhatsApp ----------
+
+// Credenciais de integrações. Segredos ficam criptografados (AES-256-GCM) em `secrets`; nunca voltam pela API.
+model Integration {
+  id          String              @id @default(uuid(7))
+  companyId   String
+  provider    IntegrationProvider
+  // Identificador do lado do provedor. No WhatsApp: phone_number_id (roteia o webhook para a empresa certa).
+  externalId  String?
+  verifyToken String?
+  config      Json                @default("{}")
+  secrets     String
+  active      Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, provider])
+  @@unique([provider, externalId])
+  @@unique([provider, verifyToken])
+  @@map("integrations")
+}
+
+model Conversation {
+  id                 String              @id @default(uuid(7))
+  companyId          String
+  leadId             String?
+  customerId         String?
+  channel            ConversationChannel @default(WHATSAPP)
+  // Identificador do contato no canal (WhatsApp: wa_id, só dígitos).
+  externalId         String
+  contactName        String?
+  status             ConversationStatus  @default(OPEN)
+  unreadCount        Int                 @default(0)
+  lastMessageAt      DateTime?
+  lastInboundAt      DateTime?
+  lastMessagePreview String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@unique([companyId, channel, externalId])
+  @@index([companyId, lastMessageAt])
+  @@index([leadId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String           @id @default(uuid(7))
+  companyId      String
+  conversationId String
+  direction      MessageDirection
+  // ID da mensagem no provedor (WhatsApp: wamid). Único por empresa: torna o webhook idempotente.
+  externalId     String?
+  type           String           @default("text")
+  content        String?
+  mediaId        String?
+  mediaMime      String?
+  mediaKey       String?
+  // Parâmetros do envio (ex.: modelo aprovado + variáveis), usados para reenviar mensagens que falharam.
+  payload        Json?
+  status         MessageStatus    @default(RECEIVED)
+  error          String?
+  sentByUserId   String?
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  createdAt      DateTime         @default(now())
+
+  company      Company      @relation(fields: [companyId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, externalId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
 }

@@ -1,13 +1,15 @@
 import {
   Building2, CalendarDays, Contact, Kanban, ListChecks, FileSignature, Gauge, Handshake, Home, Images, KeyRound, LogOut,
-  Megaphone, Menu, Plug, ScrollText, Store, Tags, UserRound, Users, BarChart3, type LucideIcon,
+  Megaphone, Menu, MessageCircle, Plug, ScrollText, Store, Tags, UserRound, Users, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { initials } from '../lib/format';
 
-interface Item { label: string; icon: LucideIcon; to?: string; perm?: string }
+interface Item { label: string; icon: LucideIcon; to?: string; perm?: string; badge?: 'unread' }
 interface Group { label?: string; items: Item[] }
 
 // Itens sem `to` pertencem a blocos futuros e aparecem desabilitados.
@@ -21,6 +23,7 @@ const NAV: Group[] = [
   { label: 'Relacionamento', items: [
     { label: 'Pipeline', icon: Kanban, to: '/pipeline', perm: 'lead.view' },
     { label: 'Leads', icon: Handshake, to: '/leads', perm: 'lead.view' },
+    { label: 'Conversas', icon: MessageCircle, to: '/conversas', perm: 'lead.view', badge: 'unread' },
     { label: 'Clientes', icon: Contact, to: '/clientes', perm: 'lead.view' },
     { label: 'Tarefas', icon: ListChecks, to: '/tarefas', perm: 'lead.view' },
     { label: 'Agenda', icon: CalendarDays, perm: 'visit.view' },
@@ -35,7 +38,7 @@ const NAV: Group[] = [
     { label: 'Usuários', icon: Users, to: '/usuarios', perm: 'admin.users' },
     { label: 'Permissões', icon: KeyRound, to: '/permissoes', perm: 'admin.users' },
     { label: 'Empresa e filiais', icon: Building2, to: '/empresa', perm: 'admin.company' },
-    { label: 'Integrações', icon: Plug, perm: 'admin.company' },
+    { label: 'Integrações', icon: Plug, to: '/integracoes', perm: 'admin.company' },
     { label: 'Auditoria', icon: ScrollText, to: '/auditoria', perm: 'admin.audit' },
   ] },
 ];
@@ -45,6 +48,7 @@ export function Shell() {
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
   const loc = useLocation();
+  const unread = useQuery({ queryKey: ['conv-unread'], queryFn: () => api<{ unread: number }>('/conversations/unread'), enabled: can('lead.view'), refetchInterval: 20_000 });
   const close = () => setOpen(false);
   if (!user) return null;
 
@@ -68,7 +72,7 @@ export function Shell() {
               {g.items.map((i) =>
                 i.to ? (
                   <NavLink key={i.label} to={i.to} end={i.to === '/'} onClick={close} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-                    <i.icon /> {i.label}
+                    <i.icon /> {i.label}{i.badge === 'unread' && !!unread.data?.unread && <span className="nav-badge">{unread.data.unread > 99 ? '99+' : unread.data.unread}</span>}
                   </NavLink>
                 ) : (
                   <div key={i.label} className="nav-item disabled" title="Disponível em breve" aria-disabled="true">

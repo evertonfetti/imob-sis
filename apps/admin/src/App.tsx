@@ -7,8 +7,10 @@ import { CompanyPage } from './pages/Company';
 import { Catalog } from './pages/Catalog';
 import { Dashboard } from './pages/Dashboard';
 import { ForgotPassword, Login, ResetPassword } from './pages/Login';
+import { Conversations } from './pages/Conversations';
 import { Customers } from './pages/Customers';
 import { LeadDetail } from './pages/LeadDetail';
+import { Integrations } from './pages/Integrations';
 import { Leads } from './pages/Leads';
 import { Pipeline } from './pages/Pipeline';
 import { Tasks } from './pages/Tasks';
@@ -45,6 +47,8 @@ export function App() {
           <Route path="pipeline" element={<Guard perm="lead.view"><Pipeline /></Guard>} />
           <Route path="leads" element={<Guard perm="lead.view"><Leads /></Guard>} />
           <Route path="leads/:id" element={<Guard perm="lead.view"><LeadDetail /></Guard>} />
+          <Route path="conversas/:id?" element={<Guard perm="lead.view"><Conversations /></Guard>} />
+          <Route path="integracoes" element={<Guard perm="admin.company"><Integrations /></Guard>} />
           <Route path="clientes" element={<Guard perm="lead.view"><Customers /></Guard>} />
           <Route path="tarefas" element={<Guard perm="lead.view"><Tasks /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />

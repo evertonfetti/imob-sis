@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
+import { RequestMethod } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from './app.module';
 import { Env } from './config/env';
@@ -25,7 +26,8 @@ export function buildAdapter(env: Env) {
 }
 
 export async function configureApp(app: NestFastifyApplication, env: Env) {
-  app.setGlobalPrefix('api/v1');
+  // Webhooks de provedores ficam fora do prefixo: /webhooks/meta/whatsapp
+  app.setGlobalPrefix('api/v1', { exclude: [{ path: 'webhooks/(.*)', method: RequestMethod.ALL }] });
   await app.register(helmet);
   await app.register(cors, {
     origin: [env.ADMIN_URL, ...(env.SITE_URL ? [env.SITE_URL] : [])],
@@ -46,6 +48,8 @@ export async function configureApp(app: NestFastifyApplication, env: Env) {
 export async function createApp(env: Env) {
   const app = await NestFactory.create<NestFastifyApplication>(AppModule.forRoot(env), buildAdapter(env), {
     bufferLogs: false,
+    // Guarda o corpo cru em req.rawBody: a assinatura dos webhooks (HMAC) é calculada sobre os bytes originais.
+    rawBody: true,
   });
   await configureApp(app, env);
   return app;
