@@ -45,12 +45,16 @@ export class MediaQueue implements OnModuleInit, OnModuleDestroy {
       try { await this.processor.process(mediaId); } catch (e) { await this.processor.markFailed(mediaId, e); }
       return;
     }
-    await this.queue.add('process', { mediaId }, {
-      attempts: ATTEMPTS,
-      backoff: { type: 'exponential', delay: 3000 },
-      removeOnComplete: 200,
-      removeOnFail: 500,
-    });
+    try {
+      // Sem resposta do Redis em 3s, não deixamos o upload pendurado: processa em linha.
+      await Promise.race([
+        this.queue.add('process', { mediaId }, { attempts: ATTEMPTS, backoff: { type: 'exponential', delay: 3000 }, removeOnComplete: 200, removeOnFail: 500 }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Redis não respondeu')), 3000)),
+      ]);
+    } catch (e) {
+      this.log.warn(`Fila indisponível (${(e as Error).message}); processando a mídia em linha.`);
+      try { await this.processor.process(mediaId); } catch (err) { await this.processor.markFailed(mediaId, err); }
+    }
   }
 
   async onModuleDestroy() {

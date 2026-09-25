@@ -20,7 +20,7 @@ const ACTIONS: Record<string, string> = {
   LOGIN: 'entrou no sistema', LOGOUT: 'saiu do sistema', CREATE: 'criou', UPDATE: 'atualizou', DEACTIVATE: 'desativou',
   ROLE_CHANGE: 'alterou o papel de', PUBLISH: 'publicou', MEDIA_ADDED: 'adicionou arquivo em', MEDIA_REMOVED: 'removeu arquivo de', COVER_CHANGED: 'alterou a capa de', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
 };
-const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
+const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', LEAD: 'um lead do site', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
 
 interface AuditItem { id: string; action: string; entity: string; userName: string | null; createdAt: string }
 
@@ -37,6 +37,11 @@ export function Dashboard() {
     queryFn: () => api<Record<string, number>>('/properties/summary'),
     enabled: can('property.view'),
   });
+  const leads = useQuery({
+    queryKey: ['leads', 'summary'],
+    queryFn: () => api<{ last7Days: number; total: number; new: number }>('/leads/summary'),
+    enabled: can('lead.view'),
+  });
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 
@@ -48,7 +53,12 @@ export function Dashboard() {
         {STATS.map((s) => (
           <div key={s.label} className="card stat">
             <div className="stat-label">{s.label}<s.icon /></div>
-            {s.label === 'Imóveis disponíveis' && props.data ? (
+            {s.label === 'Novos leads' && leads.data ? (
+              <>
+                <div className="stat-value">{leads.data.last7Days}</div>
+                <div className="stat-foot">nos últimos 7 dias · {leads.data.total} no total</div>
+              </>
+            ) : s.label === 'Imóveis disponíveis' && props.data ? (
               <>
                 <div className="stat-value">{props.data.AVAILABLE ?? 0}</div>
                 <div className="stat-foot">{props.data.published ?? 0} publicados no site · {props.data.DRAFT ?? 0} rascunhos</div>

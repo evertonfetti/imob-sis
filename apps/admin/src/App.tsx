@@ -7,6 +7,7 @@ import { CompanyPage } from './pages/Company';
 import { Catalog } from './pages/Catalog';
 import { Dashboard } from './pages/Dashboard';
 import { ForgotPassword, Login, ResetPassword } from './pages/Login';
+import { Leads } from './pages/Leads';
 import { Owners } from './pages/Owners';
 import { Properties } from './pages/Properties';
 import { PropertyForm } from './pages/PropertyForm';
@@ -37,6 +38,7 @@ export function App() {
           <Route path="imoveis" element={<Guard perm="property.view"><Properties /></Guard>} />
           <Route path="imoveis/novo" element={<Guard perm="property.create"><PropertyForm /></Guard>} />
           <Route path="imoveis/:id" element={<Guard perm="property.view"><PropertyForm /></Guard>} />
+          <Route path="leads" element={<Guard perm="lead.view"><Leads /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />
           <Route path="catalogo" element={<Guard perm="property.edit"><Catalog /></Guard>} />
           <Route path="usuarios" element={<Guard perm="admin.users"><Users /></Guard>} />

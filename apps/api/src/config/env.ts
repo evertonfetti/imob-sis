@@ -13,6 +13,8 @@ const schema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().default(900),
   REFRESH_TTL_DAYS: z.coerce.number().default(30),
   API_PUBLIC_URL: z.string().optional(),
+  SITE_URL: z.string().optional(),
+  PUBLIC_COMPANY_ID: z.string().uuid().optional(),
   REDIS_URL: z.string().optional(),
   STORAGE_DRIVER: z.enum(['local', 's3']).optional(),
   LOCAL_STORAGE_DIR: z.string().default('.data/uploads'),

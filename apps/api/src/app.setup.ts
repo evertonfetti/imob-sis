@@ -28,7 +28,7 @@ export async function configureApp(app: NestFastifyApplication, env: Env) {
   app.setGlobalPrefix('api/v1');
   await app.register(helmet);
   await app.register(cors, {
-    origin: [env.ADMIN_URL],
+    origin: [env.ADMIN_URL, ...(env.SITE_URL ? [env.SITE_URL] : [])],
     credentials: true,
     // O painel roda em outro domínio da API: PATCH/PUT/DELETE precisam estar liberados no preflight.
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

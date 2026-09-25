@@ -40,6 +40,7 @@ export const ERROR_CODES = {
   MEDIA_ORDER_INVALID: 'A ordem informada não corresponde às mídias do imóvel.',
   MEDIA_NOT_FAILED: 'Somente mídias com falha podem ser reprocessadas.',
   STORAGE_UPLOAD_INVALID: 'Envio inválido ou expirado.',
+  LEAD_PROPERTY_INVALID: 'O imóvel informado não está mais disponível.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

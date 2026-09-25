@@ -19,7 +19,7 @@ const NAV: Group[] = [
     { label: 'Catálogo', icon: Tags, to: '/catalogo', perm: 'property.edit' },
   ] },
   { label: 'Relacionamento', items: [
-    { label: 'CRM', icon: Handshake, perm: 'lead.view' },
+    { label: 'Leads', icon: Handshake, to: '/leads', perm: 'lead.view' },
     { label: 'Agenda', icon: CalendarDays, perm: 'visit.view' },
     { label: 'Propostas', icon: FileSignature, perm: 'proposal.view' },
   ] },

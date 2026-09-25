@@ -51,6 +51,26 @@ enum MediaStatus {
   FAILED
 }
 
+enum LeadSource {
+  SITE
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  GOOGLE
+  PORTAL
+  REFERRAL
+  PHONE
+  MANUAL
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  WON
+  LOST
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -80,11 +100,14 @@ model Company {
   roles    Role[]
   audits   AuditLog[]
 
-  owners        Owner[]
-  propertyTypes PropertyType[]
-  features      Feature[]
-  properties    Property[]
-  media         PropertyMedia[]
+  owners         Owner[]
+  propertyTypes  PropertyType[]
+  features       Feature[]
+  properties     Property[]
+  media          PropertyMedia[]
+  customers      Customer[]
+  leads          Lead[]
+  whatsappClicks WhatsAppClick[]
 
   @@map("companies")
 }
@@ -172,6 +195,7 @@ model User {
   refreshTokens RefreshToken[]
   resetTokens   PasswordResetToken[]
   properties    Property[]
+  leads         Lead[]
 
   @@index([companyId])
   @@map("users")
@@ -336,13 +360,15 @@ model Property {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company  Company           @relation(fields: [companyId], references: [id])
-  branch   Branch?           @relation(fields: [branchId], references: [id])
-  type     PropertyType      @relation(fields: [typeId], references: [id])
-  owner    Owner?            @relation(fields: [ownerId], references: [id])
-  broker   User?             @relation(fields: [brokerId], references: [id])
-  features PropertyFeature[]
-  media    PropertyMedia[]
+  company        Company           @relation(fields: [companyId], references: [id])
+  branch         Branch?           @relation(fields: [branchId], references: [id])
+  type           PropertyType      @relation(fields: [typeId], references: [id])
+  owner          Owner?            @relation(fields: [ownerId], references: [id])
+  broker         User?             @relation(fields: [brokerId], references: [id])
+  features       PropertyFeature[]
+  media          PropertyMedia[]
+  leads          Lead[]
+  whatsappClicks WhatsAppClick[]
 
   @@unique([companyId, code])
   @@unique([companyId, slug])
@@ -399,4 +425,117 @@ model PropertyMedia {
   @@index([propertyId, position])
   @@index([companyId])
   @@map("property_media")
+}
+
+// ---------- Bloco 4 — Leads vindos do site ----------
+// Base mínima para o formulário público. O funil (estágios, kanban, timeline, tarefas) é o Bloco 5.
+
+model Customer {
+  id        String   @id @default(uuid(7))
+  companyId String
+  name      String
+  email     String?
+  phone     String?
+  whatsapp  String?
+  document  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  leads   Lead[]
+
+  @@index([companyId, phone])
+  @@index([companyId, email])
+  @@map("customers")
+}
+
+model Lead {
+  id         String  @id @default(uuid(7))
+  companyId  String
+  customerId String
+  propertyId String?
+  brokerId   String?
+
+  source LeadSource @default(MANUAL)
+  status LeadStatus @default(NEW)
+  score  Int        @default(0)
+
+  budgetMin        Decimal?         @db.Decimal(14, 2)
+  budgetMax        Decimal?         @db.Decimal(14, 2)
+  purpose          PropertyPurpose?
+  city             String?
+  neighborhood     String?
+  bedrooms         Int?
+  purchaseTimeline String?
+  notes            String?
+  consentAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company          @relation(fields: [companyId], references: [id])
+  customer    Customer         @relation(fields: [customerId], references: [id])
+  property    Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  broker      User?            @relation(fields: [brokerId], references: [id])
+  attribution LeadAttribution?
+
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+  @@index([customerId])
+  @@index([propertyId])
+  @@map("leads")
+}
+
+// Gravada na criação do lead: não depende de o CRM recuperar isso depois.
+model LeadAttribution {
+  leadId String @id
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  fbclid      String?
+  fbc         String?
+  fbp         String?
+  gclid       String?
+  landingPage String?
+  referrer    String?
+  campaignId  String?
+  adsetId     String?
+  adId        String?
+  createdAt   DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_attributions")
+}
+
+model WhatsAppClick {
+  id         String  @id @default(uuid(7))
+  companyId  String
+  propertyId String?
+  sessionId  String?
+  visitorId  String?
+
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmContent  String?
+  utmTerm     String?
+  fbclid      String?
+  fbc         String?
+  fbp         String?
+  gclid       String?
+  landingPage String?
+  referrer    String?
+  createdAt   DateTime @default(now())
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([propertyId])
+  @@map("whatsapp_clicks")
 }

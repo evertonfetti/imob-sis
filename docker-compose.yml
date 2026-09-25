@@ -82,7 +82,15 @@ services:
     build:
       context: .
       dockerfile: apps/website/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}/api/v1
     restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      # O servidor do site fala com a API pela rede interna do Docker; o navegador usa a URL pública.
+      API_INTERNAL_URL: http://api:3333/api/v1
+      SITE_URL: "${SITE_URL:?defina SITE_URL (ex. https://www.seudominio.com.br)}"
     expose:
       - "3000"
 

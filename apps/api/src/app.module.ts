@@ -9,10 +9,12 @@ import { CatalogModule } from './catalog/catalog.module';
 import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
+import { LeadsController } from './leads/leads.controller';
 import { MediaModule } from './media/media.module';
 import { OwnersModule } from './owners/owners.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PropertiesModule } from './properties/properties.module';
+import { PublicModule } from './public/public.module';
 import { RolesController } from './roles/roles.controller';
 import { StorageModule } from './storage/storage.module';
 import { UsersModule } from './users/users.module';
@@ -36,9 +38,10 @@ export class AppModule {
         OwnersModule,
         CatalogModule,
         MediaModule,
+        PublicModule,
         PropertiesModule,
       ],
-      controllers: [HealthController, RolesController],
+      controllers: [HealthController, RolesController, LeadsController],
       providers: [
         { provide: ENV, useValue: env },
         { provide: APP_FILTER, useClass: AllExceptionsFilter },
