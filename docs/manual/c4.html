@@ -1,0 +1,237 @@
+<h1 id="c9"><span class="num">Capítulo 9</span>WhatsApp e conversas</h1>
+<p>O sistema usa a <strong>API oficial do WhatsApp Business (Meta)</strong>. Na prática, os clientes escrevem para o número da imobiliária e a equipe responde <strong>dentro do sistema</strong>, com o histórico ligado ao lead. Todas as mensagens ficam registradas.</p>
+
+<h2 id="c9-1">9.1 Conectando o número (administrador)</h2>
+<p class="nota">Etapa técnica, feita uma única vez. Se preferir, peça apoio de quem cuida do seu Facebook/Meta Business. Caminho: <strong>Integrações → WhatsApp</strong>.</p>
+<figure class="alta"><img src="img/30-integracoes.png"><figcaption>Tela de Integrações: WhatsApp e Meta Pixel.</figcaption></figure>
+<ol class="passos">
+  <li>No painel de desenvolvedores da Meta (<code>developers.facebook.com</code>), crie um app do tipo <em>Empresa</em> e adicione o produto <strong>WhatsApp</strong>. Anote o <strong>ID do número de telefone</strong>, e gere um <strong>token de acesso permanente</strong>. Em <em>Configurações do app → Básico</em>, copie o <strong>segredo do app</strong>.</li>
+  <li>No sistema, em <strong>Integrações → WhatsApp</strong>, preencha <em>ID do número de telefone</em>, <em>Token de acesso permanente</em> e <em>Segredo do app</em> (a conta do WhatsApp é opcional) e clique em <span class="btn p">Conectar</span>. Os dados são guardados criptografados e não voltam para a tela.</li>
+  <li>O sistema mostra a <strong>URL de retorno (Callback URL)</strong> e o <strong>Token de verificação</strong>. Copie os dois (botão <em>Copiar</em>) e cole na configuração de <em>Webhooks</em> do WhatsApp na Meta. Assine o campo <strong>messages</strong>.</li>
+  <li>Volte ao sistema e clique em <span class="btn">Testar conexão</span>: se estiver tudo certo, aparece o número e o nome verificado da empresa.</li>
+</ol>
+<div class="atencao"><span class="t">Cuidado</span>O token e o segredo dão acesso ao WhatsApp da empresa. Guarde-os com cuidado e nunca os envie por mensagem. Para trocar, basta preencher de novo; para desligar, use <em>Desconectar</em>.</div>
+
+<h2 id="c9-2">9.2 Atendendo pelas Conversas</h2>
+<figure class="alta"><img src="img/20-conversas.png"><figcaption>Conversas: lista à esquerda, conversa à direita. O ícone de robô indica conversa atendida pelo assistente de IA.</figcaption></figure>
+<ul>
+  <li><strong>Lista (esquerda):</strong> conversas ordenadas pela mais recente. O número verde mostra mensagens não lidas. Use a busca (nome ou telefone) e o filtro para ver só as não lidas.</li>
+  <li><strong>Conversa (direita):</strong> mensagens do cliente à esquerda e as suas à direita, com os “vistos”: ✓ enviada, ✓✓ entregue e ✓✓ azul lida. Abrir a conversa marca as mensagens como lidas.</li>
+  <li><strong>Enviar:</strong> escreva na caixa inferior e clique no avião. Se uma mensagem falhar, aparece o motivo e o botão <em>Reenviar</em>.</li>
+  <li><strong>Fotos, áudios e documentos do cliente:</strong> abrem com um clique.</li>
+  <li><strong>Ver lead:</strong> leva à ficha do lead ligado à conversa.</li>
+</ul>
+<h3>A janela de 24 horas</h3>
+<p>Por regra do WhatsApp, você só pode enviar <strong>mensagens livres</strong> até <strong>24 horas depois da última mensagem do cliente</strong>. Passado esse prazo, só é possível enviar um <strong>modelo aprovado</strong> pela Meta (clique no ícone de documento ao lado do avião; informe o nome do modelo, o idioma e as variáveis separadas por vírgula). Quando o cliente responder, a janela abre de novo.</p>
+<div class="dica"><span class="t">Dica</span>Para não perder a janela, responda no mesmo dia. Um modelo aprovado (por exemplo “retomada de contato”) é a forma correta de falar com quem ficou muito tempo sem responder.</div>
+
+<h2 id="c9-3">9.3 Quem está atendendo: robô ou pessoa</h2>
+<p>Se o agente de IA estiver ligado (capítulo 10), cada conversa tem um <strong>responsável pelo atendimento</strong>, indicado por uma etiqueta no topo: <strong>Assistente IA</strong> ou <strong>Atendimento humano</strong>. Os botões ao lado permitem mudar:</p>
+<table>
+  <thead><tr><th style="width:26%">Botão</th><th>O que faz</th></tr></thead>
+  <tbody>
+    <tr><td><span class="btn">Assumir</span></td><td>Você assume. O assistente para de responder nessa conversa. (Se você simplesmente responder pelo painel, ele também para: você assume automaticamente.)</td></tr>
+    <tr><td><span class="btn">Devolver ao robô</span></td><td>O assistente volta a responder <strong>na próxima mensagem do cliente</strong> (ele não puxa assunto sozinho).</td></tr>
+    <tr><td><span class="btn">Finalizar</span></td><td>Encerra a conversa. Se o cliente escrever de novo, ela reabre e o <strong>assistente atende</strong>.</td></tr>
+    <tr><td><span class="btn">Reabrir</span></td><td>Reabre uma conversa finalizada.</td></tr>
+  </tbody>
+</table>
+
+<h1 id="c10"><span class="num">Capítulo 10</span>O agente de atendimento por IA</h1>
+<p>O agente é um assistente virtual que <strong>responde os clientes no WhatsApp na hora</strong>, mesmo de madrugada ou quando a equipe está ocupada. Ele se apresenta como assistente virtual, conversa sobre o imóvel, envia fotos, tira dúvidas iniciais e passa a conversa para uma pessoa quando necessário. O objetivo não é substituir o corretor, e sim <strong>não deixar nenhum lead esperando</strong>.</p>
+
+<h2 id="c10-1">10.1 O que o agente faz e não faz</h2>
+<div class="cols">
+  <div class="card"><b>O que ele faz</b>
+    <ul>
+      <li>Responde em segundos, em português, com mensagens curtas.</li>
+      <li>Conversa sobre o imóvel do interesse do cliente e sugere outros parecidos.</li>
+      <li>Envia fotos dos imóveis publicados.</li>
+      <li>Tira dúvidas usando os <strong>dados do sistema</strong> e os <strong>documentos</strong> que você enviar (por exemplo, o guia de financiamento).</li>
+      <li>Anota no lead o que o cliente conta (orçamento, região, dormitórios, prazo).</li>
+      <li>Registra pedido de visita e cria a tarefa para o corretor.</li>
+      <li>Transfere para uma pessoa quando precisa.</li>
+    </ul></div>
+  <div class="card"><b>O que ele NÃO faz</b>
+    <ul>
+      <li>Não inventa preço, prazo, taxa ou condição: só usa dados oficiais do sistema.</li>
+      <li>Não promete aprovação de crédito, desconto ou negociação.</li>
+      <li>Não dá orientação jurídica, fiscal ou financeira personalizada.</li>
+      <li>Não vê o valor mínimo de negociação nem dados do proprietário.</li>
+      <li>Não mostra imóveis que não estão publicados.</li>
+      <li>Não abre imagens ou áudios do cliente (pede que escreva).</li>
+      <li>Não segue ordens do tipo “ignore suas regras”.</li>
+    </ul></div>
+</div>
+
+<h2 id="c10-2">10.2 Colocando o agente para funcionar (administrador)</h2>
+<p>O agente precisa de: (1) o WhatsApp conectado (capítulo 9), (2) uma conta de IA com um <strong>modelo de texto</strong> (seção 5.4) e (3) a configuração em <strong>Empresa e filiais → Agente de atendimento</strong>.</p>
+<ol class="passos">
+  <li><strong>Cadastre uma conta de IA de texto</strong> (OpenAI, Gemini, Claude ou Groq) e marque, na lista de modelos, ao menos um modelo de <em>Gerar texto e conversar</em>. Informe o custo por milhão de tokens para acompanhar o gasto.</li>
+  <li>Abra a aba <strong>Agente de atendimento</strong>. Escolha o <strong>modelo de texto</strong>.</li>
+  <li>Defina o <strong>nome</strong> do assistente e escreva as <strong>orientações da imobiliária</strong>: o tom de voz e as regras da casa. Exemplo: “Trate o cliente por você. Nunca informe valores de comissão. Não marque visitas aos domingos.”</li>
+  <li>Revise a <strong>mensagem de transferência</strong> (o que o cliente lê quando é passado a uma pessoa).</li>
+  <li>Ajuste os limites: <strong>máximo de respostas por conversa</strong> (depois disso, transfere), <strong>fotos por envio</strong> (0 desliga o envio de fotos) e <strong>espera antes de responder</strong> (junta mensagens seguidas).</li>
+  <li>Envie os <strong>documentos</strong> (seção 10.3) e faça o <strong>teste</strong> (seção 10.4).</li>
+  <li>Quando estiver satisfeito, ligue <strong>Responder automaticamente</strong> e clique em <span class="btn p">Salvar</span>.</li>
+</ol>
+<figure class="alta"><img src="img/29-agente.png"><figcaption>Configuração do agente de atendimento.</figcaption></figure>
+
+<h2 id="c10-3">10.3 Ensinando o agente com documentos</h2>
+<p>Além dos imóveis do sistema, o agente consulta uma <strong>base de conhecimento</strong>: documentos que você envia, em <strong>Base de conhecimento → Enviar documento</strong>. Aceita <strong>PDF, DOCX, TXT, MD e CSV</strong> com texto (até 10 MB). Bons documentos:</p>
+<ul>
+  <li>como funciona o financiamento (renda, entrada, FGTS, documentos necessários);</li>
+  <li>o que é exigido para alugar (fiador, seguro-fiança, caução);</li>
+  <li>regras de condomínio, taxas comuns, prazos de escritura;</li>
+  <li>perguntas frequentes da sua imobiliária.</li>
+</ul>
+<p>O sistema lê o texto, divide em trechos e, a cada pergunta do cliente, busca os trechos mais relevantes (a busca funciona mesmo sem acentos). Cada documento pode ser <strong>renomeado</strong>, <strong>desativado</strong> (o agente deixa de usá-lo) ou <strong>removido</strong>.</p>
+<div class="atencao"><span class="t">Cuidado com o conteúdo</span>O agente repete o que está nos documentos. Envie apenas informação <strong>correta e atual</strong>, e nunca inclua dados sigilosos (senhas, valores internos). PDFs escaneados (só imagem) não têm texto legível e são recusados: use um PDF pesquisável ou um DOCX.</div>
+
+<h2 id="c10-4">10.4 Testando antes de ligar</h2>
+<p>No cartão <strong>Testar o assistente</strong>, converse como se fosse o cliente. Você pode escolher um imóvel de contexto. Nada é enviado por WhatsApp nem gravado em leads. A resposta mostra: o texto, se transferiria para uma pessoa, as ações que faria (enviar fotos, atualizar o lead, pedir visita), os <strong>trechos de documentos consultados</strong> e o custo aproximado. <em>Salve a configuração antes de testar.</em></p>
+<div class="dica"><span class="t">Como testar bem</span>Faça as perguntas mais comuns dos seus clientes, peça fotos, diga um orçamento, peça para falar com um corretor e tente “enganar” o assistente. Se ele errar, ajuste as orientações ou melhore os documentos.</div>
+
+<h2 id="c10-5">10.5 Como a transferência para uma pessoa funciona</h2>
+<p>O assistente transfere quando:</p>
+<ul>
+  <li>o cliente <strong>pede</strong> para falar com um atendente ou corretor (a transferência é imediata, sem consultar a IA);</li>
+  <li>ele <strong>não sabe responder</strong>, o cliente quer <strong>negociar valor</strong> ou fechar negócio, ou está irritado;</li>
+  <li>o <strong>limite de respostas</strong> da conversa foi atingido;</li>
+  <li>a IA ficou <strong>indisponível</strong> (o cliente recebe um aviso de que um corretor responderá, e não fica sem resposta).</li>
+</ul>
+<p>Ao transferir: (1) o cliente recebe a mensagem de transferência; (2) a conversa passa a <strong>Atendimento humano</strong> e <strong>o assistente não interage mais</strong>; (3) o corretor recebe uma <strong>tarefa urgente</strong> (“Atender agora no WhatsApp: …”) e a linha do tempo do lead registra a transferência.</p>
+<h3>Quando o robô volta a atender</h3>
+<table>
+  <thead><tr><th style="width:36%">Situação</th><th>O que acontece</th></tr></thead>
+  <tbody>
+    <tr><td>Você clica em <em>Devolver ao robô</em></td><td>Ele volta na próxima mensagem do cliente.</td></tr>
+    <tr><td>Você clica em <em>Finalizar</em> a conversa</td><td>Se o cliente escrever de novo, a conversa reabre e o robô atende.</td></tr>
+    <tr><td>Você fecha o lead como <em>Fechado</em> ou <em>Perdido</em></td><td>A conversa é finalizada automaticamente. O cliente que voltar entra como <strong>lead novo</strong> e o robô atende.</td></tr>
+    <tr><td>Conversa com uma pessoa parada por muito tempo</td><td>Se você configurou <em>Devolver ao assistente após inatividade (horas)</em>, o robô volta sozinho quando o cliente escrever. Com 0, nunca volta sem você.</td></tr>
+    <tr><td>Uma pessoa responde pelo painel</td><td>Ela assume: o robô sai daquela conversa.</td></tr>
+  </tbody>
+</table>
+<h2 id="c10-6">10.6 Acompanhando o agente</h2>
+<ul>
+  <li>Em <strong>Conversas</strong>, as mensagens do robô têm a marca <em>Assistente IA</em> e a lista mostra um ícone de robô nas conversas que ele atende.</li>
+  <li>Em <strong>Agente de atendimento → Atividade recente</strong>: o que fez em cada conversa (respondeu, transferiu, erro), as ações e o custo de cada resposta. O cartão de configuração mostra o total do mês.</li>
+  <li>No <strong>histórico do lead</strong> aparecem “Atendimento transferido para uma pessoa” e “Cliente pediu uma visita”.</li>
+</ul>
+<div class="dica"><span class="t">Boa prática</span>Comece com <strong>poucos imóveis publicados bem descritos</strong> e um documento de perguntas frequentes. Monitore as primeiras conversas por alguns dias, ajuste as orientações e só então amplie.</div>
+
+<h1 id="c11"><span class="num">Capítulo 11</span>Marketing e redes sociais</h1>
+<h2 id="c11-1">11.1 Marketing: de onde vêm os leads</h2>
+<p>O menu <strong>Marketing</strong> mostra quais canais e campanhas trazem leads que <em>realmente avançam</em> no funil, para você investir onde dá resultado. Tem quatro abas: <strong>Geral</strong>, <strong>Campanhas</strong>, <strong>Origens</strong> e <strong>Conversões</strong>, e um seletor de período (7, 30, 90 dias…).</p>
+<figure><img src="img/22-marketing.png"><figcaption>Marketing: visão geral do período.</figcaption></figure>
+<ul>
+  <li><strong>Geral:</strong> leads no período, por dia, por origem e por campanha, com a taxa de avanço.</li>
+  <li><strong>Campanhas e Origens:</strong> agrupam por campanha e por canal (site, Instagram, portal…) e mostram, para cada um, quantos leads foram qualificados, tiveram visita e fecharam.</li>
+</ul>
+<h3>Para a origem ser registrada: use links com identificação</h3>
+<p>Nos anúncios, use links com parâmetros de campanha (UTM), por exemplo:</p>
+<p><code>https://seusite.com.br/imoveis?utm_source=instagram&amp;utm_medium=cpc&amp;utm_campaign=lancamento-outubro&amp;utm_content=video1</code></p>
+<p>Quando o visitante preenche o formulário ou clica no WhatsApp, o sistema guarda <em>fonte</em>, <em>meio</em>, <em>campanha</em>, <em>anúncio</em> e, quando o clique veio de um anúncio da Meta, os identificadores do clique. Tudo aparece na ficha do lead, bloco <strong>Origem</strong>.</p>
+
+<h2 id="c11-2">11.2 Meta Pixel e Conversions API</h2>
+<p>Essa integração (administrador ou marketing) devolve à Meta os resultados reais: quais leads foram qualificados, agendaram visita e compraram. Assim os anúncios aprendem a trazer gente melhor.</p>
+<ol class="passos">
+  <li>Em <strong>Integrações → Meta Pixel e Conversions API</strong>, informe o <strong>ID do Pixel</strong> (conjunto de dados), o <strong>token de acesso da Conversions API</strong> e, se quiser testar, o <strong>código de teste</strong> (aba “Testar eventos” da Meta). Clique em <span class="btn p">Conectar</span>.</li>
+  <li>Use <span class="btn">Testar conexão</span> e <span class="btn">Enviar evento de teste</span> para conferir.</li>
+  <li>Na aba <strong>Marketing → Conversões</strong>, acompanhe o que foi enviado e o que a Meta respondeu. Cada linha mostra o evento, o lead e o resultado (enviado, ignorado ou com falha).</li>
+</ol>
+<figure class="baixa"><img src="img/23-conversoes.png"><figcaption>Conversões enviadas à Meta.</figcaption></figure>
+<div class="atencao"><span class="t">Privacidade (LGPD)</span>Só são enviados à Meta dados de visitantes que <strong>aceitaram</strong> o aviso de cookies do site, e e-mail e telefone vão sempre <strong>criptografados</strong> (hash SHA-256). Leads criados à mão ou sem aceite ficam registrados como “ignorados”, sem envio. O Pixel só é carregado no site após o aceite.</div>
+<p>Quais eventos são enviados e em qual etapa do funil é configurável em <strong>Marketing → Conversões</strong> (por padrão: <em>Qualificado</em> → lead qualificado; <em>Visita agendada</em> → agendamento; <em>Fechado</em> → compra, com o <strong>valor negociado</strong>). Cada evento é enviado uma única vez por lead.</p>
+
+<h2 id="c11-3">11.3 Publicando nas redes sociais (Instagram e Facebook)</h2>
+<p>Você publica ou agenda posts dos imóveis direto do sistema. O caminho mais simples: abra o imóvel e clique em <span class="btn">Publicar nas redes</span>: a postagem já vem pronta, só falta escolher as contas e a data.</p>
+<h3>Conectando as contas (feito uma vez por pessoa)</h3>
+<p>Cada usuário conecta as <strong>próprias contas</strong>. O que uma pessoa conecta é <strong>privado</strong>: os colegas só veem e publicam se ela marcar <em>Compartilhar com a equipe</em>. Assim, cada corretor pode ter o seu Instagram, e a conta da empresa pode ser compartilhada por quem a conectou. Caminho: <strong>Redes sociais → Contas conectadas</strong>.</p>
+<figure class="alta"><img src="img/25-redes-contas.png"><figcaption>Contas conectadas: aplicativos da Meta e contas do Facebook/Instagram.</figcaption></figure>
+<ol class="passos">
+  <li>Em <strong>Aplicativos da Meta</strong>, clique em <span class="btn">Adicionar aplicativo</span>. É o “aplicativo” que autoriza o login com o Facebook. Crie um em <code>developers.facebook.com</code> (tipo <em>Empresa</em>, com o produto <strong>Login do Facebook</strong>), cadastre a <strong>URI de redirecionamento</strong> mostrada na tela e copie o <strong>ID do app</strong> e a <strong>chave secreta</strong>. Dê um nome ao aplicativo e salve. O sistema valida os dados com a Meta.</li>
+  <li>Clique em <span class="btn p">Entrar com o Facebook</span> (se houver mais de um aplicativo, escolha qual antes). Autorize na janela da Meta.</li>
+  <li>Volta ao sistema com a lista de <strong>Páginas</strong> e de contas <strong>Instagram profissional</strong> ligadas a elas. Marque as que quer usar e confirme.</li>
+  <li>Se quiser que a equipe use a conta, clique em <em>Compartilhar com a equipe</em> na linha dela. <em>Parar de compartilhar</em> fecha de novo.</li>
+</ol>
+<div class="atencao"><span class="t">Bom saber</span>O Instagram precisa ser uma conta <strong>profissional</strong> ligada a uma Página do Facebook. Enquanto o aplicativo estiver em <em>modo de desenvolvimento</em>, só quem tem função no app consegue entrar; para liberar para todos é preciso enviar o app para a <strong>revisão da Meta</strong>. Se aparecer “Expirada” em uma conta, use <em>Reconectar</em>.</div>
+<h3>Criando uma publicação</h3>
+<ol class="passos">
+  <li>Clique em <span class="btn p">Nova publicação</span> (em <strong>Redes sociais</strong>) ou em <span class="btn">Publicar nas redes</span> no imóvel.</li>
+  <li><strong>Fotos:</strong> escolha as fotos, na ordem desejada (a capa vem primeiro; até 10 no Instagram).</li>
+  <li><strong>Texto:</strong> já vem com descrição, preço, local, link do imóvel e código. Edite à vontade; <em>Restaurar padrão</em> volta ao original. O Instagram aceita até 2.200 caracteres.</li>
+  <li><strong>Contas:</strong> marque onde publicar (só aparecem as suas e as compartilhadas).</li>
+  <li><strong>Quando:</strong> escolha <em>Agendar para</em> uma data e hora (até 180 dias) ou <em>Publicar agora</em>.</li>
+  <li>Confira a pré-visualização e clique em <span class="btn p">Agendar</span> ou <span class="btn p">Publicar agora</span>.</li>
+</ol>
+<figure><img src="img/24-redes-publicacoes.png"><figcaption>Publicações: abas Agendadas, Publicadas, Com falha e Todas.</figcaption></figure>
+<table>
+  <thead><tr><th style="width:24%">Situação</th><th>O que significa</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Agendada</strong></td><td>Vai sair na data marcada. Ainda dá para editar, <em>Publicar agora</em> ou cancelar.</td></tr>
+    <tr><td><strong>Publicada</strong></td><td>No ar, com link para ver o post.</td></tr>
+    <tr><td><strong>Publicada em parte</strong></td><td>Saiu em uma rede e falhou na outra: reenvie só o que falhou.</td></tr>
+    <tr><td><strong>Falhou</strong></td><td>Mostra o motivo. Erros temporários são tentados de novo sozinhos (até 3 vezes).</td></tr>
+    <tr><td><strong>Cancelada</strong></td><td>Você desistiu antes de sair.</td></tr>
+  </tbody>
+</table>
+<p>O Instagram só aceita imagens JPEG e proporções entre 4:5 e 1,91:1. O sistema cria sozinho uma versão adequada de cada foto (o original não é alterado), <strong>com a marca d’água</strong>, se estiver ativa.</p>
+
+<h1 id="c12"><span class="num">Capítulo 12</span>Relatórios, alertas e automações</h1>
+<h2 id="c12-1">12.1 Relatórios</h2>
+<p>Em <strong>Marketing → Relatórios</strong> você vê os números da operação em qualquer período (7, 30, 90 dias, 12 meses ou datas personalizadas). Corretores veem só os próprios números.</p>
+<figure class="alta"><img src="img/21-relatorios.png"><figcaption>Relatórios: indicadores, gráficos e desempenho da equipe.</figcaption></figure>
+<table>
+  <thead><tr><th style="width:28%">Indicador</th><th>Como ler</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Novos leads</strong></td><td>Contatos que entraram no período e quantos estão em aberto agora.</td></tr>
+    <tr><td><strong>Conversão</strong></td><td>De cada 100 leads que entraram no período, quantos viraram negócio.</td></tr>
+    <tr><td><strong>Tempo até fechar</strong></td><td>Média de dias entre o lead entrar e o negócio fechar.</td></tr>
+    <tr><td><strong>Volume negociado</strong></td><td>Soma das propostas aceitas.</td></tr>
+    <tr><td><strong>Visitas realizadas, Propostas, Perdidos, Negócios</strong></td><td>Contagens do período.</td></tr>
+    <tr><td><strong>Gráficos</strong></td><td>Leads por período, por origem, funil, imóveis mais procurados e motivos de perda.</td></tr>
+    <tr><td><strong>Desempenho da equipe</strong></td><td>Por corretor: leads, score médio, visitas realizadas, propostas e negócios (só para quem vê todos os leads).</td></tr>
+  </tbody>
+</table>
+<div class="dica"><span class="t">Use os motivos de perda</span>O gráfico de motivos de perda mostra o que impede as vendas (preço, financiamento, desistência). É o melhor ponto de partida para melhorar a operação.</div>
+
+<h2 id="c12-2">12.2 Alertas: “Precisa de atenção”</h2>
+<p>Os alertas são calculados na hora, a partir dos dados, e aparecem no Dashboard:</p>
+<table>
+  <thead><tr><th style="width:32%">Alerta</th><th>Quando aparece (padrão)</th></tr></thead>
+  <tbody>
+    <tr><td>Lead sem atendimento</td><td>Está há mais de 2 horas na primeira etapa (urgente após 24 horas).</td></tr>
+    <tr><td>Lead parado</td><td>Está há mais de 7 dias na mesma etapa.</td></tr>
+    <tr><td>Tarefas atrasadas</td><td>Há tarefas abertas com o prazo vencido.</td></tr>
+    <tr><td>Visita sem confirmação</td><td>Faltam menos de 24 horas e ela ainda não foi confirmada.</td></tr>
+    <tr><td>Visita sem resultado</td><td>Já passou e não foi marcada como realizada ou falta.</td></tr>
+    <tr><td>Proposta vencendo / sem movimento</td><td>Vence em 48 horas / está há 5 dias sem novidade.</td></tr>
+    <tr><td>Cliente esperando no WhatsApp</td><td>Escreveu há mais de 2 horas e ninguém respondeu.</td></tr>
+  </tbody>
+</table>
+<h3>Ajustando os prazos (administrador)</h3>
+<p>Os números acima são apenas o ponto de partida: cada imobiliária tem o seu ritmo. Em <strong>Empresa e filiais → Alertas e automações</strong>, o administrador ajusta todos os prazos. Ao lado dos campos de prazo, o sistema mostra <strong>como a sua operação realmente se comporta</strong> (por exemplo: “metade dos leads sai da primeira etapa em 3 horas e 80% em 20 horas”), para você escolher valores que sinalizem só o que foge do normal.</p>
+<figure class="alta"><img src="img/27-alertas-config.png"><figcaption>Configuração dos alertas e das tarefas automáticas.</figcaption></figure>
+<p>Curto demais gera alertas em excesso; longo demais deixa o lead esfriar. Ajuste aos poucos. O botão <span class="btn">Restaurar padrões</span> volta aos valores originais.</p>
+
+<h2 id="c12-3">12.3 Automações do sistema</h2>
+<p>O sistema trabalha sozinho em segundo plano. Resumo do que ele faz por você:</p>
+<table>
+  <thead><tr><th style="width:34%">Quando…</th><th>…o sistema faz</th></tr></thead>
+  <tbody>
+    <tr><td>Chega um lead novo</td><td>Distribui para o corretor e cria a tarefa “Fazer o primeiro contato” (30 min).</td></tr>
+    <tr><td>Você agenda uma visita</td><td>Leva o lead a “Visita agendada” e cria o lembrete de confirmar.</td></tr>
+    <tr><td>A visita é realizada</td><td>Leva o lead a “Visita realizada” e cria a tarefa de ligar em 24 h.</td></tr>
+    <tr><td>O cliente falta ou cancela</td><td>Cria a tarefa de reagendar.</td></tr>
+    <tr><td>Você registra uma proposta</td><td>Leva o lead a “Proposta” e depois a “Negociação” nas contrapropostas.</td></tr>
+    <tr><td>A proposta é aceita / o negócio é fechado</td><td>Reserva o imóvel / marca vendido ou alugado, leva o lead a “Fechado” e envia a compra à Meta.</td></tr>
+    <tr><td>A proposta vence</td><td>Marca como expirada.</td></tr>
+    <tr><td>Um lead esquenta (score ≥ 60)</td><td>Cria uma tarefa para priorizar o contato.</td></tr>
+    <tr><td>Você publica um imóvel novo</td><td>Cria tarefas “Apresentar o imóvel” para leads com alta compatibilidade (≥ 75%).</td></tr>
+    <tr><td>Um lead fica parado</td><td>Cria uma tarefa de retomada, uma vez por período parado.</td></tr>
+    <tr><td>O lead é fechado ou perdido</td><td>Cancela as tarefas automáticas e finaliza a conversa.</td></tr>
+    <tr><td>Chega mensagem no WhatsApp</td><td>Registra no lead e, se o agente estiver ligado, responde.</td></tr>
+  </tbody>
+</table>
+<p>As tarefas de <strong>retomar lead parado</strong> e <strong>apresentar imóvel novo</strong> podem ser ligadas ou desligadas em <em>Alertas e automações</em>.</p>

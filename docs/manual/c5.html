@@ -1,0 +1,173 @@
+<h1 id="c13"><span class="num">Capítulo 13</span>Administração</h1>
+<p>Este capítulo é para quem administra o sistema (perfil <strong>Administrador</strong>; o Gerente também gerencia usuários). As telas ficam no grupo <strong>Administração</strong> do menu.</p>
+
+<h2 id="c13-1">13.1 Usuários</h2>
+<figure class="baixa"><img src="img/31-usuarios.png"><figcaption>Lista de usuários.</figcaption></figure>
+<h3>Criando um usuário</h3>
+<ol class="passos">
+  <li>Em <strong>Administração → Usuários</strong>, clique em <span class="btn p">Novo usuário</span>.</li>
+  <li>Preencha <strong>nome</strong>, <strong>e-mail</strong> (será o login), telefone, <strong>papel</strong> (perfil), filial e CRECI (para corretores).</li>
+  <li>Defina uma <strong>senha inicial</strong> (mínimo de 10 caracteres) e repasse à pessoa por um canal seguro. Ela pode trocá-la pelo “Esqueci minha senha”.</li>
+  <li>Salve.</li>
+</ol>
+<ul>
+  <li><strong>Editar:</strong> altere dados e papel (é assim que se muda o que a pessoa pode fazer). Para redefinir a senha, preencha <em>Nova senha</em> (em branco mantém a atual).</li>
+  <li><strong>Desativar:</strong> a pessoa perde o acesso imediatamente, mas o histórico dela (leads, tarefas, registros) é mantido. Nunca apague um usuário que saiu da empresa: desative.</li>
+</ul>
+<div class="dica"><span class="t">Corretor novo?</span>Crie o usuário com o papel <em>Corretor</em>. Se a empresa usa rodízio de leads, ele passa a receber leads automaticamente assim que estiver ativo.</div>
+
+<h2 id="c13-2">13.2 Permissões</h2>
+<p>Em <strong>Administração → Permissões</strong> você consulta, em uma matriz, o que cada papel pode fazer no sistema, organizado por área (imóveis, mídia, leads, funil, visitas, propostas, marketing e administração). Um ✔ significa que o papel tem a permissão. Abaixo do nome de cada papel aparece quantos usuários o têm.</p>
+<figure class="alta"><img src="img/32-permissoes.png"><figcaption>Matriz de permissões por papel (consulta).</figcaption></figure>
+<div class="dica"><span class="t">Como mudar o acesso de alguém</span>A forma normal é trocar o <strong>papel</strong> da pessoa em <em>Usuários → Editar</em>. Os cinco papéis padrão cobrem a maior parte das imobiliárias. Se a sua operação precisa de um perfil diferente (por exemplo, um corretor que também publica imóveis), peça o ajuste à equipe técnica que mantém o sistema.</div>
+
+<h2 id="c13-3">13.3 Empresa e filiais</h2>
+<p>Em <strong>Administração → Empresa e filiais</strong> há cinco abas:</p>
+<table>
+  <thead><tr><th style="width:26%">Aba</th><th>Conteúdo</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Empresa</strong></td><td>Razão social, nome fantasia, CNPJ, CRECI, e-mail, site, telefone, WhatsApp, cores primária e secundária e a <strong>distribuição de leads</strong> (veja abaixo). Esses dados aparecem no site.</td></tr>
+    <tr><td><strong>Filiais</strong></td><td>Unidades de atendimento: nome, contatos, endereço e situação (ativa ou não). Depois, escolha a filial na ficha de imóveis e usuários.</td></tr>
+    <tr><td><strong>Alertas e automações</strong></td><td>Prazos dos alertas e liga/desliga das tarefas automáticas (seção 12.2).</td></tr>
+    <tr><td><strong>Imagens e IA</strong></td><td>Contas de IA, modelos padrão, limite mensal e marca d’água com a logo (capítulo 5).</td></tr>
+    <tr><td><strong>Agente de atendimento</strong></td><td>Configuração, documentos, teste e atividade do agente de IA (capítulo 10).</td></tr>
+  </tbody>
+</table>
+<figure class="baixa"><img src="img/26-empresa.png"><figcaption>Aba “Empresa”.</figcaption></figure>
+<h3>Distribuição de leads</h3>
+<p>Define como um lead novo escolhe o corretor <strong>quando o imóvel não tem responsável definido</strong>:</p>
+<ul>
+  <li><strong>Manual:</strong> o lead fica sem responsável até alguém atribuir (o perfil Atendimento costuma fazer isso).</li>
+  <li><strong>Rodízio entre corretores:</strong> o corretor que está há mais tempo sem receber lead é o próximo. Distribui de forma justa.</li>
+</ul>
+<p>Se o imóvel tem corretor responsável (e ele é corretor), o lead vai para ele, seja qual for a regra.</p>
+<p class="nota">A logo da empresa é enviada na aba <em>Imagens e IA</em> (marca d’água) e também é usada no site.</p>
+
+<h2 id="c13-4">13.4 Integrações</h2>
+<p>Em <strong>Administração → Integrações</strong> ficam o <strong>WhatsApp</strong> (capítulo 9) e o <strong>Meta Pixel e Conversions API</strong> (capítulo 11). Cada cartão mostra se está <em>Conectado</em> e permite testar e desconectar. Os segredos (tokens) são guardados criptografados e nunca aparecem de volta. As contas de IA e os aplicativos de redes sociais têm telas próprias (capítulos 5 e 11).</p>
+
+<h2 id="c13-5">13.5 Auditoria</h2>
+<p>A auditoria é o “diário” do sistema: registra <strong>quem fez o quê e quando</strong> (logins, criação e edição de imóveis, mudança de etapa de leads, propostas, publicações, alterações de configuração…). Serve para tirar dúvidas (“quem mudou o preço?”), acompanhar a equipe e dar segurança.</p>
+<figure class="baixa"><img src="img/33-auditoria.png"><figcaption>Auditoria: registros com usuário, ação, item e data.</figcaption></figure>
+<ul>
+  <li>Filtre por tipo de registro (imóvel, lead, proposta, integração…).</li>
+  <li>Clique em uma linha para ver o <strong>antes e depois</strong> das alterações. Senhas e segredos nunca são gravados em claro.</li>
+  <li>Os registros não têm edição nem exclusão pelo painel.</li>
+</ul>
+
+<h1 id="c14"><span class="num">Capítulo 14</span>Rotina do dia a dia, por perfil</h1>
+<p>Um roteiro simples para cada função. Use como lista de conferência.</p>
+<div class="cols">
+  <div class="card"><b>Corretor</b>
+    <ul>
+      <li><strong>Manhã:</strong> Dashboard → “Precisa de atenção”; Tarefas → aba “Hoje” e “Atrasadas”.</li>
+      <li>Responder leads novos e conversas do WhatsApp (Conversas).</li>
+      <li>Confirmar as visitas de amanhã (Agenda).</li>
+      <li><strong>Depois de cada visita:</strong> marcar como realizada e registrar o retorno do cliente.</li>
+      <li>Atualizar as etapas no Pipeline e anotar o que ficou combinado.</li>
+      <li><strong>Fim do dia:</strong> nenhuma tarefa atrasada; agendar o próximo passo de cada lead quente.</li>
+      <li>Manter os imóveis sob sua responsabilidade com fotos e valores atualizados.</li>
+    </ul></div>
+  <div class="card"><b>Atendimento (recepção)</b>
+    <ul>
+      <li>Acompanhar <strong>Conversas</strong> e os alertas de leads sem atendimento.</li>
+      <li>Cadastrar leads que chegam por telefone ou presencialmente (<em>Novo lead</em>).</li>
+      <li>Distribuir leads sem responsável (Leads → ficha → Responsável).</li>
+      <li>Agendar visitas e confirmar horários com os clientes.</li>
+      <li>Assumir conversas que o assistente transferiu e passar ao corretor certo.</li>
+      <li>Finalizar conversas concluídas.</li>
+    </ul></div>
+  <div class="card"><b>Gerente</b>
+    <ul>
+      <li>Dashboard e <strong>Relatórios</strong> (semanal): conversão, tempo até fechar, motivos de perda, desempenho da equipe.</li>
+      <li>Ver leads parados e propostas sem movimento; cobrar a equipe.</li>
+      <li>Aceitar, recusar e fechar propostas.</li>
+      <li>Conferir imóveis com poucas fotos (Mídia / IA).</li>
+      <li>Redistribuir leads quando necessário.</li>
+    </ul></div>
+  <div class="card"><b>Marketing</b>
+    <ul>
+      <li>Publicar imóveis novos no site e nas redes (com agendamento).</li>
+      <li>Melhorar as fotos com IA e aprovar as versões.</li>
+      <li>Acompanhar <strong>Marketing</strong>: quais campanhas trazem leads que avançam.</li>
+      <li>Conferir as <strong>Conversões</strong> enviadas à Meta.</li>
+      <li>Manter a marca d’água e as contas de redes sociais funcionando.</li>
+    </ul></div>
+  <div class="card"><b>Administrador</b>
+    <ul>
+      <li>Criar e desativar usuários; conferir o papel de cada um.</li>
+      <li>Manter integrações (WhatsApp, Meta) e contas de IA em dia.</li>
+      <li>Acompanhar o consumo de IA do mês.</li>
+      <li>Ajustar alertas e o agente de atendimento com base no que a operação mostra.</li>
+      <li>Consultar a Auditoria quando algo estranho acontecer.</li>
+    </ul></div>
+  <div class="card"><b>Toda a equipe, todos os dias</b>
+    <ul>
+      <li>Responder rápido: o primeiro contato define o negócio.</li>
+      <li>Anotar tudo no lead, não em papel.</li>
+      <li>Nunca deixar lead sem próximo passo.</li>
+      <li>Respeitar o horário e a vontade do cliente.</li>
+    </ul></div>
+</div>
+
+<h1 id="c15"><span class="num">Capítulo 15</span>Perguntas frequentes e solução de problemas</h1>
+<h2 id="c15-1">15.1 Dúvidas comuns</h2>
+<h3>Não encontro um lead / imóvel / menu que deveria existir.</h3>
+<p>Quase sempre é permissão: corretores só veem os próprios leads, e cada perfil enxerga só alguns menus. Peça ao administrador para conferir o seu papel em <strong>Usuários</strong> e em <strong>Permissões</strong>.</p>
+<h3>Publiquei o imóvel, mas ele não aparece no site.</h3>
+<p>Veja a seção 6.3: precisa estar publicado, com status Disponível ou Reservado e com ao menos uma foto processada. Aguarde cerca de um minuto.</p>
+<h3>Não consigo publicar: o sistema pede informações.</h3>
+<p>O aviso diz o que falta (título, cidade, bairro, valor ou foto). Preencha e tente de novo.</p>
+<h3>A foto ficou “Processando…” ou “Falhou”.</h3>
+<p>Aguarde alguns segundos: fotos grandes demoram. Se falhar, clique em <em>Tentar novamente</em>; se persistir, exporte a foto de novo (JPG) e envie outra vez.</p>
+<h3>Não consigo enviar mensagem no WhatsApp: “janela de 24 horas fechada”.</h3>
+<p>Já passou de 24 horas desde a última mensagem do cliente. Envie um <strong>modelo aprovado</strong> (seção 9.2) e aguarde a resposta.</p>
+<h3>A mensagem do WhatsApp falhou.</h3>
+<p>Leia o motivo abaixo da mensagem e use <em>Reenviar</em>. Se todas falharem, peça ao administrador para clicar em <em>Testar conexão</em> em Integrações: o token pode ter expirado.</p>
+<h3>O assistente de IA não respondeu a um cliente.</h3>
+<p>Confira: (1) o agente está <strong>ativo</strong>? (2) a conversa está com <strong>Assistente IA</strong> (e não com “Atendimento humano”)? (3) a conversa não está <em>finalizada</em>? (4) o limite de respostas da conversa foi atingido? (5) o modelo de IA está com a chave válida e sem limite estourado? Veja também <em>Atividade recente</em> do agente: erros aparecem lá.</p>
+<h3>O assistente respondeu algo errado.</h3>
+<p>Assuma a conversa, corrija com o cliente e depois melhore as <strong>orientações</strong> e os <strong>documentos</strong> do agente. Use o teste do painel para confirmar a correção.</p>
+<h3>Uma edição por IA falhou ou foi recusada.</h3>
+<p>O provedor pode ter recusado o pedido (política de conteúdo), estar instável ou a chave/limite ter acabado. A mensagem explica; tente descrever de outra forma ou de novo em alguns minutos. Falhas não são cobradas nem contam no limite mensal.</p>
+<h3>Recebi “O limite mensal de edições por IA foi atingido”.</h3>
+<p>O administrador pode aumentar o limite em <em>Empresa → Imagens e IA → Modelos padrão</em>, ou usar o modo básico, que não conta.</p>
+<h3>A conta do Instagram/Facebook aparece como “Expirada”.</h3>
+<p>A Meta invalidou a autorização (troca de senha, remoção de permissão). Use <em>Reconectar</em> na linha da conta.</p>
+<h3>Não consigo entrar com o Facebook.</h3>
+<p>Confirme se existe um <strong>aplicativo da Meta</strong> cadastrado e se a URI de redirecionamento está igual à mostrada na tela. Com o app em modo de desenvolvimento, só quem tem função nele consegue entrar.</p>
+<h3>Esqueci a senha e o e-mail de recuperação não chega.</h3>
+<p>Verifique o spam. Se não chegar, peça ao administrador para definir uma nova senha em <strong>Usuários → Editar → Nova senha</strong>.</p>
+<h3>Cadastrei um lead duplicado.</h3>
+<p>Leads são ligados ao <strong>cliente</strong> pelo telefone. Ao cadastrar alguém que já existe, escolha o cliente existente em vez de criar outro. O administrador pode excluir um lead duplicado (com a permissão de excluir leads).</p>
+<h3>Apaguei algo sem querer.</h3>
+<p>Fotos e imóveis excluídos não voltam. Por isso o sistema pede confirmação e sugere arquivar em vez de excluir. Na dúvida, <strong>arquive</strong>.</p>
+
+<h2 id="c15-2">15.2 Quando precisar de suporte</h2>
+<p>Ao pedir ajuda, informe: (1) <strong>o que você estava fazendo</strong> e em qual tela; (2) <strong>o texto exato</strong> da mensagem de erro; (3) o <strong>código de solicitação</strong> que aparece em erros inesperados; (4) o <strong>dia e a hora</strong>; e, se possível, (5) uma <strong>captura de tela</strong>. Isso acelera muito a solução. Nunca envie senhas, tokens ou chaves por mensagem.</p>
+
+<h1 id="c16"><span class="num">Capítulo 16</span>Boas práticas e privacidade (LGPD)</h1>
+<p>O sistema guarda dados pessoais de clientes (nome, telefone, e-mail, conversas). A Lei Geral de Proteção de Dados (LGPD) exige cuidado com esses dados. Este capítulo resume atitudes práticas; ele <strong>não substitui a orientação de um profissional jurídico</strong>.</p>
+<h2 id="c16-1">16.1 No dia a dia</h2>
+<ul>
+  <li><strong>Use os dados só para o atendimento imobiliário</strong>: fale com quem pediu contato e sobre o assunto que interessa a essa pessoa.</li>
+  <li><strong>Não compartilhe</strong> telefones, conversas ou dados de clientes e proprietários fora do trabalho.</li>
+  <li><strong>Respeite pedidos</strong> de quem não quer mais ser contatado: registre no lead e não insista.</li>
+  <li><strong>Proteja o seu acesso</strong>: senha própria e forte, sem compartilhar; saia do sistema em computadores de uso comum.</li>
+  <li><strong>Quem saiu da empresa</strong> deve ter o usuário desativado no mesmo dia.</li>
+  <li><strong>Valor mínimo de negociação e dados do proprietário</strong> são sigilosos: nunca informe ao cliente.</li>
+</ul>
+<h2 id="c16-2">16.2 O que o sistema faz por você</h2>
+<ul>
+  <li>O formulário do site exige o <strong>consentimento</strong> do visitante para contato.</li>
+  <li>O aviso de <strong>cookies</strong> controla o envio de dados de campanhas à Meta; sem aceite, nada é enviado, e os dados de contato vão <strong>criptografados</strong> (hash).</li>
+  <li>Segredos (tokens, senhas, chaves de IA) ficam <strong>criptografados</strong> e nunca aparecem de volta.</li>
+  <li>Cada empresa só enxerga os <strong>próprios dados</strong>, e cada corretor, os próprios leads (salvo permissão).</li>
+  <li>A <strong>auditoria</strong> registra quem fez cada alteração importante.</li>
+</ul>
+<h2 id="c16-3">16.3 Sobre o uso de inteligência artificial</h2>
+<ul>
+  <li>O agente de atendimento se identifica como assistente virtual e deixa fácil chamar uma pessoa.</li>
+  <li>Os trechos das conversas e dos imóveis enviados à IA vão ao <strong>provedor que você escolheu</strong> (OpenAI, Google, Anthropic ou Groq), sob os termos dele. Não coloque nos documentos do agente informações sigilosas.</li>
+  <li>Fotos editadas por IA são sinalizadas no site. Não use a IA para enganar o cliente sobre o estado real do imóvel.</li>
+</ul>
