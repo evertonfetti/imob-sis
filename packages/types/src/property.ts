@@ -22,8 +22,10 @@ const area = z.number().min(0).max(99_999_999).optional().nullable();
 const uuid = z.string().uuid().optional().nullable();
 
 // ---------- Proprietários ----------
-export const ownerSchema = z.object({
-  type: z.enum(OWNER_TYPES).default('PERSON'),
+// Atenção: o `.default()` só vale na criação. `.partial()` de um campo com default reaplicaria o padrão
+// em toda edição (sobrescrevendo o valor salvo), por isso a atualização parte de um schema sem defaults.
+const ownerBase = z.object({
+  type: z.enum(OWNER_TYPES),
   name: z.string().trim().min(2, 'Informe o nome').max(160),
   document: text(30),
   email: z.string().trim().toLowerCase().email('E-mail inválido').optional().nullable().or(z.literal('')),
@@ -34,7 +36,8 @@ export const ownerSchema = z.object({
   state: z.string().trim().length(2, 'Use a sigla (UF)').toUpperCase().optional().nullable().or(z.literal('')),
   notes: text(2000),
 });
-export const updateOwnerSchema = ownerSchema.partial();
+export const ownerSchema = ownerBase.extend({ type: z.enum(OWNER_TYPES).default('PERSON') });
+export const updateOwnerSchema = ownerBase.partial();
 export type OwnerInput = z.infer<typeof ownerSchema>;
 
 // ---------- Catálogo ----------

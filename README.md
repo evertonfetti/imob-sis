@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 4 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos (upload direto, fila, WebP, capa e ordenação) e site público (busca, SEO, formulário de interesse, WhatsApp).
+**Status:** Blocos 1 a 5 concluídos — a primeira versão interna está completa: fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público e CRM (funil, kanban, timeline, tarefas, distribuição de leads).
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -60,6 +60,13 @@ O `docker-compose.yml` da raiz sobe tudo: **PostgreSQL + api + admin + website**
 O `website` lê os imóveis publicados pela API e faz cache de 1 a 5 minutos, então uma publicação leva até ~1 min para aparecer.
 Cada formulário de interesse cria **cliente + lead + origem da campanha** (UTMs, `fbclid`, `gclid`, `fbc`/`fbp`) e aparece em **Leads** no painel;
 cada clique no WhatsApp também é registrado. O número do WhatsApp e a cor da marca vêm de **Empresa** no painel. Sitemap em `/sitemap.xml`.
+
+### CRM
+
+- **Funil:** 11 etapas padrão (Novo → … → Fechado / Perdido). Renomeie e mude as cores em *Pipeline → Configurar funil*. Mover para "Perdido" exige o motivo.
+- **Distribuição de leads** (*Empresa e filiais*): **Manual** ou **Rodízio** entre corretores. O corretor responsável por um imóvel recebe os leads dele quando é um corretor; caso contrário vale a distribuição configurada.
+- **Quem vê o quê:** só quem tem a permissão `lead.view_all` (administrador, gerente, atendimento, marketing) vê os leads de todos; o corretor vê os que estão atribuídos a ele.
+- Todo lead novo com responsável ganha a tarefa *"Fazer o primeiro contato"* (prazo de 30 min). Cada movimento gera histórico (tempo por etapa) e registro na timeline.
 
 ### Fotos e mídias
 

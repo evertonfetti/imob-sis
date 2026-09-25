@@ -71,6 +71,38 @@ enum LeadStatus {
   LOST
 }
 
+enum StageType {
+  OPEN
+  WON
+  LOST
+}
+
+enum LeadDistribution {
+  MANUAL
+  ROUND_ROBIN
+}
+
+enum TaskType {
+  CALL
+  WHATSAPP
+  EMAIL
+  VISIT
+  FOLLOW_UP
+  OTHER
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -78,36 +110,41 @@ enum UserStatus {
 }
 
 model Company {
-  id             String        @id @default(uuid(7))
-  name           String
-  tradeName      String?
-  document       String?
-  creci          String?
-  email          String?
-  phone          String?
-  whatsapp       String?
-  website        String?
-  logoUrl        String?
-  primaryColor   String?
-  secondaryColor String?
-  status         CompanyStatus @default(ACTIVE)
-  propertySeq    Int           @default(0)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id               String           @id @default(uuid(7))
+  name             String
+  tradeName        String?
+  document         String?
+  creci            String?
+  email            String?
+  phone            String?
+  whatsapp         String?
+  website          String?
+  logoUrl          String?
+  primaryColor     String?
+  secondaryColor   String?
+  status           CompanyStatus    @default(ACTIVE)
+  propertySeq      Int              @default(0)
+  leadDistribution LeadDistribution @default(MANUAL)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   branches Branch[]
   users    User[]
   roles    Role[]
   audits   AuditLog[]
 
-  owners         Owner[]
-  propertyTypes  PropertyType[]
-  features       Feature[]
-  properties     Property[]
-  media          PropertyMedia[]
-  customers      Customer[]
-  leads          Lead[]
-  whatsappClicks WhatsAppClick[]
+  owners             Owner[]
+  propertyTypes      PropertyType[]
+  features           Feature[]
+  properties         Property[]
+  media              PropertyMedia[]
+  customers          Customer[]
+  leads              Lead[]
+  whatsappClicks     WhatsAppClick[]
+  pipelines          Pipeline[]
+  leadStageHistories LeadStageHistory[]
+  timelineEvents     TimelineEvent[]
+  tasks              Task[]
 
   @@map("companies")
 }
@@ -189,13 +226,15 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  company       Company              @relation(fields: [companyId], references: [id])
-  branch        Branch?              @relation(fields: [branchId], references: [id])
-  role          Role                 @relation(fields: [roleId], references: [id])
-  refreshTokens RefreshToken[]
-  resetTokens   PasswordResetToken[]
-  properties    Property[]
-  leads         Lead[]
+  company            Company              @relation(fields: [companyId], references: [id])
+  branch             Branch?              @relation(fields: [branchId], references: [id])
+  role               Role                 @relation(fields: [roleId], references: [id])
+  refreshTokens      RefreshToken[]
+  resetTokens        PasswordResetToken[]
+  properties         Property[]
+  leads              Lead[]
+  lastLeadAssignedAt DateTime?
+  assignedTasks      Task[]               @relation("TaskAssignee")
 
   @@index([companyId])
   @@map("users")
@@ -369,6 +408,7 @@ model Property {
   media          PropertyMedia[]
   leads          Lead[]
   whatsappClicks WhatsAppClick[]
+  tasks          Task[]
 
   @@unique([companyId, code])
   @@unique([companyId, slug])
@@ -471,17 +511,28 @@ model Lead {
   notes            String?
   consentAt        DateTime?
 
+  stageId        String?
+  stageEnteredAt DateTime  @default(now())
+  lostReason     String?
+  closedAt       DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company     Company          @relation(fields: [companyId], references: [id])
-  customer    Customer         @relation(fields: [customerId], references: [id])
-  property    Property?        @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  broker      User?            @relation(fields: [brokerId], references: [id])
-  attribution LeadAttribution?
+  company      Company            @relation(fields: [companyId], references: [id])
+  customer     Customer           @relation(fields: [customerId], references: [id])
+  property     Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  broker       User?              @relation(fields: [brokerId], references: [id])
+  stage        PipelineStage?     @relation(fields: [stageId], references: [id])
+  attribution  LeadAttribution?
+  timeline     TimelineEvent[]
+  stageHistory LeadStageHistory[]
+  tasks        Task[]
 
   @@index([companyId, createdAt])
   @@index([companyId, status])
+  @@index([companyId, stageId])
+  @@index([companyId, brokerId])
   @@index([customerId])
   @@index([propertyId])
   @@map("leads")
@@ -538,4 +589,100 @@ model WhatsAppClick {
   @@index([companyId, createdAt])
   @@index([propertyId])
   @@map("whatsapp_clicks")
+}
+
+// ---------- Bloco 5 — CRM ----------
+
+model Pipeline {
+  id        String  @id @default(uuid(7))
+  companyId String
+  name      String
+  active    Boolean @default(true)
+
+  company Company         @relation(fields: [companyId], references: [id])
+  stages  PipelineStage[]
+
+  @@index([companyId])
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id         String    @id @default(uuid(7))
+  pipelineId String
+  name       String
+  position   Int
+  color      String    @default("#8a8578")
+  type       StageType @default(OPEN)
+  // Entrar neste estágio dispara o evento lead.qualified (usado pelo Marketing/CAPI).
+  qualifies  Boolean   @default(false)
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  leads    Lead[]
+
+  @@index([pipelineId, position])
+  @@map("pipeline_stages")
+}
+
+// Histórico de movimentação: base para tempo por estágio, conversão e gargalos.
+model LeadStageHistory {
+  id          String   @id @default(uuid(7))
+  companyId   String
+  leadId      String
+  fromStageId String?
+  toStageId   String
+  userId      String?
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([companyId, toStageId])
+  @@map("lead_stage_history")
+}
+
+model TimelineEvent {
+  id          String   @id @default(uuid(7))
+  companyId   String
+  leadId      String
+  type        String
+  entityId    String?
+  userId      String?
+  title       String
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@map("timeline_events")
+}
+
+model Task {
+  id             String       @id @default(uuid(7))
+  companyId      String
+  leadId         String?
+  propertyId     String?
+  assignedUserId String?
+  createdById    String?
+  type           TaskType     @default(FOLLOW_UP)
+  title          String
+  description    String?
+  priority       TaskPriority @default(MEDIUM)
+  status         TaskStatus   @default(OPEN)
+  dueAt          DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+
+  company      Company   @relation(fields: [companyId], references: [id])
+  lead         Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  property     Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  assignedUser User?     @relation("TaskAssignee", fields: [assignedUserId], references: [id])
+
+  @@index([companyId, status, dueAt])
+  @@index([assignedUserId, status])
+  @@index([leadId])
+  @@map("tasks")
 }

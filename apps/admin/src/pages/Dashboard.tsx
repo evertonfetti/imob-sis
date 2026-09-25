@@ -18,9 +18,9 @@ const STATS = [
 
 const ACTIONS: Record<string, string> = {
   LOGIN: 'entrou no sistema', LOGOUT: 'saiu do sistema', CREATE: 'criou', UPDATE: 'atualizou', DEACTIVATE: 'desativou',
-  ROLE_CHANGE: 'alterou o papel de', PUBLISH: 'publicou', MEDIA_ADDED: 'adicionou arquivo em', MEDIA_REMOVED: 'removeu arquivo de', COVER_CHANGED: 'alterou a capa de', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
+  ROLE_CHANGE: 'alterou o papel de', STAGE_CHANGE: 'moveu no funil', ASSIGN: 'atribuiu', PUBLISH: 'publicou', MEDIA_ADDED: 'adicionou arquivo em', MEDIA_REMOVED: 'removeu arquivo de', COVER_CHANGED: 'alterou a capa de', UNPUBLISH: 'despublicou', ARCHIVE: 'arquivou', DELETE: 'excluiu', PASSWORD_RESET: 'redefiniu a senha', LOGIN_FAILED: 'errou a senha',
 };
-const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', LEAD: 'um lead do site', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
+const ENTITIES: Record<string, string> = { AUTH: '', USER: 'um usuário', COMPANY: 'a empresa', BRANCH: 'uma filial', PROPERTY: 'um imóvel', LEAD: 'um lead', CUSTOMER: 'um cliente', PIPELINE_STAGE: 'uma etapa do funil', OWNER: 'um proprietário', PROPERTY_TYPE: 'um tipo de imóvel', FEATURE: 'uma característica' };
 
 interface AuditItem { id: string; action: string; entity: string; userName: string | null; createdAt: string }
 
@@ -39,7 +39,7 @@ export function Dashboard() {
   });
   const leads = useQuery({
     queryKey: ['leads', 'summary'],
-    queryFn: () => api<{ last7Days: number; total: number; new: number }>('/leads/summary'),
+    queryFn: () => api<{ last7Days: number; total: number; unattended: number; overdueTasks: number }>('/leads/summary'),
     enabled: can('lead.view'),
   });
   const hour = new Date().getHours();
@@ -57,6 +57,11 @@ export function Dashboard() {
               <>
                 <div className="stat-value">{leads.data.last7Days}</div>
                 <div className="stat-foot">nos últimos 7 dias · {leads.data.total} no total</div>
+              </>
+            ) : s.label === 'Leads sem atendimento' && leads.data ? (
+              <>
+                <div className="stat-value">{leads.data.unattended}</div>
+                <div className="stat-foot">{leads.data.unattended === 0 ? 'todos os leads foram atendidos' : 'parados na primeira etapa do funil'}{leads.data.overdueTasks ? ` · ${leads.data.overdueTasks} tarefa(s) atrasada(s)` : ''}</div>
               </>
             ) : s.label === 'Imóveis disponíveis' && props.data ? (
               <>

@@ -124,7 +124,10 @@ describe('site público: busca', () => {
 
 describe('site público: formulário de interesse', () => {
   it('cria cliente, lead e atribuição; atribui ao corretor do imóvel; não duplica em 24h nem o cliente', async () => {
-    const p = await makeProperty({ title: 'Imóvel do formulário' });
+    const brokerId = (await call('GET', '/auth/me', admin.accessToken)).json().id; // (admin cadastra o imóvel)
+    const brokerA = (await call('GET', '/users?pageSize=100', admin.accessToken)).json().items.find((u: { email: string }) => u.email === 'broker.a@teste.com').id;
+    const p = await makeProperty({ title: 'Imóvel do formulário', brokerId: brokerA });
+    expect(brokerId).not.toBe(brokerA);
     const attribution = { utmSource: 'facebook', utmMedium: 'cpc', utmCampaign: 'lancamento', fbclid: 'IwAR123', fbc: 'fb.1.1.IwAR123', fbp: 'fb.1.2.3', landingPage: 'https://site/imovel/x', referrer: 'https://facebook.com' };
     const res = await postLead({ propertyId: p.id, email: 'CARLOS@Mail.com', message: 'Quero visitar', ...attribution });
     expect(res.statusCode).toBe(201);
@@ -133,7 +136,7 @@ describe('site público: formulário de interesse', () => {
     const lead = leads.items.find((l: { property: { id: string } | null }) => l.property?.id === p.id);
     expect(lead).toMatchObject({ source: 'SITE', status: 'NEW' });
     expect(lead.customer).toMatchObject({ name: 'Carlos Lima', phone: '11988887777', email: 'carlos@mail.com' });
-    expect(lead.broker.id).toBe(admin.user ? (await call('GET', `/properties/${p.id}`, admin.accessToken)).json().brokerId : '');
+    expect(lead.broker.id).toBe(brokerA); // corretor responsável pelo imóvel
     expect(lead.attribution).toMatchObject({ utmSource: 'facebook', utmCampaign: 'lancamento', fbclid: 'IwAR123' });
     const stored = await prisma.leadAttribution.findUniqueOrThrow({ where: { leadId: lead.id } });
     expect(stored).toMatchObject({ fbc: 'fb.1.1.IwAR123', fbp: 'fb.1.2.3', referrer: 'https://facebook.com' });

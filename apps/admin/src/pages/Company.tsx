@@ -25,7 +25,7 @@ export function CompanyPage() {
   );
 }
 
-const COMPANY_FIELDS = ['name', 'tradeName', 'document', 'creci', 'email', 'phone', 'whatsapp', 'website', 'primaryColor', 'secondaryColor'] as const;
+const COMPANY_FIELDS = ['name', 'tradeName', 'document', 'creci', 'email', 'phone', 'whatsapp', 'website', 'primaryColor', 'secondaryColor', 'leadDistribution'] as const;
 
 function CompanyForm() {
   const qc = useQueryClient();
@@ -37,7 +37,7 @@ function CompanyForm() {
     if (q.data) setF(Object.fromEntries(COMPANY_FIELDS.map((k) => [k, q.data[k] ?? ''])));
   }, [q.data]);
   const save = useMutation({
-    mutationFn: () => api('/company', { method: 'PATCH', body: Object.fromEntries(COMPANY_FIELDS.map((k) => [k, f[k] === '' ? null : f[k]])) }),
+    mutationFn: () => api('/company', { method: 'PATCH', body: Object.fromEntries(COMPANY_FIELDS.map((k) => [k, f[k] === '' ? (k === 'leadDistribution' ? undefined : null) : f[k]])) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['company'] }); toast.show('Dados da empresa salvos.'); setErr(null); },
     onError: setErr,
   });
@@ -60,6 +60,12 @@ function CompanyForm() {
         <Field label="WhatsApp"><Input {...bind('whatsapp')} /></Field>
         <Field label="Cor primária" error={fe.primaryColor} hint="Formato #RRGGBB"><ColorInput {...bind('primaryColor')} /></Field>
         <Field label="Cor secundária" error={fe.secondaryColor} hint="Formato #RRGGBB"><ColorInput {...bind('secondaryColor')} /></Field>
+        <Field label="Distribuição de leads" className="span-2" hint="Como os novos leads escolhem o corretor quando o imóvel não tem um responsável. No rodízio, o corretor que está há mais tempo sem receber lead é o próximo.">
+          <select className="select" value={f.leadDistribution ?? 'MANUAL'} onChange={(e) => setF({ ...f, leadDistribution: e.target.value })}>
+            <option value="MANUAL">Manual (a equipe distribui)</option>
+            <option value="ROUND_ROBIN">Rodízio entre corretores</option>
+          </select>
+        </Field>
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
         <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Salvando…' : 'Salvar alterações'}</Button>

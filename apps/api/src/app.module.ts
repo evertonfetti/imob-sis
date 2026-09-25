@@ -1,5 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
@@ -9,7 +10,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
-import { LeadsController } from './leads/leads.controller';
+import { CrmModule } from './crm/crm.module';
 import { MediaModule } from './media/media.module';
 import { OwnersModule } from './owners/owners.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -29,6 +30,7 @@ export class AppModule {
           throttlers: [{ limit: 300, ttl: 60_000 }],
           skipIf: () => env.NODE_ENV === 'test',
         }),
+        EventEmitterModule.forRoot(),
         PrismaModule,
         AuditModule,
         StorageModule,
@@ -38,10 +40,11 @@ export class AppModule {
         OwnersModule,
         CatalogModule,
         MediaModule,
+        CrmModule,
         PublicModule,
         PropertiesModule,
       ],
-      controllers: [HealthController, RolesController, LeadsController],
+      controllers: [HealthController, RolesController],
       providers: [
         { provide: ENV, useValue: env },
         { provide: APP_FILTER, useClass: AllExceptionsFilter },

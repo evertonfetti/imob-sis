@@ -4,7 +4,7 @@ import {
   type PublicCompany, type PublicLeadInput, type PublicListQuery, type PublicPropertyCard, type PublicPropertyDetail,
   type WhatsappClickInput,
 } from '@imob/types';
-import { AuditService } from '../audit/audit.service';
+import { LeadsService } from '../crm/leads.service';
 import { AppException, notFound } from '../common/app-exception';
 import type { ReqCtx } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,7 +37,7 @@ export class PublicService {
     private readonly prisma: PrismaService,
     private readonly company: PublicCompanyService,
     private readonly storage: StorageService,
-    private readonly audit: AuditService,
+    private readonly leads: LeadsService,
   ) {}
 
   // ---------- Apresentação ----------
@@ -232,35 +232,24 @@ export class PublicService {
       // Reenvios do mesmo interesse em 24h não geram lead duplicado.
       const since = new Date(Date.now() - 24 * 3_600_000);
       const dup = await tx.lead.findFirst({ where: { companyId, customerId: customer.id, propertyId: property?.id ?? null, createdAt: { gte: since } } });
-      if (dup) return { leadId: dup.id, created: false };
+      if (dup) return null;
 
-      const lead = await tx.lead.create({
-        data: {
-          companyId, customerId: customer.id, propertyId: property?.id ?? null,
-          brokerId: property?.brokerId ?? null,
-          source: 'SITE', status: 'NEW', notes: clean(input.message),
-          purpose: property?.purpose ?? null, city: property?.city ?? null, neighborhood: property?.neighborhood ?? null,
-          bedrooms: property?.bedrooms ?? null, consentAt: new Date(),
-          attribution: {
-            create: {
-              utmSource: clean(input.utmSource), utmMedium: clean(input.utmMedium), utmCampaign: clean(input.utmCampaign),
-              utmContent: clean(input.utmContent), utmTerm: clean(input.utmTerm),
-              fbclid: clean(input.fbclid), fbc: clean(input.fbc), fbp: clean(input.fbp), gclid: clean(input.gclid),
-              landingPage: clean(input.landingPage), referrer: clean(input.referrer),
-              campaignId: clean(input.campaignId), adsetId: clean(input.adsetId), adId: clean(input.adId),
-            },
-          },
+      // Funil, distribuição (corretor do imóvel → rodízio) e histórico ficam por conta do CRM.
+      return this.leads.createLead(tx, {
+        companyId, customerId: customer.id, propertyId: property?.id ?? null, source: 'SITE',
+        notes: clean(input.message), consentAt: new Date(),
+        propertyDefaults: property ? { purpose: property.purpose, city: property.city, neighborhood: property.neighborhood, bedrooms: property.bedrooms, brokerId: property.brokerId, code: property.code } : undefined,
+        attribution: {
+          utmSource: clean(input.utmSource), utmMedium: clean(input.utmMedium), utmCampaign: clean(input.utmCampaign),
+          utmContent: clean(input.utmContent), utmTerm: clean(input.utmTerm),
+          fbclid: clean(input.fbclid), fbc: clean(input.fbc), fbp: clean(input.fbp), gclid: clean(input.gclid),
+          landingPage: clean(input.landingPage), referrer: clean(input.referrer),
+          campaignId: clean(input.campaignId), adsetId: clean(input.adsetId), adId: clean(input.adId),
         },
       });
-      return { leadId: lead.id, created: true, customerId: customer.id };
     });
 
-    if (result.created) {
-      await this.audit.record({
-        companyId, userId: null, entity: 'LEAD', entityId: result.leadId, action: 'CREATE',
-        after: { source: 'SITE', propertyId: property?.id ?? null, propertyCode: property?.code ?? null }, ctx,
-      });
-    }
+    if (result) await this.leads.emitCreated(result, ctx);
     return { ok: true };
   }
 

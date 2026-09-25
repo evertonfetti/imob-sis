@@ -24,6 +24,7 @@ export const PERMISSIONS = {
   'lead.assign': 'Distribuir leads',
   'lead.delete': 'Excluir leads',
   'lead.export': 'Exportar leads',
+  'lead.view_all': 'Ver leads de todos os corretores',
   // CRM
   'crm.pipeline': 'Movimentar pipeline',
   'crm.manage': 'Configurar CRM',
@@ -75,12 +76,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   MARKETING: [
     'property.view', 'property.publish',
     'media.view', 'media.upload', 'media.ai_edit',
-    'lead.view',
+    'lead.view', 'lead.view_all',
     'marketing.view', 'marketing.manage', 'marketing.capi',
   ],
   ATTENDANT: [
     'property.view', 'media.view',
-    'lead.view', 'lead.create', 'lead.edit', 'lead.assign',
+    'lead.view', 'lead.view_all', 'lead.create', 'lead.edit', 'lead.assign',
     'crm.pipeline',
     'visit.view', 'visit.create', 'visit.edit',
   ],

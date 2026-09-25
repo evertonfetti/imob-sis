@@ -103,6 +103,15 @@ describe('proprietários', () => {
   });
 });
 
+describe('edição parcial', () => {
+  it('editar um campo do proprietário não reseta os demais (ex.: tipo "Empresa" permanece)', async () => {
+    const owner = (await call('POST', '/owners', admin.accessToken, { name: 'Construtora Alfa', type: 'COMPANY', document: '12.345.678/0001-90' })).json();
+    expect(owner.type).toBe('COMPANY');
+    const edited = (await call('PATCH', `/owners/${owner.id}`, admin.accessToken, { name: 'Construtora Alfa Ltda' })).json();
+    expect(edited).toMatchObject({ name: 'Construtora Alfa Ltda', type: 'COMPANY', document: '12.345.678/0001-90' });
+  });
+});
+
 describe('isolamento e permissões', () => {
   it('empresa B não vê, edita nem publica imóvel, proprietário ou tipo da empresa A', async () => {
     const owner = (await call('POST', '/owners', admin.accessToken, { name: 'Dono A' })).json();

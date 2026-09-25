@@ -1,6 +1,7 @@
 import { hash } from '@node-rs/argon2';
 import type { PrismaClient } from './generated/client';
 import { seedCatalog } from './seed-catalog';
+import { backfillLeadStages, ensureDefaultPipeline } from './seed-pipeline';
 import { seedRoles } from './seed-roles';
 
 export interface BootstrapOptions {
@@ -24,6 +25,8 @@ export async function bootstrap(prisma: PrismaClient, opts: BootstrapOptions = {
   }
   await seedRoles(prisma, company.id);
   await seedCatalog(prisma, company.id);
+  await ensureDefaultPipeline(prisma, company.id);
+  await backfillLeadStages(prisma, company.id);
 
   if (!opts.adminEmail || !opts.adminPassword) return { adminCreated: false };
   const email = opts.adminEmail.toLowerCase();

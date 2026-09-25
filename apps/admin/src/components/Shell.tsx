@@ -1,5 +1,5 @@
 import {
-  Building2, CalendarDays, FileSignature, Gauge, Handshake, Home, Images, KeyRound, LogOut,
+  Building2, CalendarDays, Contact, Kanban, ListChecks, FileSignature, Gauge, Handshake, Home, Images, KeyRound, LogOut,
   Megaphone, Menu, Plug, ScrollText, Store, Tags, UserRound, Users, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -19,7 +19,10 @@ const NAV: Group[] = [
     { label: 'Catálogo', icon: Tags, to: '/catalogo', perm: 'property.edit' },
   ] },
   { label: 'Relacionamento', items: [
+    { label: 'Pipeline', icon: Kanban, to: '/pipeline', perm: 'lead.view' },
     { label: 'Leads', icon: Handshake, to: '/leads', perm: 'lead.view' },
+    { label: 'Clientes', icon: Contact, to: '/clientes', perm: 'lead.view' },
+    { label: 'Tarefas', icon: ListChecks, to: '/tarefas', perm: 'lead.view' },
     { label: 'Agenda', icon: CalendarDays, perm: 'visit.view' },
     { label: 'Propostas', icon: FileSignature, perm: 'proposal.view' },
   ] },

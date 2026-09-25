@@ -16,3 +16,4 @@ export class DbClient extends PrismaClient {
 export { seedRoles } from './seed-roles';
 export { bootstrap, type BootstrapOptions } from './bootstrap';
 export { seedCatalog } from './seed-catalog';
+export { ensureDefaultPipeline, backfillLeadStages } from './seed-pipeline';

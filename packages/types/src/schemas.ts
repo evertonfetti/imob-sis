@@ -82,6 +82,7 @@ export const updateCompanySchema = z
     logoUrl: optionalText,
     primaryColor: hexColor.optional().nullable(),
     secondaryColor: hexColor.optional().nullable(),
+    leadDistribution: z.enum(['MANUAL', 'ROUND_ROBIN']).optional(),
   })
   .partial();
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;

@@ -41,6 +41,13 @@ export const ERROR_CODES = {
   MEDIA_NOT_FAILED: 'Somente mídias com falha podem ser reprocessadas.',
   STORAGE_UPLOAD_INVALID: 'Envio inválido ou expirado.',
   LEAD_PROPERTY_INVALID: 'O imóvel informado não está mais disponível.',
+  PROPERTY_INVALID: 'O imóvel informado não existe.',
+  LEAD_LOST_REASON_REQUIRED: 'Informe o motivo da perda do lead.',
+  LEAD_STAGE_INVALID: 'O estágio informado não existe.',
+  LEAD_CUSTOMER_INVALID: 'O cliente informado não existe.',
+  LEAD_BROKER_INVALID: 'O corretor informado não existe ou está inativo.',
+  LEAD_NO_BROKER_AVAILABLE: 'Não há corretores ativos para receber o lead.',
+  TASK_INVALID: 'A tarefa informada não existe ou já foi concluída.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

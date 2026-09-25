@@ -5,3 +5,4 @@ export * from './property';
 export * from './utils';
 export * from './media';
 export * from './public';
+export * from './crm';
