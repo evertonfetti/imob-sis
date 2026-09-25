@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 8 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) e publicação/agendamento no Instagram e Facebook.
+**Status:** Blocos 1 a 9 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook e comercial (visitas, agenda e propostas).
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -91,10 +91,18 @@ Os segredos ficam criptografados no banco (AES-256-GCM) e nunca voltam pela API.
 
 No imóvel, **Publicar nas redes** abre a postagem já pronta (fotos com a capa primeiro, contas conectadas e o texto com a descrição do imóvel, preço, local, link do site e código); falta só a data (ou publicar agora). Também em *Redes sociais → Nova publicação*.
 
-- **Conectar:** *Redes sociais → Contas conectadas → Entrar com o Facebook*. O sistema lista as Páginas e as contas do Instagram profissional ligadas a elas, e você escolhe quais usar. Requer um app da Meta (`META_APP_ID`, `META_APP_SECRET`); a tela mostra o passo a passo e a URI de redirecionamento a cadastrar. Em modo de desenvolvimento só quem tem função no app consegue entrar; para liberar a todos é preciso enviar o app para a **revisão da Meta**.
+- **Conectar:** *Redes sociais → Contas conectadas → Entrar com o Facebook*. O sistema lista as Páginas e as contas do Instagram profissional ligadas a elas, e você escolhe quais usar. Cada empresa cadastra o **próprio app da Meta** na mesma tela (ID + chave secreta, validados na Meta e guardados criptografados no banco), sem tocar no servidor; a tela mostra o passo a passo e a URI de redirecionamento a cadastrar. `META_APP_ID`/`META_APP_SECRET` são só um padrão opcional para empresas que não cadastraram o seu. Em modo de desenvolvimento só quem tem função no app consegue entrar; para liberar a todos é preciso enviar o app para a **revisão da Meta**.
 - **Agendamento próprio:** o banco é a fonte da verdade (sobrevive a reinícios; não precisa de Redis) e há trava contra publicação duplicada com várias instâncias. Cada rede publica e falha separadamente, com até 3 tentativas para erros temporários e botão **Reenviar**.
 - **Instagram:** aceita só JPEG e proporção entre 4:5 e 1,91:1. O sistema gera sozinho uma versão JPEG recortada de cada foto (o original é preservado). Carrossel de até 10 fotos; texto de até 2.200 caracteres. As fotos precisam estar acessíveis publicamente (`API_PUBLIC_URL`).
 - Os tokens das Páginas ficam criptografados. Se a Meta invalidar um token, a conta aparece como *Expirada* e pede para reconectar.
+
+### Comercial (visitas, agenda e propostas)
+
+- **Visitas:** agendadas pelo lead (ou em *Agenda*), com corretor, duração e observações. O sistema avisa **conflito de horário** do corretor (dá para agendar mesmo assim). Ciclo: agendada → confirmada → realizada / cancelada / cliente não compareceu; "realizada" e "faltou" só valem a partir do horário. Reagendar cancela e recria o lembrete de confirmação.
+- **Propostas:** valor pedido (do imóvel) x proposta, entrada, financiamento, validade e condições, com **histórico de contrapropostas** (comprador e proprietário). Aceitar/recusar/fechar exige a permissão *Gerenciar propostas*. Propostas em aberto **expiram sozinhas** na data de validade.
+- **Efeito no imóvel e no funil:** proposta aceita **reserva** o imóvel; *Fechar negócio* marca o imóvel como vendido/alugado, leva o lead a *Fechado* e cancela as outras propostas do imóvel. As etapas do funil só **avançam** (nunca retrocedem por automação) e usam papéis fixos, então continuam funcionando se forem renomeadas.
+- **Automação:** timeline do lead, tarefas com prazo (confirmar visita 24h antes, ligar após a visita, reagendar quando o cliente falta) e o evento *Purchase* da Meta com o **valor negociado**.
+- Corretores veem apenas as visitas/propostas dos próprios leads; quem tem *Ver todos os leads* vê tudo.
 
 ### Fotos e mídias
 

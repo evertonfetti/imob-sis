@@ -167,6 +167,18 @@ describe('conversões por etapa do funil', () => {
     expect(skipped).toMatchObject({ eventName: 'QualifiedLead', status: 'SKIPPED' });
   });
 
+  it('fechar o negócio por uma proposta envia Purchase com o valor NEGOCIADO, não o preço anunciado', async () => {
+    const p = await publishedProperty({ title: 'Casa negociada', salePrice: 900000 });
+    await siteLead({ propertyId: p.id, phone: '11955550009', eventId: 'evt-negociada', marketingConsent: true, fbp: 'fb.1.1.999' });
+    const leadId = await leadIdOf('11955550009');
+    const prop = (await call('POST', '/proposals', 'admin', { leadId, proposedPrice: 815000 })).json();
+    await call('PATCH', `/proposals/${prop.id}`, 'admin', { status: 'ACCEPTED' });
+    capiCalls.length = 0;
+    expect((await call('POST', `/proposals/${prop.id}/close`, 'admin')).statusCode).toBe(200);
+    const purchase = capiCalls.map((c) => c.body.data[0]).find((e) => e.event_name === 'Purchase')!;
+    expect(purchase.custom_data).toMatchObject({ currency: 'BRL', value: 815000, content_ids: [p.code] });
+  });
+
   it('o mapeamento etapa → evento é configurável por quem gerencia marketing', async () => {
     await siteLead({ phone: '11955550003', eventId: 'evt-mapa', marketingConsent: true, fbp: 'fb.1.1.777' });
     const leadId = await leadIdOf('11955550003');

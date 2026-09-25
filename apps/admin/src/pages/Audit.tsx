@@ -11,11 +11,11 @@ interface Log {
   before: Record<string, unknown> | null; after: Record<string, unknown> | null; createdAt: string;
 }
 
-const ENTITIES = { AUTH: 'Acesso', USER: 'Usuário', COMPANY: 'Empresa', BRANCH: 'Filial', PROPERTY: 'Imóvel', LEAD: 'Lead', CUSTOMER: 'Cliente', INTEGRATION: 'Integração', SOCIAL_POST: 'Publicação social', SOCIAL_ACCOUNT: 'Conta social',  PIPELINE_STAGE: 'Etapa do funil', OWNER: 'Proprietário', PROPERTY_TYPE: 'Tipo de imóvel', FEATURE: 'Característica' } as const;
+const ENTITIES = { AUTH: 'Acesso', USER: 'Usuário', COMPANY: 'Empresa', BRANCH: 'Filial', PROPERTY: 'Imóvel', LEAD: 'Lead', CUSTOMER: 'Cliente', INTEGRATION: 'Integração', SOCIAL_POST: 'Publicação social', SOCIAL_ACCOUNT: 'Conta social',  VISIT: 'Visita', PROPOSAL: 'Proposta', PIPELINE_STAGE: 'Etapa do funil', OWNER: 'Proprietário', PROPERTY_TYPE: 'Tipo de imóvel', FEATURE: 'Característica' } as const;
 const ACTIONS: Record<string, [string, 'ok' | 'warn' | 'danger' | 'accent' | undefined]> = {
   LOGIN: ['Login', 'ok'], LOGOUT: ['Logout', undefined], LOGIN_FAILED: ['Login falhou', 'danger'], CREATE: ['Criação', 'accent'],
   UPDATE: ['Alteração', 'warn'], DEACTIVATE: ['Desativação', 'danger'], ROLE_CHANGE: ['Mudança de papel', 'warn'],
-  PASSWORD_RESET: ['Senha redefinida', 'warn'], PUBLISH: ['Publicação', 'ok'], UNPUBLISH: ['Despublicação', 'warn'], ARCHIVE: ['Arquivamento', 'warn'], DELETE: ['Exclusão', 'danger'], STAGE_CHANGE: ['Mudança de etapa', 'accent'], ASSIGN: ['Atribuição', 'accent'], MEDIA_ADDED: ['Arquivo adicionado', 'accent'], MEDIA_REMOVED: ['Arquivo removido', 'warn'], COVER_CHANGED: ['Capa alterada', undefined], PASSWORD_RESET_REQUESTED: ['Redefinição solicitada', undefined],
+  COUNTER: ['Contraproposta', 'warn'], CLOSE_DEAL: ['Negócio fechado', 'ok'], RESCHEDULE: ['Remarcação', 'warn'], STATUS_CONFIRMED: ['Confirmada', 'ok'], STATUS_COMPLETED: ['Realizada', 'ok'], STATUS_CANCELLED: ['Cancelamento', 'danger'], STATUS_NO_SHOW: ['Não compareceu', 'danger'], STATUS_SENT: ['Enviada', 'accent'], STATUS_ACCEPTED: ['Aceita', 'ok'], STATUS_REJECTED: ['Recusada', 'danger'], STATUS_EXPIRED: ['Expirada', undefined], PASSWORD_RESET: ['Senha redefinida', 'warn'], PUBLISH: ['Publicação', 'ok'], UNPUBLISH: ['Despublicação', 'warn'], ARCHIVE: ['Arquivamento', 'warn'], DELETE: ['Exclusão', 'danger'], STAGE_CHANGE: ['Mudança de etapa', 'accent'], ASSIGN: ['Atribuição', 'accent'], MEDIA_ADDED: ['Arquivo adicionado', 'accent'], MEDIA_REMOVED: ['Arquivo removido', 'warn'], COVER_CHANGED: ['Capa alterada', undefined], PASSWORD_RESET_REQUESTED: ['Redefinição solicitada', undefined],
 };
 const fmt = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v));
 

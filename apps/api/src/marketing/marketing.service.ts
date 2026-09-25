@@ -53,7 +53,9 @@ export class MarketingService {
         const p = lead.property;
         customData = { content_ids: [p.code], content_name: p.title, content_type: 'home_listing' };
         if (t.eventName === 'Purchase') {
-          const value = p.purpose === 'RENT' ? num(p.rentPrice) : num(p.salePrice);
+          // Valor real do negócio (proposta aceita); sem proposta, o preço anunciado.
+          const deal = await this.prisma.proposal.findFirst({ where: { leadId: lead.id, companyId: t.companyId, status: 'ACCEPTED' }, orderBy: { decidedAt: 'desc' }, select: { proposedPrice: true } });
+          const value = deal ? num(deal.proposedPrice) : p.purpose === 'RENT' ? num(p.rentPrice) : num(p.salePrice);
           if (value) customData = { ...customData, currency: 'BRL', value };
         }
       }

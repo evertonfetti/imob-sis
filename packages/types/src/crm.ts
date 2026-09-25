@@ -7,17 +7,17 @@ export const STAGE_TYPES = ['OPEN', 'WON', 'LOST'] as const;
 export type StageType = (typeof STAGE_TYPES)[number];
 
 /** Estágios iniciais (spec §28). `qualifies`: entrar aqui dispara o evento lead.qualified. */
-export const DEFAULT_STAGES: { name: string; color: string; type: StageType; qualifies?: boolean; metaEvent?: 'QualifiedLead' | 'Schedule' | 'Purchase' }[] = [
+export const DEFAULT_STAGES: { name: string; color: string; type: StageType; qualifies?: boolean; metaEvent?: 'QualifiedLead' | 'Schedule' | 'Purchase'; systemKey?: 'VISIT_SCHEDULED' | 'VISIT_DONE' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' }[] = [
   { name: 'Novo', color: '#8a8578', type: 'OPEN' },
   { name: 'Contato iniciado', color: '#7f8fa0', type: 'OPEN' },
   { name: 'Contato realizado', color: '#6f8f8a', type: 'OPEN' },
   { name: 'Qualificado', color: '#4f7a6a', type: 'OPEN', qualifies: true, metaEvent: 'QualifiedLead' },
   { name: 'Imóveis apresentados', color: '#8c8a5a', type: 'OPEN' },
-  { name: 'Visita agendada', color: '#a7864d', type: 'OPEN', metaEvent: 'Schedule' },
-  { name: 'Visita realizada', color: '#b07a4a', type: 'OPEN' },
-  { name: 'Proposta', color: '#9a6a5a', type: 'OPEN' },
-  { name: 'Negociação', color: '#8a5a6a', type: 'OPEN' },
-  { name: 'Fechado', color: '#3f6b52', type: 'WON', metaEvent: 'Purchase' },
+  { name: 'Visita agendada', color: '#a7864d', type: 'OPEN', metaEvent: 'Schedule', systemKey: 'VISIT_SCHEDULED' },
+  { name: 'Visita realizada', color: '#b07a4a', type: 'OPEN', systemKey: 'VISIT_DONE' },
+  { name: 'Proposta', color: '#9a6a5a', type: 'OPEN', systemKey: 'PROPOSAL' },
+  { name: 'Negociação', color: '#8a5a6a', type: 'OPEN', systemKey: 'NEGOTIATION' },
+  { name: 'Fechado', color: '#3f6b52', type: 'WON', metaEvent: 'Purchase', systemKey: 'WON' },
   { name: 'Perdido', color: '#9b3f2e', type: 'LOST' },
 ];
 
@@ -43,7 +43,7 @@ export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = { LOW: 'Baixa'
 export const TIMELINE_TYPES = [
   'LEAD_CREATED', 'STAGE_CHANGED', 'LEAD_ASSIGNED', 'LEAD_UPDATED', 'NOTE_ADDED', 'TASK_CREATED', 'TASK_COMPLETED',
   // reservados para blocos futuros
-  'WHATSAPP_RECEIVED', 'WHATSAPP_SENT', 'VISIT_CREATED', 'VISIT_COMPLETED', 'PROPOSAL_CREATED', 'PROPOSAL_UPDATED',
+  'WHATSAPP_RECEIVED', 'WHATSAPP_SENT', 'VISIT_CREATED', 'VISIT_COMPLETED', 'VISIT_CANCELLED', 'PROPOSAL_CREATED', 'PROPOSAL_UPDATED',
 ] as const;
 export type TimelineType = (typeof TIMELINE_TYPES)[number];
 

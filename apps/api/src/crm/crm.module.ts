@@ -9,6 +9,6 @@ import { TasksService } from './tasks.service';
 @Module({
   controllers: [LeadsController, PipelineController, CustomersController, TasksController],
   providers: [LeadsService, PipelineService, CustomersService, TasksService, TimelineListener, CrmAutomationListener],
-  exports: [LeadsService, PipelineService],
+  exports: [LeadsService, PipelineService, TasksService],
 })
 export class CrmModule {}

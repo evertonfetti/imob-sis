@@ -74,10 +74,15 @@ export class TasksService {
   }
 
   /** Criação feita pelo sistema (automação), sem usuário logado. */
-  async createSystem(input: { companyId: string; leadId: string; assignedUserId: string | null; title: string; type: CreateTaskInput['type']; priority: CreateTaskInput['priority']; dueAt: Date }) {
+  async createSystem(input: { companyId: string; leadId: string; assignedUserId: string | null; title: string; type: CreateTaskInput['type']; priority: CreateTaskInput['priority']; dueAt: Date; ref?: string }) {
     const task = await this.prisma.task.create({ data: { ...input, createdById: null } });
     await this.emit(CrmEvents.TaskCreated, { companyId: input.companyId, leadId: input.leadId, userId: null, taskId: task.id, title: task.title });
     return task;
+  }
+
+  /** Cancela tarefas automáticas em aberto ligadas a um evento (ex.: visita reagendada/cancelada). */
+  cancelByRef(companyId: string, ref: string) {
+    return this.prisma.task.updateMany({ where: { companyId, ref, status: 'OPEN' }, data: { status: 'CANCELLED' } });
   }
 
   private async load(user: AuthedUser, id: string) {

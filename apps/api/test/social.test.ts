@@ -116,6 +116,57 @@ describe('conexão com o Facebook', () => {
     expect((await call('POST', '/social/connect', 'manager')).statusCode).toBe(403); // gerente só visualiza marketing
   });
 
+  it('cada empresa cadastra o próprio app da Meta (segredo criptografado, nunca devolvido); sem o cadastro, cai no padrão do servidor', async () => {
+    const plain = await bootApp({ API_PUBLIC_URL: 'https://api.teste.com.br', SITE_URL: 'https://site.teste.com.br', SOCIAL_POLL_MS: '1' });
+    try {
+      const a = (await login(plain, 'admin.a@teste.com')).body.accessToken;
+      const b = (await login(plain, 'admin.b@teste.com')).body.accessToken;
+      const put = (t: string, payload: unknown) => plain.inject({ method: 'PUT', url: '/api/v1/social/app', headers: auth(t), payload: payload as never });
+
+      // validações e permissão
+      expect((await put(a, { appId: 'abc', appSecret: 'x'.repeat(32) })).statusCode).toBe(400);
+      expect((await put(a, { appId: '111222333' })).statusCode).toBe(400); // primeira vez exige a chave
+      expect((await plain.inject({ method: 'PUT', url: '/api/v1/social/app', headers: auth(tk.broker!), payload: { appId: '111222333', appSecret: 'x'.repeat(32) } })).statusCode).toBe(403);
+
+      // a Meta recusa o par → não salva
+      fail = [{ match: /oauth\/access_token/, times: 1, status: 400, code: 101, message: 'Invalid app secret' }];
+      const bad = await put(a, { appId: '111222333', appSecret: 'segredo-invalido-0123456789' });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json().code).toBe('SOCIAL_APP_INVALID');
+      expect((await plain.inject({ method: 'GET', url: '/api/v1/social/accounts', headers: auth(a) })).json().configured).toBe(false);
+
+      // salva na empresa A
+      const ok = await put(a, { appId: '111222333', appSecret: 'segredo-empresa-a-0123456789' });
+      expect(ok.statusCode).toBe(200);
+      expect(ok.json().configured).toBe(true);
+      expect(ok.json().app).toEqual({ appId: '111222333', source: 'company' });
+      expect(JSON.stringify(ok.json())).not.toContain('segredo-empresa-a');
+      const row = await prisma.integration.findFirstOrThrow({ where: { provider: 'META_APP' } });
+      expect(row.externalId).toBe('111222333');
+      expect(row.secrets).not.toContain('segredo-empresa-a'); // criptografado no banco
+
+      // o login usa o app da empresa A; a empresa B continua sem app
+      const url = new URL((await plain.inject({ method: 'POST', url: '/api/v1/social/connect', headers: auth(a) })).json().url);
+      expect(url.searchParams.get('client_id')).toBe('111222333');
+      expect((await plain.inject({ method: 'POST', url: '/api/v1/social/connect', headers: auth(b) })).json().code).toBe('SOCIAL_NOT_CONFIGURED');
+      calls.length = 0;
+      const cb = await plain.inject({ method: 'GET', url: `/api/v1/social/oauth/callback?code=C1&state=${encodeURIComponent(url.searchParams.get('state')!)}` });
+      expect(cb.headers.location).toContain('status=connected');
+      const exch = graph(/GET oauth\/access_token/);
+      expect(exch.length).toBe(2);
+      for (const e of exch) { expect(e.query.get('client_id')).toBe('111222333'); expect(e.query.get('client_secret')).toBe('segredo-empresa-a-0123456789'); }
+
+      // trocar só o ID mantém a chave; remover volta ao padrão (sem env aqui = não configurado)
+      expect((await put(a, { appId: '444555666' })).json().app.appId).toBe('444555666');
+      expect((await plain.inject({ method: 'DELETE', url: '/api/v1/social/app', headers: auth(a) })).statusCode).toBe(204);
+      expect((await plain.inject({ method: 'GET', url: '/api/v1/social/accounts', headers: auth(a) })).json().configured).toBe(false);
+    } finally { await plain.close(); }
+
+    // com env no servidor, a empresa sem cadastro usa o padrão e a que cadastrou usa o seu
+    const withEnv = (await call('GET', '/social/accounts', 'adminB')).json();
+    expect(withEnv.app).toEqual({ appId: '1234567890', source: 'server' });
+  });
+
   it('monta a URL do diálogo com escopos e redirect, guarda as Páginas/Instagram como pendentes (token criptografado) e ativa só as escolhidas', async () => {
     const { url, cb } = await connectAccounts();
     expect(url.origin).toBe('https://www.facebook.com');

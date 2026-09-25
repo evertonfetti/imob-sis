@@ -30,6 +30,11 @@ export class SocialGraph {
     return data as T;
   }
 
+  /** Confirma que o par ID/chave é aceito pela Meta (token de app). */
+  async validateApp() {
+    return this.call<{ access_token: string }>('oauth/access_token', { query: { client_id: this.c.appId, client_secret: this.c.appSecret, grant_type: 'client_credentials' } });
+  }
+
   // ---------- Login ----------
   oauthDialogUrl(p: { redirectUri: string; state: string; scopes: string[] }) {
     const q = new URLSearchParams({ client_id: this.c.appId, redirect_uri: p.redirectUri, state: p.state, response_type: 'code', scope: p.scopes.join(',') });

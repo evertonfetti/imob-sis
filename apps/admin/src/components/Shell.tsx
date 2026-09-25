@@ -26,8 +26,8 @@ const NAV: Group[] = [
     { label: 'Conversas', icon: MessageCircle, to: '/conversas', perm: 'lead.view', badge: 'unread' },
     { label: 'Clientes', icon: Contact, to: '/clientes', perm: 'lead.view' },
     { label: 'Tarefas', icon: ListChecks, to: '/tarefas', perm: 'lead.view' },
-    { label: 'Agenda', icon: CalendarDays, perm: 'visit.view' },
-    { label: 'Propostas', icon: FileSignature, perm: 'proposal.view' },
+    { label: 'Agenda', icon: CalendarDays, to: '/agenda', perm: 'visit.view' },
+    { label: 'Propostas', icon: FileSignature, to: '/propostas', perm: 'proposal.view' },
   ] },
   { label: 'Marketing', items: [
     { label: 'Marketing', icon: Megaphone, to: '/marketing', perm: 'marketing.view' },

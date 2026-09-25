@@ -4,14 +4,14 @@ import {
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, Check, Facebook, Image as ImageIcon, Instagram, Plus, RotateCw, Send, Share2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Empty, Modal, PageHeader, SkeletonRows, errorMessage, useToast } from '../components/ui';
+import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dateTime } from '../lib/format';
 
-interface Accounts { configured: boolean; redirectUri: string; accounts: SocialAccountDto[]; pending: SocialAccountDto[] }
+interface Accounts { configured: boolean; app: { appId: string | null; source: 'company' | 'server' | null }; redirectUri: string; accounts: SocialAccountDto[]; pending: SocialAccountDto[] }
 
 const STATUS_TONE: Record<SocialPostStatus, 'ok' | 'warn' | 'danger' | 'accent' | undefined> = {
   SCHEDULED: 'accent', PUBLISHING: 'warn', PUBLISHED: 'ok', PARTIAL: 'warn', FAILED: 'danger', CANCELLED: undefined,
@@ -144,17 +144,7 @@ function AccountsTab({ status }: { status: string | null }) {
   if (q.isLoading) return <div className="card"><SkeletonRows rows={4} /></div>;
   return (
     <>
-      {!s?.configured && (
-        <div className="card card-pad" style={{ marginBottom: 20 }}>
-          <div className="card-title" style={{ marginBottom: 8 }}>Falta configurar o aplicativo da Meta</div>
-          <ol className="steps-list">
-            <li>Em <strong>developers.facebook.com</strong>, crie um aplicativo do tipo <em>Empresa</em> e adicione o produto <strong>Login do Facebook</strong>.</li>
-            <li>Em “URIs de redirecionamento do OAuth válidos”, cadastre: <code style={{ overflowWrap: 'anywhere' }}>{s?.redirectUri}</code></li>
-            <li>Copie o <strong>ID do app</strong> e a <strong>chave secreta</strong> e defina as variáveis <code>META_APP_ID</code> e <code>META_APP_SECRET</code> no servidor.</li>
-            <li>Enquanto o app estiver em <em>modo de desenvolvimento</em>, só quem tem função no app consegue entrar. Para liberar a todos, envie o app para <strong>revisão da Meta</strong> (permissões de publicação em Páginas e no Instagram).</li>
-          </ol>
-        </div>
-      )}
+      {manage && <AppCard s={s} onSaved={refresh} />}
       <section className="card">
         <div className="card-head">
           <div><div className="card-title">Facebook e Instagram</div><div className="card-sub">Entre com o Facebook e escolha quais Páginas e contas do Instagram usar.</div></div>
@@ -203,5 +193,68 @@ function ChooseModal({ pending, onClose, onDone }: { pending: SocialAccountDto[]
         ))}
       </div>
     </Modal>
+  );
+}
+
+/** Aplicativo da Meta desta empresa: o ID e a chave secreta ficam no banco (criptografados) e valem só para ela. */
+function AppCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void }) {
+  const toast = useToast();
+  const own = s?.app.source === 'company';
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ appId: '', appSecret: '' });
+  const [err, setErr] = useState<unknown>(null);
+  const fe = fieldErrors(err);
+  const editing = open || !s?.configured;
+  const save = useMutation({
+    mutationFn: () => api('/social/app', { method: 'PUT', body: { appId: f.appId || s?.app.appId, ...(f.appSecret && { appSecret: f.appSecret }) } }),
+    onSuccess: () => { onSaved(); setOpen(false); setF({ appId: '', appSecret: '' }); setErr(null); toast.show('Aplicativo da Meta salvo.'); },
+    onError: setErr,
+  });
+  const remove = useMutation({
+    mutationFn: () => api('/social/app', { method: 'DELETE' }),
+    onSuccess: () => { onSaved(); toast.show('Aplicativo removido.'); },
+    onError: (e) => toast.show(errorMessage(e)),
+  });
+
+  return (
+    <section className="card" style={{ marginBottom: 20 }}>
+      <div className="card-head">
+        <div><div className="card-title">Aplicativo da Meta</div><div className="card-sub">Cada empresa usa o próprio app: é ele que autoriza o login com o Facebook.</div></div>
+        <div className="toolbar">
+          <Badge tone={s?.configured ? 'ok' : 'warn'}>{s?.configured ? (own ? 'Configurado' : 'Padrão do servidor') : 'Não configurado'}</Badge>
+          {s?.configured && !editing && <Button onClick={() => setOpen(true)}>{own ? 'Alterar' : 'Usar outro app'}</Button>}
+        </div>
+      </div>
+      <div className="section-body">
+        {s?.configured && !editing ? (
+          <>
+            <div className="kvrow"><span>ID do app</span><span>{s.app.appId}</span></div>
+            <div className="kvrow"><span>Chave secreta</span><span>•••••••• (salva, criptografada)</span></div>
+            {own && <div className="toolbar" style={{ marginTop: 12 }}><Button variant="ghost" className="btn-danger" onClick={() => confirm('Remover o aplicativo? As contas já conectadas continuam, mas novos logins ficam bloqueados até cadastrar outro app.') && remove.mutate()}>Remover aplicativo</Button></div>}
+          </>
+        ) : (
+          <form onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
+            <ol className="steps-list">
+              <li>Em <strong>developers.facebook.com</strong>, crie um aplicativo do tipo <em>Empresa</em> e adicione o produto <strong>Login do Facebook</strong>.</li>
+              <li>Em “URIs de redirecionamento do OAuth válidos”, cadastre: <code style={{ overflowWrap: 'anywhere' }}>{s?.redirectUri}</code></li>
+              <li>Em <em>Configurações → Básico</em>, copie o <strong>ID do app</strong> e a <strong>chave secreta</strong> e cole abaixo.</li>
+              <li>Enquanto o app estiver em <em>modo de desenvolvimento</em>, só quem tem função no app consegue entrar. Para liberar a todos, envie o app para <strong>revisão da Meta</strong>.</li>
+            </ol>
+            {err != null && !Object.keys(fe).length && <div className="alert" style={{ margin: '12px 0' }}>{errorMessage(err)}</div>}
+            <div className="form-grid" style={{ marginTop: 12 }}>
+              <Field label="ID do app" error={fe.appId} hint="Só números, no topo das configurações do app."><Input required inputMode="numeric" value={f.appId || s?.app.appId || ''} onChange={(e) => setF({ ...f, appId: e.target.value })} placeholder="123456789012345" /></Field>
+              <Field label="Chave secreta do app" error={fe.appSecret} hint={own ? 'Já salva. Preencha somente para trocar.' : 'Fica criptografada e nunca é exibida de volta.'}>
+                <Input type="password" autoComplete="off" required={!own} value={f.appSecret} onChange={(e) => setF({ ...f, appSecret: e.target.value })} placeholder={own ? '•••••••• (salva)' : ''} />
+              </Field>
+            </div>
+            <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+              {s?.configured && <Button type="button" variant="ghost" onClick={() => { setOpen(false); setErr(null); }}>Cancelar</Button>}
+              <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Validando com a Meta…' : 'Salvar aplicativo'}</Button>
+            </div>
+          </form>
+        )}
+      </div>
+      {toast.node}
+    </section>
   );
 }

@@ -65,7 +65,7 @@ services:
       # Opcional: chave (32+ caracteres) que criptografa o token do WhatsApp guardado no banco.
       # Sem ela, usa-se o JWT_ACCESS_SECRET: trocá-lo depois obriga a reconectar o WhatsApp.
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
-      # Login com o Facebook (publicação em redes sociais). Opcional: sem elas, o botão fica desativado.
+      # Opcional: app da Meta padrão. Cada empresa cadastra o seu no painel (Redes sociais → Contas conectadas).
       META_APP_ID: ${META_APP_ID:-}
       META_APP_SECRET: ${META_APP_SECRET:-}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}

@@ -2,6 +2,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { Spinner } from './components/ui';
 import { useAuth } from './lib/auth';
+import { Agenda } from './pages/Agenda';
 import { Audit } from './pages/Audit';
 import { CompanyPage } from './pages/Company';
 import { Catalog } from './pages/Catalog';
@@ -18,6 +19,7 @@ import { Tasks } from './pages/Tasks';
 import { MarketingConversions } from './pages/MarketingConversions';
 import { Owners } from './pages/Owners';
 import { Properties } from './pages/Properties';
+import { Proposals } from './pages/Proposals';
 import { PropertyForm } from './pages/PropertyForm';
 import { Roles } from './pages/Roles';
 import { SocialComposer } from './pages/SocialComposer';
@@ -61,6 +63,8 @@ export function App() {
           <Route path="redes-sociais/nova" element={<Guard perm="marketing.manage"><SocialComposer /></Guard>} />
           <Route path="redes-sociais/:id" element={<Guard perm="marketing.manage"><SocialComposer /></Guard>} />
           <Route path="clientes" element={<Guard perm="lead.view"><Customers /></Guard>} />
+          <Route path="agenda" element={<Guard perm="visit.view"><Agenda /></Guard>} />
+          <Route path="propostas" element={<Guard perm="proposal.view"><Proposals /></Guard>} />
           <Route path="tarefas" element={<Guard perm="lead.view"><Tasks /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />
           <Route path="catalogo" element={<Guard perm="property.edit"><Catalog /></Guard>} />

@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
-  activateAccountsSchema, createSocialPostSchema, listSocialPostsSchema, updateSocialPostSchema,
-  type CreateSocialPostInput, type UpdateSocialPostInput,
+  activateAccountsSchema, createSocialPostSchema, listSocialPostsSchema, socialAppSchema, updateSocialPostSchema,
+  type CreateSocialPostInput, type SocialAppInput, type UpdateSocialPostInput,
 } from '@imob/types';
 import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
@@ -35,6 +35,13 @@ export class SocialController {
     const status = await this.accounts.handleCallback(q);
     return reply.status(302).header('location', `${this.env.ADMIN_URL.replace(/\/$/, '')}/redes-sociais?aba=contas&status=${status}`).send();
   }
+
+  // ---------- Aplicativo Meta desta empresa ----------
+  @Put('app') @RequirePermissions('marketing.manage')
+  saveApp(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(socialAppSchema)) body: SocialAppInput): Promise<unknown> { return this.accounts.saveApp(c(ctx), body); }
+
+  @Delete('app') @HttpCode(204) @RequirePermissions('marketing.manage')
+  async removeApp(@Ctx() ctx: ReqCtx) { await this.accounts.removeApp(c(ctx)); }
 
   @Get('accounts') @RequirePermissions('marketing.view')
   list(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.accounts.list(ctx.user!.companyId); }

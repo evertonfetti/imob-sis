@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Prisma } from '@imob/database';
 import type {
-  AssignLeadInput, ChangeStageInput, CreateLeadInput, LeadStatus, ListLeadsQuery, UpdateLeadInput,
+  AssignLeadInput, ChangeStageInput, CreateLeadInput, LeadStatus, ListLeadsQuery, StageSystemKey, UpdateLeadInput,
 } from '@imob/types';
 import { AuditService, diff, sanitize } from '../audit/audit.service';
 import { AppException, notFound } from '../common/app-exception';
@@ -295,37 +295,65 @@ export class LeadsService {
     const pipeline = await this.pipeline.get(companyId);
     const to = pipeline.stages.find((s) => s.id === input.stageId);
     if (!to) throw new AppException('LEAD_STAGE_INVALID', 400);
-    const from = lead.stage ?? pipeline.stages[0] ?? null;
-    if (lead.stageId === to.id) return this.get(ctx.user, id);
+    if (lead.stageId !== to.id) await this.applyStage(companyId, lead, pipeline.stages, to, { userId: ctx.user.id, reason: input.lostReason, ctx });
+    return this.get(ctx.user, id);
+  }
 
-    const reason = input.lostReason?.trim() || null;
+  /** Núcleo da mudança de etapa: grava, registra histórico/auditoria e emite os eventos. Usado pelo painel e pela automação. */
+  private async applyStage(
+    companyId: string,
+    lead: { id: string; stageId: string | null; stage: { id: string; name: string } | null },
+    stages: { id: string; name: string; position: number; type: string; qualifies: boolean }[],
+    to: { id: string; name: string; position: number; type: string; qualifies: boolean },
+    o: { userId: string | null; reason?: string | null; ctx?: ReqCtx },
+  ) {
+    const from = lead.stage ?? stages[0] ?? null;
+    const reason = o.reason?.trim() || null;
     if (to.type === 'LOST' && (!reason || reason.length < 3)) throw new AppException('LEAD_LOST_REASON_REQUIRED', 400);
 
-    const qualifiedPos = pipeline.stages.find((s) => s.qualifies)?.position ?? null;
+    const qualifiedPos = stages.find((s) => s.qualifies)?.position ?? null;
     const closed = to.type !== 'OPEN';
-    const firstTimeQualified = to.qualifies && (await this.prisma.leadStageHistory.count({ where: { leadId: id, toStageId: to.id } })) === 0;
+    const firstTimeQualified = to.qualifies && (await this.prisma.leadStageHistory.count({ where: { leadId: lead.id, toStageId: to.id } })) === 0;
 
     await this.prisma.$transaction([
       this.prisma.lead.update({
-        where: { id },
+        where: { id: lead.id },
         data: {
           stageId: to.id, stageEnteredAt: new Date(), status: statusFor(to, qualifiedPos),
           closedAt: closed ? new Date() : null, lostReason: to.type === 'LOST' ? reason : null,
         },
       }),
-      this.prisma.leadStageHistory.create({ data: { companyId, leadId: id, fromStageId: from?.id ?? null, toStageId: to.id, userId: ctx.user.id } }),
+      this.prisma.leadStageHistory.create({ data: { companyId, leadId: lead.id, fromStageId: from?.id ?? null, toStageId: to.id, userId: o.userId } }),
     ]);
 
-    await this.audit.record({ companyId, entity: 'LEAD', entityId: id, action: 'STAGE_CHANGE', before: { stage: from?.name ?? null }, after: { stage: to.name, ...(reason && { lostReason: reason }) }, ctx });
+    await this.audit.record({
+      companyId, userId: o.userId, entity: 'LEAD', entityId: lead.id, action: 'STAGE_CHANGE',
+      before: { stage: from?.name ?? null }, after: { stage: to.name, ...(reason && { lostReason: reason }) }, ctx: o.ctx,
+    });
     const ev: LeadStageChangedEvent = {
-      companyId, leadId: id, userId: ctx.user.id, fromStageId: from?.id ?? null, toStageId: to.id, fromName: from?.name ?? null, toName: to.name, toType: to.type, lostReason: reason,
+      companyId, leadId: lead.id, userId: o.userId, fromStageId: from?.id ?? null, toStageId: to.id, fromName: from?.name ?? null, toName: to.name, toType: to.type, lostReason: reason,
     };
     await this.emit(CrmEvents.LeadStageChanged, ev);
     if (firstTimeQualified) {
-      const q: LeadQualifiedEvent = { companyId, leadId: id, userId: ctx.user.id, stageId: to.id, stageName: to.name };
+      const q: LeadQualifiedEvent = { companyId, leadId: lead.id, userId: o.userId, stageId: to.id, stageName: to.name };
       await this.emit(CrmEvents.LeadQualified, q);
     }
-    return this.get(ctx.user, id);
+  }
+
+  /**
+   * Automação comercial: leva o lead para a etapa com o papel indicado (visita agendada, proposta, fechado…).
+   * Só avança: nunca volta um lead de etapa, e leads já fechados/perdidos não são tocados.
+   */
+  async advanceTo(companyId: string, leadId: string, key: StageSystemKey, userId: string | null): Promise<boolean> {
+    const lead = await this.prisma.lead.findFirst({ where: { id: leadId, companyId }, include: { stage: true } });
+    if (!lead) return false;
+    const pipeline = await this.pipeline.get(companyId);
+    const target = await this.prisma.pipelineStage.findFirst({ where: { pipelineId: pipeline.id, systemKey: key } });
+    if (!target) return false; // funil sem essa etapa: nada a fazer
+    const current = lead.stage ?? pipeline.stages[0];
+    if (!current || current.type !== 'OPEN' || target.position <= current.position || lead.stageId === target.id) return false;
+    await this.applyStage(companyId, lead, pipeline.stages, { ...target, type: target.type as string }, { userId });
+    return true;
   }
 
   async addNote(ctx: AuthedCtx, id: string, text: string) {

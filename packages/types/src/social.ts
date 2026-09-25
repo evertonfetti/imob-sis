@@ -15,6 +15,13 @@ export const INSTAGRAM_CAPTION_MAX = 2200;
 export const INSTAGRAM_CAROUSEL_MAX = 10;
 export const SOCIAL_MAX_DAYS_AHEAD = 180;
 
+export const socialAppSchema = z.object({
+  appId: z.string().trim().regex(/^\d{5,32}$/, 'O ID do app tem só números'),
+  // Em branco = manter a chave já salva (ela nunca volta para a tela).
+  appSecret: z.string().trim().min(16, 'Chave secreta inválida').max(128).optional(),
+});
+export type SocialAppInput = z.infer<typeof socialAppSchema>;
+
 export const activateAccountsSchema = z.object({ accountIds: z.array(z.string().uuid()).max(50) });
 
 export const createSocialPostSchema = z.object({

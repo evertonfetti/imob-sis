@@ -87,7 +87,7 @@ export class SocialPublisher implements OnModuleInit, OnModuleDestroy {
 
   private async publishTarget(post: { id: string; companyId: string; propertyId: string; caption: string }, t: { id: string; attempts: number; account: { id: string; provider: string; externalId: string; pageId: string | null; secrets: string; name: string } }, urls: string[]) {
     const attempts = t.attempts + 1;
-    const g = this.accounts.graph();
+    const g = await this.accounts.graph(post.companyId);
     try {
       const token = this.accounts.token(t.account.secrets);
       let externalId: string; let permalink: string | null;

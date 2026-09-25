@@ -78,8 +78,8 @@ export function errorMessage(e: unknown) {
 }
 
 export function fieldErrors(e: unknown): Record<string, string> {
-  if (e instanceof ApiError && Array.isArray(e.details)) {
-    return Object.fromEntries((e.details as { field: string; message: string }[]).map((d) => [d.field, d.message]));
+  if (e instanceof ApiError && e.code === 'VALIDATION_FAILED' && Array.isArray(e.details)) {
+    return Object.fromEntries((e.details as { field: string; message: string }[]).filter((d) => typeof d?.field === 'string').map((d) => [d.field, d.message]));
   }
   return {};
 }

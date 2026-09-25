@@ -1,10 +1,11 @@
-import { LEAD_STATUS_LABELS, PURPOSE_LABELS, TASK_TYPE_LABELS, type LeadStatus } from '@imob/types';
+import { LEAD_STATUS_LABELS, PROPOSAL_STATUS_LABELS, PURPOSE_LABELS, TASK_TYPE_LABELS, VISIT_STATUS_LABELS, type LeadStatus, type Paginated } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeft, ArrowRightLeft, Check, CheckCircle2, Circle, ClipboardList, Mail, MessageCircle, Pencil, Phone, Plus, Sparkles, StickyNote, Trash2, UserCheck,
+  ArrowLeft, ArrowRightLeft, CalendarDays, Check, CheckCircle2, Circle, ClipboardList, FileSignature, Mail, MessageCircle, Pencil, Phone, Plus, Sparkles, StickyNote, Trash2, UserCheck,
 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { PROPOSAL_TONE, ProposalDetail, ProposalModal, VISIT_TONE, VisitModal, type ProposalRow, type VisitRow } from '../components/commercial';
 import { LostModal, StagePill, searchProperties, sourceLabel, useBrokers, usePipeline } from '../components/crm';
 import { SearchPicker } from '../components/SearchPicker';
 import { TaskModal, type TaskRow } from '../components/TaskModal';
@@ -29,7 +30,7 @@ interface Lead {
 
 const STATUS_TONE: Record<LeadStatus, 'ok' | 'warn' | 'danger' | 'accent' | undefined> = { NEW: 'accent', CONTACTED: 'warn', QUALIFIED: 'warn', WON: 'ok', LOST: 'danger' };
 const TL_ICON: Record<string, ReactNode> = {
-  LEAD_CREATED: <Sparkles />, STAGE_CHANGED: <ArrowRightLeft />, LEAD_ASSIGNED: <UserCheck />, LEAD_UPDATED: <Pencil />, NOTE_ADDED: <StickyNote />, TASK_CREATED: <ClipboardList />, TASK_COMPLETED: <CheckCircle2 />, WHATSAPP_RECEIVED: <MessageCircle />, WHATSAPP_SENT: <MessageCircle />,
+  LEAD_CREATED: <Sparkles />, STAGE_CHANGED: <ArrowRightLeft />, LEAD_ASSIGNED: <UserCheck />, LEAD_UPDATED: <Pencil />, NOTE_ADDED: <StickyNote />, TASK_CREATED: <ClipboardList />, TASK_COMPLETED: <CheckCircle2 />, VISIT_CREATED: <CalendarDays />, VISIT_COMPLETED: <CheckCircle2 />, VISIT_CANCELLED: <CalendarDays />, PROPOSAL_CREATED: <FileSignature />, PROPOSAL_UPDATED: <FileSignature />, WHATSAPP_RECEIVED: <MessageCircle />, WHATSAPP_SENT: <MessageCircle />,
 };
 
 export function LeadDetail() {
@@ -44,9 +45,13 @@ export function LeadDetail() {
   const [lost, setLost] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<TaskRow | 'new' | null>(null);
   const [editing, setEditing] = useState(false);
+  const [visitModal, setVisitModal] = useState<VisitRow | 'new' | null>(null);
+  const [proposalModal, setProposalModal] = useState<'new' | string | null>(null);
 
   const q = useQuery({ queryKey: ['lead', id], queryFn: () => api<Lead>(`/leads/${id}`) });
-  const refresh = () => { for (const k of ['lead', 'board', 'leads', 'tasks']) qc.invalidateQueries({ queryKey: [k] }); };
+  const visits = useQuery({ queryKey: ['visits', 'lead', id], queryFn: () => api<Paginated<VisitRow>>(`/visits?leadId=${id}&pageSize=50`), enabled: can('visit.view') });
+  const proposals = useQuery({ queryKey: ['proposals', 'lead', id], queryFn: () => api<Paginated<ProposalRow>>(`/proposals?leadId=${id}&pageSize=50`), enabled: can('proposal.view') });
+  const refresh = () => { for (const k of ['lead', 'board', 'leads', 'tasks', 'visits', 'proposals']) qc.invalidateQueries({ queryKey: [k] }); };
   const onError = (e: unknown) => toast.show(errorMessage(e));
 
   const stage = useMutation({
@@ -167,6 +172,35 @@ export function LeadDetail() {
             </div>
           </section>
 
+          {can('visit.view') && (
+            <section className="card">
+              <div className="card-head"><div className="card-title">Visitas</div>{can('visit.create') && <Button variant="ghost" onClick={() => setVisitModal('new')}><Plus /> Agendar</Button>}</div>
+              <div className="section-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                {!visits.data?.items.length ? <div className="card-sub" style={{ padding: '12px 0' }}>Nenhuma visita agendada.</div> : [...visits.data.items].reverse().map((v) => (
+                  <div key={v.id} className="mini-row" onClick={() => can('visit.edit') && (v.status === 'SCHEDULED' || v.status === 'CONFIRMED') && setVisitModal(v)}>
+                    <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500 }}>{dateTime(v.scheduledAt)}</div><div className="card-sub">{v.property.code} · {v.broker.name}</div></div>
+                    <Badge tone={VISIT_TONE[v.status]}>{VISIT_STATUS_LABELS[v.status]}</Badge>
+                  </div>
+                ))}
+                <Link to="/agenda" className="card-sub" style={{ display: 'block', paddingTop: 8, color: 'var(--accent)' }}>Ver na agenda</Link>
+              </div>
+            </section>
+          )}
+
+          {can('proposal.view') && (
+            <section className="card">
+              <div className="card-head"><div className="card-title">Propostas</div>{can('proposal.create') && <Button variant="ghost" onClick={() => setProposalModal('new')}><Plus /> Nova</Button>}</div>
+              <div className="section-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
+                {!proposals.data?.items.length ? <div className="card-sub" style={{ padding: '12px 0' }}>Nenhuma proposta registrada.</div> : proposals.data.items.map((p) => (
+                  <div key={p.id} className="mini-row" onClick={() => setProposalModal(p.id)}>
+                    <div style={{ minWidth: 0 }}><div style={{ fontWeight: 500 }}>{brl(p.proposedPrice)}</div><div className="card-sub">{p.property.code}</div></div>
+                    <Badge tone={PROPOSAL_TONE[p.status]}>{PROPOSAL_STATUS_LABELS[p.status]}</Badge>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="card">
             <div className="card-head"><div className="card-title">Interesse</div>{can('lead.edit') && <Button variant="ghost" onClick={() => setEditing(true)}><Pencil /> Editar</Button>}</div>
             <div className="section-body" style={{ paddingTop: 8, paddingBottom: 8 }}>
@@ -203,6 +237,9 @@ export function LeadDetail() {
 
       {lost && <LostModal busy={stage.isPending} onClose={() => setLost(null)} onConfirm={(reason) => stage.mutate({ stageId: lost, lostReason: reason })} />}
       {taskModal && <TaskModal task={taskModal === 'new' ? null : taskModal} leadId={l.id} onClose={() => setTaskModal(null)} onSaved={() => setTaskModal(null)} />}
+      {visitModal && <VisitModal visit={visitModal === 'new' ? null : visitModal} leadId={l.id} property={l.property ? { id: l.property.id, label: `${l.property.code} · ${l.property.title}` } : null} onClose={() => setVisitModal(null)} onSaved={() => { setVisitModal(null); toast.show('Visita salva.'); }} />}
+      {proposalModal === 'new' && <ProposalModal leadId={l.id} property={l.property ? { id: l.property.id, label: `${l.property.code} · ${l.property.title}` } : null} onClose={() => setProposalModal(null)} onSaved={(p) => setProposalModal(p.id)} />}
+      {proposalModal && proposalModal !== 'new' && <ProposalDetail id={proposalModal} onClose={() => setProposalModal(null)} />}
       {editing && <EditInterest lead={l} onClose={() => setEditing(false)} onSaved={(nl) => { qc.setQueryData(['lead', id], nl); refresh(); setEditing(false); toast.show('Dados atualizados.'); }} />}
       {toast.node}
     </>
