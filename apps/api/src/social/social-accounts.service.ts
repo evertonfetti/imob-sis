@@ -30,10 +30,17 @@ export class SocialAccountsService {
   // ---------- Aplicativos da Meta (vários por empresa; as variáveis de ambiente são só um app padrão opcional) ----------
   private get serverApp() { return this.env.META_APP_ID && this.env.META_APP_SECRET ? { appId: this.env.META_APP_ID, appSecret: this.env.META_APP_SECRET } : null; }
 
-  /** Credenciais do app escolhido (id do cadastro ou 'server'). `null` = não existe/não é da empresa. */
-  async credentials(companyId: string, ref: string): Promise<{ appId: string; appSecret: string; name: string; ref: string } | null> {
+  // Privado por padrão: só o dono usa; `shared` libera para a equipe. Administradores gerenciam o que foi compartilhado.
+  private visibleApp = (u: { companyId: string; id: string }) => ({ companyId: u.companyId, OR: [{ createdById: u.id }, { shared: true }] });
+  private visibleAccount = (u: { companyId: string; id: string }) => ({ companyId: u.companyId, OR: [{ connectedById: u.id }, { shared: true }] });
+  private canManage(u: { id: string; permissions: string[] }, ownerId: string | null, shared: boolean) {
+    return ownerId === u.id || (shared && u.permissions.includes('admin.company'));
+  }
+
+  /** Credenciais do app escolhido (id do cadastro ou 'server'). `null` = não existe, não é da empresa ou (com `userId`) não está disponível para o usuário. */
+  async credentials(companyId: string, ref: string, userId?: string): Promise<{ appId: string; appSecret: string; name: string; ref: string } | null> {
     if (ref === 'server') return this.serverApp ? { ...this.serverApp, name: 'Padrão do sistema', ref } : null;
-    const r = await this.prisma.socialApp.findFirst({ where: { id: ref, companyId } });
+    const r = await this.prisma.socialApp.findFirst({ where: userId ? { id: ref, ...this.visibleApp({ companyId, id: userId }) } : { id: ref, companyId } });
     return r ? { appId: r.appId, appSecret: decryptJson<{ appSecret: string }>(r.secrets, this.key).appSecret, name: r.name, ref: r.id } : null;
   }
 
@@ -59,30 +66,32 @@ export class SocialAccountsService {
   async createApp(ctx: AuthedCtx, input: SocialAppInput) {
     const { companyId } = ctx.user;
     if (!input.appSecret) throw new AppException('VALIDATION_FAILED', 400, 'Informe a chave secreta do aplicativo.');
-    if (await this.prisma.socialApp.findUnique({ where: { companyId_appId: { companyId, appId: input.appId } } })) throw new AppException('SOCIAL_APP_DUPLICATE', 409);
+    if (await this.prisma.socialApp.findFirst({ where: { companyId, createdById: ctx.user.id, appId: input.appId } })) throw new AppException('SOCIAL_APP_DUPLICATE', 409);
     await this.validate(input.appId, input.appSecret);
-    const saved = await this.prisma.socialApp.create({ data: { companyId, name: input.name, appId: input.appId, secrets: encryptJson({ appSecret: input.appSecret }, this.key), createdById: ctx.user.id } });
-    await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: saved.id, action: 'CREATE', after: { provider: 'META_APP', name: input.name, appId: input.appId }, ctx });
-    return this.list(companyId);
+    const saved = await this.prisma.socialApp.create({ data: { companyId, name: input.name, appId: input.appId, secrets: encryptJson({ appSecret: input.appSecret }, this.key), createdById: ctx.user.id, shared: !!input.shared } });
+    await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: saved.id, action: 'CREATE', after: { provider: 'META_APP', name: input.name, appId: input.appId, shared: !!input.shared }, ctx });
+    return this.list(ctx.user);
   }
 
   async updateApp(ctx: AuthedCtx, id: string, input: UpdateSocialAppInput) {
     const { companyId } = ctx.user;
-    const cur = await this.prisma.socialApp.findFirst({ where: { id, companyId } });
+    const cur = await this.prisma.socialApp.findFirst({ where: { id, ...this.visibleApp(ctx.user) } });
     if (!cur) throw notFound('Aplicativo não encontrado.');
+    if (!this.canManage(ctx.user, cur.createdById, cur.shared)) throw new AppException('SOCIAL_FORBIDDEN', 403);
     const appId = input.appId ?? cur.appId;
     const appSecret = input.appSecret ?? decryptJson<{ appSecret: string }>(cur.secrets, this.key).appSecret;
-    if (input.appId && input.appId !== cur.appId && (await this.prisma.socialApp.findUnique({ where: { companyId_appId: { companyId, appId } } }))) throw new AppException('SOCIAL_APP_DUPLICATE', 409);
+    if (input.appId && input.appId !== cur.appId && (await this.prisma.socialApp.findFirst({ where: { companyId, createdById: cur.createdById, appId } }))) throw new AppException('SOCIAL_APP_DUPLICATE', 409);
     if (input.appId || input.appSecret) await this.validate(appId, appSecret);
-    await this.prisma.socialApp.update({ where: { id }, data: { name: input.name ?? cur.name, appId, ...(input.appSecret && { secrets: encryptJson({ appSecret }, this.key) }) } });
-    await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: id, action: 'UPDATE', after: { provider: 'META_APP', name: input.name ?? cur.name, appId, secretChanged: !!input.appSecret }, ctx });
-    return this.list(companyId);
+    await this.prisma.socialApp.update({ where: { id }, data: { name: input.name ?? cur.name, appId, ...(input.shared !== undefined && { shared: input.shared }), ...(input.appSecret && { secrets: encryptJson({ appSecret }, this.key) }) } });
+    await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: id, action: 'UPDATE', after: { provider: 'META_APP', name: input.name ?? cur.name, appId, secretChanged: !!input.appSecret, ...(input.shared !== undefined && { shared: input.shared }) }, ctx });
+    return this.list(ctx.user);
   }
 
   async removeApp(ctx: AuthedCtx, id: string) {
     const { companyId } = ctx.user;
-    const cur = await this.prisma.socialApp.findFirst({ where: { id, companyId } });
+    const cur = await this.prisma.socialApp.findFirst({ where: { id, ...this.visibleApp(ctx.user) } });
     if (!cur) throw notFound('Aplicativo não encontrado.');
+    if (!this.canManage(ctx.user, cur.createdById, cur.shared)) throw new AppException('SOCIAL_FORBIDDEN', 403);
     await this.prisma.socialApp.delete({ where: { id } }); // contas conectadas por ele continuam publicando (o token é da Página)
     await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: id, action: 'DELETE', before: { provider: 'META_APP', name: cur.name, appId: cur.appId }, ctx });
   }
@@ -110,18 +119,18 @@ export class SocialAccountsService {
   }
 
   async connectUrl(ctx: AuthedCtx, appRef?: string) {
-    const { companyId } = ctx.user;
+    const { companyId, id: userId } = ctx.user;
     let ref = appRef;
     if (!ref) {
-      const [n, only] = await Promise.all([this.prisma.socialApp.count({ where: { companyId } }), this.prisma.socialApp.findFirst({ where: { companyId }, select: { id: true } })]);
-      const options = n + (this.serverApp ? 1 : 0);
+      const mine = await this.prisma.socialApp.findMany({ where: this.visibleApp(ctx.user), select: { id: true }, take: 2 });
+      const options = mine.length + (this.serverApp ? 1 : 0);
       if (options === 0) throw new AppException('SOCIAL_NOT_CONFIGURED', 409);
       if (options > 1) throw new AppException('SOCIAL_APP_REQUIRED', 400);
-      ref = only?.id ?? 'server';
+      ref = mine[0]?.id ?? 'server';
     }
-    const cred = await this.credentials(companyId, ref);
+    const cred = await this.credentials(companyId, ref, userId);
     if (!cred) throw new AppException(appRef ? 'SOCIAL_APP_REQUIRED' : 'SOCIAL_NOT_CONFIGURED', appRef ? 400 : 409);
-    const state = this.sign({ cid: companyId, uid: ctx.user.id, app: cred.ref, exp: Date.now() + STATE_TTL_MS, n: randomBytes(8).toString('hex') });
+    const state = this.sign({ cid: companyId, uid: userId, app: cred.ref, exp: Date.now() + STATE_TTL_MS, n: randomBytes(8).toString('hex') });
     return { url: this.graphFor(cred).oauthDialogUrl({ redirectUri: this.redirectUri, state, scopes: SOCIAL_SCOPES }) };
   }
 
@@ -158,58 +167,63 @@ export class SocialAccountsService {
   }
 
   private async upsert(companyId: string, userId: string, socialAppId: string | null, a: { provider: 'FACEBOOK_PAGE' | 'INSTAGRAM'; externalId: string; name: string; username: string | null; pictureUrl: string | null; pageId: string | null; secrets: string }) {
-    const where = { companyId_provider_externalId: { companyId, provider: a.provider, externalId: a.externalId } };
-    const existing = await this.prisma.socialAccount.findUnique({ where });
+    // Cada usuário tem a sua conexão do mesmo perfil (o token é dele).
+    const existing = await this.prisma.socialAccount.findFirst({ where: { companyId, connectedById: userId, provider: a.provider, externalId: a.externalId } });
     if (existing) {
       // Token novo: uma conta que tinha expirado volta a funcionar; as que já estavam ativas continuam.
-      await this.prisma.socialAccount.update({ where, data: { name: a.name, username: a.username, pictureUrl: a.pictureUrl, pageId: a.pageId, secrets: a.secrets, connectedById: userId, socialAppId, status: existing.status === 'EXPIRED' ? 'ACTIVE' : existing.status } });
+      await this.prisma.socialAccount.update({ where: { id: existing.id }, data: { name: a.name, username: a.username, pictureUrl: a.pictureUrl, pageId: a.pageId, secrets: a.secrets, connectedById: userId, socialAppId, status: existing.status === 'EXPIRED' ? 'ACTIVE' : existing.status } });
     } else {
       await this.prisma.socialAccount.create({ data: { ...a, companyId, connectedById: userId, socialAppId, status: 'PENDING' } });
     }
   }
 
   // ---------- Consulta e seleção ----------
-  private dto(a: { id: string; socialAppId?: string | null; app?: { name: string } | null; provider: string; externalId: string; name: string; username: string | null; pictureUrl: string | null; status: string; pageId: string | null }, pageNames: Map<string, string>): SocialAccountDto {
+  private dto(u: { id: string }, owners: Map<string, string>, a: { id: string; socialAppId?: string | null; app?: { name: string } | null; provider: string; externalId: string; name: string; username: string | null; pictureUrl: string | null; status: string; pageId: string | null; shared: boolean; connectedById: string | null }, pageNames: Map<string, string>): SocialAccountDto {
     return {
-      id: a.id, appName: a.app?.name ?? null, appRef: a.socialAppId ?? null, provider: a.provider as SocialAccountDto['provider'], externalId: a.externalId, name: a.name, username: a.username, pictureUrl: a.pictureUrl,
+      id: a.id, appName: a.app?.name ?? null, appRef: a.socialAppId ?? null, mine: a.connectedById === u.id, shared: a.shared, ownerName: a.connectedById ? (owners.get(a.connectedById) ?? null) : null,
+      provider: a.provider as SocialAccountDto['provider'], externalId: a.externalId, name: a.name, username: a.username, pictureUrl: a.pictureUrl,
       status: a.status as SocialAccountDto['status'], linkedPageName: a.pageId ? (pageNames.get(a.pageId) ?? null) : null,
     };
   }
 
-  async list(companyId: string) {
+  /** Só o que o usuário pode ver: as próprias contas/apps e o que colegas compartilharam. */
+  async list(user: { id: string; companyId: string }) {
     const [rows, apps] = await Promise.all([
-      this.prisma.socialAccount.findMany({ where: { companyId }, include: { app: { select: { name: true } } }, orderBy: [{ provider: 'asc' }, { name: 'asc' }] }),
-      this.prisma.socialApp.findMany({ where: { companyId }, orderBy: { createdAt: 'asc' }, include: { _count: { select: { accounts: true } } } }),
+      this.prisma.socialAccount.findMany({ where: this.visibleAccount(user), include: { app: { select: { name: true } } }, orderBy: [{ provider: 'asc' }, { name: 'asc' }] }),
+      this.prisma.socialApp.findMany({ where: this.visibleApp(user), orderBy: { createdAt: 'asc' } }),
     ]);
+    const ownerIds = [...new Set([...rows.map((r) => r.connectedById), ...apps.map((a) => a.createdById)].filter((x): x is string => !!x))];
+    const owners = new Map((ownerIds.length ? await this.prisma.user.findMany({ where: { id: { in: ownerIds }, companyId: user.companyId }, select: { id: true, name: true } }) : []).map((o) => [o.id, o.name]));
     const pageNames = new Map(rows.filter((r) => r.provider === 'FACEBOOK_PAGE').map((r) => [r.externalId, r.name]));
-    const list: SocialAppDto[] = apps.map((a) => ({ id: a.id, name: a.name, appId: a.appId, source: 'company', accountCount: a._count.accounts }));
-    if (this.serverApp) list.push({ id: 'server', name: 'Padrão do sistema', appId: this.serverApp.appId, source: 'server', accountCount: rows.filter((r) => !r.socialAppId).length });
+    const list: SocialAppDto[] = apps.map((a) => ({ id: a.id, name: a.name, appId: a.appId, source: 'company', accountCount: rows.filter((r) => r.socialAppId === a.id).length, mine: a.createdById === user.id, shared: a.shared, ownerName: a.createdById ? (owners.get(a.createdById) ?? null) : null }));
+    if (this.serverApp) list.push({ id: 'server', name: 'Padrão do sistema', appId: this.serverApp.appId, source: 'server', accountCount: rows.filter((r) => !r.socialAppId).length, mine: false, shared: true, ownerName: null });
     return {
       configured: list.length > 0,
       apps: list,
       redirectUri: this.redirectUri,
-      accounts: rows.filter((r) => r.status !== 'PENDING').map((r) => this.dto(r, pageNames)),
-      pending: rows.filter((r) => r.status === 'PENDING').map((r) => this.dto(r, pageNames)),
+      accounts: rows.filter((r) => r.status !== 'PENDING').map((r) => this.dto(user, owners, r, pageNames)),
+      pending: rows.filter((r) => r.status === 'PENDING').map((r) => this.dto(user, owners, r, pageNames)),
     };
   }
 
   /** Marca como ativas as contas escolhidas e descarta as que ficaram pendentes (e seus tokens). */
   async activate(ctx: AuthedCtx, ids: string[]) {
     const { companyId } = ctx.user;
-    const chosen = await this.prisma.socialAccount.findMany({ where: { id: { in: ids }, companyId } });
+    const chosen = await this.prisma.socialAccount.findMany({ where: { id: { in: ids }, companyId, connectedById: ctx.user.id, status: 'PENDING' } }); // só as contas que você acabou de conectar
     if (chosen.length !== new Set(ids).size) throw new AppException('SOCIAL_ACCOUNT_INVALID', 400);
     await this.prisma.$transaction([
-      this.prisma.socialAccount.updateMany({ where: { id: { in: ids }, companyId }, data: { status: 'ACTIVE' } }),
-      this.prisma.socialAccount.deleteMany({ where: { companyId, status: 'PENDING', id: { notIn: ids } } }),
+      this.prisma.socialAccount.updateMany({ where: { id: { in: ids }, companyId, connectedById: ctx.user.id }, data: { status: 'ACTIVE' } }),
+      this.prisma.socialAccount.deleteMany({ where: { companyId, connectedById: ctx.user.id, status: 'PENDING', id: { notIn: ids } } }),
     ]);
     await this.audit.record({ companyId, entity: 'SOCIAL_ACCOUNT', action: 'ACTIVATE', after: { accounts: chosen.map((c) => `${c.provider}:${c.name}`) }, ctx });
-    return this.list(companyId);
+    return this.list(ctx.user);
   }
 
   async remove(ctx: AuthedCtx, id: string) {
     const { companyId } = ctx.user;
-    const a = await this.prisma.socialAccount.findFirst({ where: { id, companyId } });
+    const a = await this.prisma.socialAccount.findFirst({ where: { id, ...this.visibleAccount(ctx.user) } });
     if (!a) throw notFound('Conta não encontrada.');
+    if (!this.canManage(ctx.user, a.connectedById, a.shared)) throw new AppException('SOCIAL_FORBIDDEN', 403);
     // Publicações agendadas deixam de mirar nesta conta; sem nenhum destino, são canceladas.
     const affected = await this.prisma.socialPostTarget.findMany({ where: { accountId: id, status: 'PENDING', post: { status: 'SCHEDULED' } }, select: { postId: true } });
     await this.prisma.socialPostTarget.deleteMany({ where: { accountId: id, status: 'PENDING', post: { status: 'SCHEDULED' } } });
@@ -220,9 +234,20 @@ export class SocialAccountsService {
     await this.audit.record({ companyId, entity: 'SOCIAL_ACCOUNT', entityId: id, action: 'DISCONNECT', before: { provider: a.provider, name: a.name }, ctx });
   }
 
+  /** Só quem conectou decide se a equipe pode publicar nesta conta. */
+  async setShared(ctx: AuthedCtx, id: string, shared: boolean) {
+    const a = await this.prisma.socialAccount.findFirst({ where: { id, ...this.visibleAccount(ctx.user) } });
+    if (!a) throw notFound('Conta não encontrada.');
+    if (a.connectedById !== ctx.user.id) throw new AppException('SOCIAL_FORBIDDEN', 403);
+    if (a.status === 'PENDING') throw new AppException('SOCIAL_ACCOUNT_INVALID', 400);
+    await this.prisma.socialAccount.update({ where: { id }, data: { shared } });
+    await this.audit.record({ companyId: ctx.user.companyId, entity: 'SOCIAL_ACCOUNT', entityId: id, action: shared ? 'SHARE' : 'UNSHARE', after: { name: a.name, shared }, ctx });
+    return this.list(ctx.user);
+  }
+
   /** Confere se o token ainda vale; marca como expirada se a Meta recusar. */
   async check(ctx: AuthedCtx, id: string) {
-    const a = await this.prisma.socialAccount.findFirst({ where: { id, companyId: ctx.user.companyId } });
+    const a = await this.prisma.socialAccount.findFirst({ where: { id, ...this.visibleAccount(ctx.user) } });
     if (!a) throw notFound('Conta não encontrada.');
     try {
       await (await this.graph(ctx.user.companyId)).pageName(a.pageId ?? a.externalId, this.token(a.secrets));

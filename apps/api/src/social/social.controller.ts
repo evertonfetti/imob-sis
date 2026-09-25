@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
-  activateAccountsSchema, createSocialPostSchema, listSocialPostsSchema, connectSocialSchema, socialAppSchema, updateSocialAppSchema, updateSocialPostSchema,
+  activateAccountsSchema, createSocialPostSchema, listSocialPostsSchema, connectSocialSchema, shareSchema, socialAppSchema, updateSocialAppSchema, updateSocialPostSchema,
   type ConnectSocialInput, type CreateSocialPostInput, type SocialAppInput, type UpdateSocialAppInput, type UpdateSocialPostInput,
 } from '@imob/types';
 import type { FastifyReply } from 'fastify';
@@ -47,10 +47,13 @@ export class SocialController {
   async removeApp(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string) { await this.accounts.removeApp(c(ctx), id); }
 
   @Get('accounts') @RequirePermissions('marketing.view')
-  list(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.accounts.list(ctx.user!.companyId); }
+  list(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.accounts.list(ctx.user!); }
 
   @Post('accounts/activate') @HttpCode(200) @RequirePermissions('marketing.manage')
   activate(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(activateAccountsSchema)) body: z.infer<typeof activateAccountsSchema>): Promise<unknown> { return this.accounts.activate(c(ctx), body.accountIds); }
+
+  @Patch('accounts/:id/share') @RequirePermissions('marketing.manage')
+  share(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string, @Body(new ZodPipe(shareSchema)) body: { shared: boolean }): Promise<unknown> { return this.accounts.setShared(c(ctx), id, body.shared); }
 
   @Post('accounts/:id/check') @HttpCode(200) @RequirePermissions('marketing.manage')
   check(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.accounts.check(c(ctx), id); }

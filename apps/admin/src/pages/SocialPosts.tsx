@@ -142,6 +142,7 @@ function AccountsTab({ status }: { status: string | null }) {
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ['social-accounts'] });
   const check = useMutation({ mutationFn: (id: string) => api<{ ok: boolean }>(`/social/accounts/${id}/check`, { method: 'POST' }), onSuccess: (r) => { refresh(); toast.show(r.ok ? 'Conexão ok.' : 'A conexão expirou. Reconecte a conta.'); }, onError: (e) => toast.show(errorMessage(e)) });
+  const share = useMutation({ mutationFn: (v: { id: string; shared: boolean }) => api(`/social/accounts/${v.id}/share`, { method: 'PATCH', body: { shared: v.shared } }), onSuccess: (_r, v) => { refresh(); toast.show(v.shared ? 'Conta compartilhada com a equipe.' : 'Conta voltou a ser só sua.'); }, onError: (e) => toast.show(errorMessage(e)) });
   const remove = useMutation({ mutationFn: (id: string) => api(`/social/accounts/${id}`, { method: 'DELETE' }), onSuccess: () => { refresh(); toast.show('Conta desconectada.'); }, onError: (e) => toast.show(errorMessage(e)) });
 
   if (q.isLoading) return <div className="card"><SkeletonRows rows={4} /></div>;
@@ -163,13 +164,15 @@ function AccountsTab({ status }: { status: string | null }) {
             <div className="acc-pic">{a.pictureUrl ? <img src={a.pictureUrl} alt="" /> : <Icon provider={a.provider} />}</div>
             <div className="acc-info">
               <strong>{a.provider === 'INSTAGRAM' && a.username ? `@${a.username}` : a.name}</strong>
-              <span className="card-sub">{SOCIAL_PROVIDER_LABELS[a.provider]}{apps.length > 1 && a.appName ? ` · via ${a.appName}` : ''}{a.linkedPageName ? ` · ligada à Página ${a.linkedPageName}` : ''}</span>
+              <span className="card-sub">{SOCIAL_PROVIDER_LABELS[a.provider]}{apps.length > 1 && a.appName ? ` · via ${a.appName}` : ''}{!a.mine && a.ownerName ? ` · de ${a.ownerName}` : ''}{a.linkedPageName ? ` · ligada à Página ${a.linkedPageName}` : ''}</span>
             </div>
+            <Badge tone={a.shared ? 'accent' : undefined} plain>{a.shared ? 'Compartilhada' : 'Só você'}</Badge>
             <Badge tone={a.status === 'ACTIVE' ? 'ok' : 'danger'}>{a.status === 'ACTIVE' ? 'Ativa' : 'Expirada'}</Badge>
             {manage && (
               <div className="toolbar">
-                {a.status === 'EXPIRED' ? <Button onClick={() => connect.mutate(a.appRef ?? undefined)}>Reconectar</Button> : <Button variant="ghost" onClick={() => check.mutate(a.id)} disabled={check.isPending}>Verificar</Button>}
-                <Button variant="ghost" className="btn-danger" onClick={() => confirm(`Desconectar ${a.name}? Publicações agendadas só para esta conta serão canceladas.`) && remove.mutate(a.id)}>Desconectar</Button>
+                {a.mine && <Button variant="ghost" onClick={() => share.mutate({ id: a.id, shared: !a.shared })} disabled={share.isPending}>{a.shared ? 'Parar de compartilhar' : 'Compartilhar com a equipe'}</Button>}
+                {a.status === 'EXPIRED' ? (a.mine ? <Button onClick={() => connect.mutate(a.appRef ?? undefined)}>Reconectar</Button> : null) : <Button variant="ghost" onClick={() => check.mutate(a.id)} disabled={check.isPending}>Verificar</Button>}
+                {(a.mine || (a.shared && can('admin.company'))) && <Button variant="ghost" className="btn-danger" onClick={() => confirm(`Desconectar ${a.name}? Publicações agendadas só para esta conta serão canceladas.`) && remove.mutate(a.id)}>Desconectar</Button>}
               </div>
             )}
           </div>
@@ -207,15 +210,16 @@ function ChooseModal({ pending, onClose, onDone }: { pending: SocialAccountDto[]
 /** Aplicativos da Meta desta empresa (pode haver vários): o ID e a chave secreta ficam no banco, criptografados. */
 function AppsCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void }) {
   const toast = useToast();
+  const { can } = useAuth();
   const apps = s?.apps ?? [];
-  const [form, setForm] = useState<{ id: string | null; name: string; appId: string; appSecret: string } | null>(null);
+  const [form, setForm] = useState<{ id: string | null; name: string; appId: string; appSecret: string; shared: boolean } | null>(null);
   const [err, setErr] = useState<unknown>(null);
   const fe = fieldErrors(err);
   const editing = form?.id ? apps.find((a) => a.id === form.id) : null;
-  const open = (a?: SocialAppDto) => { setErr(null); setForm(a ? { id: a.id, name: a.name, appId: a.appId, appSecret: '' } : { id: null, name: '', appId: '', appSecret: '' }); };
+  const open = (a?: SocialAppDto) => { setErr(null); setForm(a ? { id: a.id, name: a.name, appId: a.appId, appSecret: '', shared: a.shared } : { id: null, name: '', appId: '', appSecret: '', shared: false }); };
   const save = useMutation({
     mutationFn: () => {
-      const body = { name: form!.name, appId: form!.appId, ...(form!.appSecret && { appSecret: form!.appSecret }) };
+      const body = { name: form!.name, appId: form!.appId, shared: form!.shared, ...(form!.appSecret && { appSecret: form!.appSecret }) };
       return form!.id ? api(`/social/apps/${form!.id}`, { method: 'PATCH', body }) : api('/social/apps', { method: 'POST', body });
     },
     onSuccess: () => { onSaved(); setForm(null); setErr(null); toast.show('Aplicativo salvo.'); },
@@ -230,16 +234,17 @@ function AppsCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void
   return (
     <section className="card" style={{ marginBottom: 20 }}>
       <div className="card-head">
-        <div><div className="card-title">Aplicativos da Meta</div><div className="card-sub">Cadastre um ou mais apps: cada um autoriza o login com o Facebook de contas diferentes.</div></div>
+        <div><div className="card-title">Aplicativos da Meta</div><div className="card-sub">Cada pessoa usa o próprio app e as próprias contas. Só quem cadastrou vê e usa, a menos que compartilhe com a equipe.</div></div>
         <Button variant={apps.length ? 'default' : 'primary'} onClick={() => open()}><Plus /> Adicionar aplicativo</Button>
       </div>
       {apps.length > 0 && apps.map((a) => (
         <div key={a.id} className="acc">
           <div className="acc-info">
             <strong>{a.name}</strong>
-            <span className="card-sub">ID {a.appId} · {a.accountCount} {a.accountCount === 1 ? 'conta conectada' : 'contas conectadas'}{a.source === 'server' ? ' · configurado no servidor' : ''}</span>
+            <span className="card-sub">ID {a.appId} · {a.accountCount} {a.accountCount === 1 ? 'conta conectada' : 'contas conectadas'}{a.source === 'server' ? ' · configurado no servidor' : !a.mine && a.ownerName ? ` · de ${a.ownerName}` : ''}</span>
           </div>
-          {a.source === 'company' && (
+          {a.source === 'company' && <Badge tone={a.shared ? 'accent' : undefined} plain>{a.shared ? 'Compartilhado' : 'Só você'}</Badge>}
+          {a.source === 'company' && (a.mine || (a.shared && can('admin.company'))) && (
             <div className="toolbar">
               <Button variant="ghost" onClick={() => open(a)}>Editar</Button>
               <Button variant="ghost" className="btn-danger" onClick={() => confirm(`Remover “${a.name}”? As contas já conectadas continuam publicando, mas novos logins por este app deixam de funcionar.`) && remove.mutate(a.id)}>Remover</Button>
@@ -266,6 +271,9 @@ function AppsCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void
               <Input type="password" autoComplete="off" required={!editing} value={form.appSecret} onChange={(e) => setForm({ ...form, appSecret: e.target.value })} placeholder={editing ? '•••••••• (salva)' : ''} />
             </Field>
           </div>
+          <label className="check" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 14, fontSize: 13.5 }}>
+            <input type="checkbox" checked={form.shared} onChange={(e) => setForm({ ...form, shared: e.target.checked })} /> Compartilhar com a equipe <span className="card-sub">(os colegas poderão conectar contas por este app)</span>
+          </label>
           <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
             <Button type="button" variant="ghost" onClick={() => { setForm(null); setErr(null); }}>Cancelar</Button>
             <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Validando com a Meta…' : 'Salvar aplicativo'}</Button>

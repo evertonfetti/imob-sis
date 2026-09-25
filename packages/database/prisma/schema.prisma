@@ -941,14 +941,16 @@ model SocialApp {
   appId       String
   // { appSecret } criptografado (AES-256-GCM).
   secrets     String
+  // Dono do app (quem cadastrou). Privado por padrão; `shared` libera para a equipe.
   createdById String?
+  shared      Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   company  Company         @relation(fields: [companyId], references: [id])
   accounts SocialAccount[]
 
-  @@unique([companyId, appId])
+  @@unique([companyId, createdById, appId])
   @@map("social_apps")
 }
 
@@ -967,6 +969,8 @@ model SocialAccount {
   connectedById String?
   // App da Meta pelo qual a conta foi conectada (null = app padrão do servidor ou app removido).
   socialAppId   String?
+  // Privada por padrão: só quem conectou usa. Compartilhada = toda a equipe pode publicar nela.
+  shared        Boolean             @default(false)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
@@ -974,7 +978,7 @@ model SocialAccount {
   app     SocialApp?         @relation(fields: [socialAppId], references: [id], onDelete: SetNull)
   targets SocialPostTarget[]
 
-  @@unique([companyId, provider, externalId])
+  @@unique([companyId, connectedById, provider, externalId])
   @@index([companyId, status])
   @@map("social_accounts")
 }

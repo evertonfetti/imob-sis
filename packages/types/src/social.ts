@@ -20,13 +20,17 @@ export const socialAppSchema = z.object({
   appId: z.string().trim().regex(/^\d{5,32}$/, 'O ID do app tem só números'),
   // Em branco = manter a chave já salva (ela nunca volta para a tela).
   appSecret: z.string().trim().min(16, 'Chave secreta inválida').max(128).optional(),
+  /** Libera o app para toda a equipe (padrão: só o dono usa). */
+  shared: z.boolean().optional(),
 });
 export const updateSocialAppSchema = socialAppSchema.partial();
+export const shareSchema = z.object({ shared: z.boolean() });
 export type SocialAppInput = z.infer<typeof socialAppSchema>;
 export type UpdateSocialAppInput = z.infer<typeof updateSocialAppSchema>;
 export const connectSocialSchema = z.object({ appId: z.string().uuid().or(z.literal('server')).optional() }).default({});
 export type ConnectSocialInput = z.infer<typeof connectSocialSchema>;
-export interface SocialAppDto { id: string; name: string; appId: string; source: 'company' | 'server'; accountCount: number }
+/** `mine`: cadastrado por você (só você edita/remove, salvo administradores em apps compartilhados). */
+export interface SocialAppDto { id: string; name: string; appId: string; source: 'company' | 'server'; accountCount: number; mine: boolean; shared: boolean; ownerName: string | null }
 
 export const activateAccountsSchema = z.object({ accountIds: z.array(z.string().uuid()).max(50) });
 
@@ -55,6 +59,10 @@ export interface SocialAccountDto {
   appName: string | null;
   /** Cadastro do app pelo qual a conta entrou (null = app padrão do servidor ou app removido). */
   appRef: string | null;
+  /** Conectada por você; contas de colegas só aparecem quando compartilhadas. */
+  mine: boolean;
+  shared: boolean;
+  ownerName: string | null;
   provider: SocialProvider;
   externalId: string;
   name: string;

@@ -63,12 +63,12 @@ export class SocialPostsService {
   }
 
   // ---------- Validação ----------
-  private async validate(companyId: string, propertyId: string, i: { mediaIds: string[]; accountIds: string[]; caption: string; scheduledAt?: string | null }) {
+  private async validate(companyId: string, userId: string, propertyId: string, i: { mediaIds: string[]; accountIds: string[]; caption: string; scheduledAt?: string | null }) {
     const mediaIds = [...new Set(i.mediaIds)];
     const media = await this.prisma.propertyMedia.count({ where: { id: { in: mediaIds }, propertyId, companyId, type: 'IMAGE', status: 'READY' } });
     if (media !== mediaIds.length) throw new AppException('SOCIAL_MEDIA_INVALID', 400);
     const accountIds = [...new Set(i.accountIds)];
-    const accounts = await this.prisma.socialAccount.findMany({ where: { id: { in: accountIds }, companyId, status: 'ACTIVE' } });
+    const accounts = await this.prisma.socialAccount.findMany({ where: { id: { in: accountIds }, companyId, status: 'ACTIVE', OR: [{ connectedById: userId }, { shared: true }] } }); // só contas suas ou compartilhadas
     if (accounts.length !== accountIds.length) throw new AppException('SOCIAL_ACCOUNT_INVALID', 400);
     if (accounts.some((a) => a.provider === 'INSTAGRAM') && i.caption.length > INSTAGRAM_CAPTION_MAX) throw new AppException('SOCIAL_INSTAGRAM_CAPTION', 400);
     let when = new Date();
@@ -83,7 +83,7 @@ export class SocialPostsService {
   async create(ctx: AuthedCtx, input: CreateSocialPostInput) {
     const { companyId } = ctx.user;
     if (!(await this.prisma.property.findFirst({ where: { id: input.propertyId, companyId }, select: { id: true } }))) throw notFound('Imóvel não encontrado.');
-    const v = await this.validate(companyId, input.propertyId, input);
+    const v = await this.validate(companyId, ctx.user.id, input.propertyId, input);
     const post = await this.prisma.socialPost.create({
       data: {
         companyId, propertyId: input.propertyId, createdById: ctx.user.id, caption: input.caption, mediaIds: v.mediaIds, scheduledAt: v.when,
@@ -105,7 +105,7 @@ export class SocialPostsService {
     const { companyId } = ctx.user;
     const cur = await this.load(ctx.user, id);
     if (cur.status !== 'SCHEDULED') throw new AppException('SOCIAL_POST_LOCKED', 409);
-    const v = await this.validate(companyId, cur.propertyId, {
+    const v = await this.validate(companyId, ctx.user.id, cur.propertyId, {
       mediaIds: input.mediaIds ?? cur.mediaIds, accountIds: input.accountIds ?? cur.targets.map((t) => t.accountId),
       caption: input.caption ?? cur.caption, scheduledAt: input.scheduledAt === undefined ? cur.scheduledAt.toISOString() : input.scheduledAt,
     });

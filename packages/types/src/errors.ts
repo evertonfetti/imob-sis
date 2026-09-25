@@ -60,6 +60,7 @@ export const ERROR_CODES = {
   PROPOSAL_PROPERTY_REQUIRED: 'Informe o imóvel da proposta.',
   PROPOSAL_PRICE_INVALID: 'O valor da proposta é inválido.',
   SOCIAL_NOT_CONFIGURED: 'Cadastre o ID e a chave secreta do aplicativo da Meta antes de entrar com o Facebook.',
+  SOCIAL_FORBIDDEN: 'Só quem cadastrou pode alterar isto.',
   SOCIAL_APP_REQUIRED: 'Escolha qual aplicativo da Meta usar para entrar.',
   SOCIAL_APP_DUPLICATE: 'Este aplicativo (ID) já está cadastrado.',
   SOCIAL_APP_INVALID: 'A Meta não aceitou o ID do app ou a chave secreta. Confira os dados no painel de desenvolvedores.',

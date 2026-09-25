@@ -189,6 +189,71 @@ describe('conexão com o Facebook', () => {
     expect(withEnv.apps).toMatchObject([{ id: 'server', appId: '1234567890', source: 'server' }]);
   });
 
+  it('apps e contas são privados do usuário que os cadastrou; só aparecem, conectam e publicam para os colegas quando compartilhados', async () => {
+    const put = (method: 'POST' | 'PATCH' | 'DELETE' | 'GET', url: string, who: string, payload?: unknown) => call(method as never, url, who, payload);
+    const mine = await put('POST', '/social/apps', 'marketing', { name: 'App do Gestor Social', appId: '777888999', appSecret: 'segredo-privado-0123456789' });
+    expect(mine.statusCode).toBe(201);
+    const appId = mine.json().apps.find((a: { appId: string }) => a.appId === '777888999').id as string;
+    expect(mine.json().apps.find((a: { id: string }) => a.id === appId)).toMatchObject({ mine: true, shared: false });
+
+    // o admin não enxerga, não usa nem mexe no app privado de outro usuário
+    const adminView = (await put('GET', '/social/accounts', 'admin')).json();
+    expect(adminView.apps.map((a: { id: string }) => a.id)).not.toContain(appId);
+    expect((await put('POST', '/social/connect', 'admin', { appId })).json().code).toBe('SOCIAL_APP_REQUIRED');
+    expect((await put('PATCH', `/social/apps/${appId}`, 'admin', { name: 'Invadido' })).statusCode).toBe(404);
+    expect((await put('DELETE', `/social/apps/${appId}`, 'admin')).statusCode).toBe(404);
+
+    // o dono conecta por esse app; contas pendentes e ativas são só dele
+    const url = new URL((await put('POST', '/social/connect', 'marketing', { appId })).json().url);
+    expect(url.searchParams.get('client_id')).toBe('777888999');
+    await app.inject({ method: 'GET', url: `/api/v1/social/oauth/callback?code=CODE123&state=${encodeURIComponent(url.searchParams.get('state')!)}` });
+    const pend = (await put('GET', '/social/accounts', 'marketing')).json().pending.filter((a: { appRef: string }) => a.appRef === appId) as { id: string; provider: string }[];
+    expect(pend.length).toBeGreaterThan(0);
+    expect((await put('GET', '/social/accounts', 'admin')).json().pending.map((a: { id: string }) => a.id)).not.toEqual(expect.arrayContaining(pend.map((a) => a.id)));
+    expect((await put('POST', '/social/accounts/activate', 'admin', { accountIds: pend.map((a) => a.id) })).json().code).toBe('SOCIAL_ACCOUNT_INVALID');
+    await put('POST', '/social/accounts/activate', 'marketing', { accountIds: pend.map((a) => a.id) });
+    const fb = pend.find((a) => a.provider === 'FACEBOOK_PAGE')!.id;
+
+    // conta privada: o admin não vê, não publica nela, não verifica nem remove
+    const payload = { propertyId: prop.id, mediaIds: [mediaIds[0]], caption: 'Texto', accountIds: [fb], scheduledAt: new Date(Date.now() + 3_600_000).toISOString() };
+    expect((await put('GET', '/social/accounts', 'admin')).json().accounts.map((a: { id: string }) => a.id)).not.toContain(fb);
+    expect((await put('POST', '/social/posts', 'admin', payload)).json().code).toBe('SOCIAL_ACCOUNT_INVALID');
+    expect((await put('POST', `/social/accounts/${fb}/check`, 'admin')).statusCode).toBe(404);
+    expect((await put('DELETE', `/social/accounts/${fb}`, 'admin')).statusCode).toBe(404);
+    expect((await put('PATCH', `/social/accounts/${fb}/share`, 'admin', { shared: true })).statusCode).toBe(404);
+
+    // compartilhar a conta libera o uso para a equipe, mas não a posse
+    const shared = (await put('PATCH', `/social/accounts/${fb}/share`, 'marketing', { shared: true })).json();
+    expect(shared.accounts.find((a: { id: string }) => a.id === fb)).toMatchObject({ mine: true, shared: true });
+    const seen = (await put('GET', '/social/accounts', 'admin')).json().accounts.find((a: { id: string }) => a.id === fb);
+    expect(seen).toMatchObject({ mine: false, shared: true, ownerName: 'Gestor Social' });
+    expect((await put('PATCH', `/social/accounts/${fb}/share`, 'admin', { shared: false })).statusCode).toBe(403);
+    expect((await put('POST', '/social/posts', 'admin', payload)).statusCode).toBe(201);
+    // o corretor comum (sem gerenciar marketing) continua sem acesso
+    expect((await put('GET', '/social/accounts', 'broker')).statusCode).toBe(403); // corretor nem enxerga o módulo
+    expect((await put('PATCH', `/social/accounts/${fb}/share`, 'broker', { shared: false })).statusCode).toBe(403);
+
+    // descompartilhar fecha de novo
+    await put('PATCH', `/social/accounts/${fb}/share`, 'marketing', { shared: false });
+    expect((await put('POST', '/social/posts', 'admin', payload)).json().code).toBe('SOCIAL_ACCOUNT_INVALID');
+
+    // app compartilhado: o colega usa; o dono e quem administra a empresa gerenciam; um terceiro sem essa permissão não
+    await put('PATCH', `/social/apps/${appId}`, 'marketing', { shared: true });
+    expect((await put('GET', '/social/accounts', 'admin')).json().apps.find((a: { id: string }) => a.id === appId)).toMatchObject({ mine: false, shared: true, ownerName: 'Gestor Social' });
+    expect((await put('POST', '/social/connect', 'admin', { appId })).statusCode).toBe(200);
+    expect((await put('PATCH', `/social/apps/${appId}`, 'admin', { name: 'Renomeado pelo admin' })).statusCode).toBe(200);
+    expect((await put('DELETE', `/social/apps/${appId}`, 'manager')).statusCode).toBe(403); // gerente só visualiza marketing
+
+    // mesmo ID de app pode existir para donos diferentes
+    expect((await put('POST', '/social/apps', 'admin', { name: 'Meu app', appId: '777888999', appSecret: 'segredo-do-admin-0123456789' })).statusCode).toBe(201);
+    expect((await put('POST', '/social/apps', 'admin', { name: 'Meu app 2', appId: '777888999', appSecret: 'segredo-do-admin-0123456789' })).json().code).toBe('SOCIAL_APP_DUPLICATE');
+
+    // limpeza para os demais testes
+    await prisma.socialAccount.deleteMany({ where: { socialAppId: appId } });
+    await prisma.socialApp.deleteMany({ where: { OR: [{ id: appId }, { appId: '777888999' }] } });
+    await prisma.socialPost.deleteMany({ where: { createdById: { not: null }, caption: 'Texto', status: 'SCHEDULED', targets: { none: {} } } });
+  });
+
   it('monta a URL do diálogo com escopos e redirect, guarda as Páginas/Instagram como pendentes (token criptografado) e ativa só as escolhidas', async () => {
     const { url, cb } = await connectAccounts();
     expect(url.origin).toBe('https://www.facebook.com');
