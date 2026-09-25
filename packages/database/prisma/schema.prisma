@@ -138,6 +138,32 @@ enum MarketingEventStatus {
   SKIPPED
 }
 
+enum SocialProvider {
+  FACEBOOK_PAGE
+  INSTAGRAM
+}
+
+enum SocialAccountStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+}
+
+enum SocialPostStatus {
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum SocialTargetStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -184,6 +210,8 @@ model Company {
   conversations      Conversation[]
   messages           Message[]
   marketingEvents    MarketingEvent[]
+  socialAccounts     SocialAccount[]
+  socialPosts        SocialPost[]
 
   @@map("companies")
 }
@@ -448,6 +476,7 @@ model Property {
   leads          Lead[]
   whatsappClicks WhatsAppClick[]
   tasks          Task[]
+  socialPosts    SocialPost[]
 
   @@unique([companyId, code])
   @@unique([companyId, slug])
@@ -489,6 +518,8 @@ model PropertyMedia {
   originalKey  String
   processedKey String?
   thumbnailKey String?
+  // JPEG recortado para o Instagram (que não aceita WebP e limita a proporção). Gerado sob demanda.
+  socialKey    String?
 
   caption    String?
   position   Int     @default(0)
@@ -853,4 +884,79 @@ model MarketingEvent {
   @@index([companyId, createdAt])
   @@index([leadId, eventName])
   @@map("marketing_events")
+}
+
+// ---------- Bloco 8 — Publicação em redes sociais ----------
+
+// Página do Facebook ou conta do Instagram conectada via login com o Facebook.
+// O token de acesso (da Página) fica criptografado em `secrets` e nunca volta pela API.
+model SocialAccount {
+  id            String              @id @default(uuid(7))
+  companyId     String
+  provider      SocialProvider
+  externalId    String
+  name          String
+  username      String?
+  pictureUrl    String?
+  // Instagram: Página do Facebook à qual a conta está ligada.
+  pageId        String?
+  status        SocialAccountStatus @default(PENDING)
+  secrets       String
+  connectedById String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  company Company            @relation(fields: [companyId], references: [id])
+  targets SocialPostTarget[]
+
+  @@unique([companyId, provider, externalId])
+  @@index([companyId, status])
+  @@map("social_accounts")
+}
+
+model SocialPost {
+  id          String           @id @default(uuid(7))
+  companyId   String
+  propertyId  String
+  createdById String?
+  caption     String
+  mediaIds    String[]
+  status      SocialPostStatus @default(SCHEDULED)
+  scheduledAt DateTime
+  // Trava de processamento: evita que duas instâncias publiquem a mesma postagem.
+  lockedAt    DateTime?
+  publishedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  company  Company            @relation(fields: [companyId], references: [id])
+  property Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  targets  SocialPostTarget[]
+
+  @@index([status, scheduledAt])
+  @@index([companyId, scheduledAt])
+  @@index([propertyId])
+  @@map("social_posts")
+}
+
+// Cada rede publica (e falha) de forma independente.
+model SocialPostTarget {
+  id            String             @id @default(uuid(7))
+  postId        String
+  accountId     String
+  status        SocialTargetStatus @default(PENDING)
+  externalId    String?
+  permalink     String?
+  error         String?
+  retryable     Boolean            @default(false)
+  attempts      Int                @default(0)
+  nextAttemptAt DateTime?
+  publishedAt   DateTime?
+
+  post    SocialPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, accountId])
+  @@index([status, nextAttemptAt])
+  @@map("social_post_targets")
 }

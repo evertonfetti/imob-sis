@@ -3,7 +3,7 @@ import {
   type PropertyPurpose, type PropertyStatus,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Images } from 'lucide-react';
+import { ArrowLeft, Images, Share2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Badge, Button, Field, Input, Select, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
@@ -72,7 +72,7 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
 
 const ACTION_LABEL: Record<string, string> = {
   CREATE: 'Cadastrado', UPDATE: 'Alterado', PUBLISH: 'Publicado', UNPUBLISH: 'Despublicado', ARCHIVE: 'Arquivado',
-  MEDIA_ADDED: 'Arquivo adicionado', MEDIA_REMOVED: 'Arquivo removido', COVER_CHANGED: 'Capa alterada',
+  SOCIAL_PUBLISHED: 'Publicado nas redes', MEDIA_ADDED: 'Arquivo adicionado', MEDIA_REMOVED: 'Arquivo removido', COVER_CHANGED: 'Capa alterada',
 };
 
 export function PropertyForm() {
@@ -291,6 +291,9 @@ export function PropertyForm() {
                     <div className="card-sub">{p.published ? `No site desde ${dateTime(p.publishedAt)}` : 'Não publicado no site.'}</div>
                   )}
                   <label className="check"><input type="checkbox" checked={f.featured} onChange={(e) => set('featured', e.target.checked)} /><span>Imóvel em destaque<small>Aparece com prioridade no site.</small></span></label>
+                  {!isNew && p.published && can('marketing.manage') && (
+                    <Button type="button" block onClick={() => nav(`/redes-sociais/nova?imovel=${p.id}`)}><Share2 /> Publicar nas redes</Button>
+                  )}
                   {!isNew && can('property.publish') && (
                     p.published
                       ? <Button type="button" block disabled={busy} onClick={() => act.mutate('unpublish')}>Despublicar</Button>

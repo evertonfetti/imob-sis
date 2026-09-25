@@ -18,6 +18,12 @@ const schema = z.object({
   ENCRYPTION_KEY: z.string().min(32, 'ENCRYPTION_KEY precisa ter 32+ caracteres').optional(),
   // Espera entre as tentativas de envio à Meta (cresce exponencialmente). Configurável para testes.
   MARKETING_RETRY_DELAY_MS: z.coerce.number().default(5000),
+  // Login com o Facebook (publicação em redes sociais). O app da Meta é da plataforma, não de cada empresa.
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_OAUTH_URL: z.string().default('https://www.facebook.com'),
+  SOCIAL_POLL_MS: z.coerce.number().default(3000), // espera entre consultas do processamento de mídia do Instagram
+  SOCIAL_TICK_MS: z.coerce.number().default(20000), // frequência do agendador de publicações
   WHATSAPP_GRAPH_URL: z.string().default('https://graph.facebook.com'),
   WHATSAPP_API_VERSION: z.string().default('v22.0'),
   PUBLIC_COMPANY_ID: z.string().uuid().optional(),

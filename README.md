@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 7 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API).
+**Status:** Blocos 1 a 8 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) e publicação/agendamento no Instagram e Facebook.
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -86,6 +86,15 @@ Os segredos ficam criptografados no banco (AES-256-GCM) e nunca voltam pela API.
 - **Privacidade (LGPD):** e-mail, telefone e nome vão sempre com hash (SHA-256), e **somente de visitantes que aceitaram** o aviso de cookies do site. O Pixel só é carregado após o aceite. Sem consentimento, o evento é registrado como *Ignorado* e nenhum dado pessoal é guardado nele.
 - **Sem duplicidade:** o navegador (Pixel) e o servidor (CAPI) usam o mesmo `event_id`, e a Meta conta uma vez.
 - O site guarda o ID do Pixel em cache por até 1 minuto: depois de conectar, o aviso de cookies e o Pixel aparecem em até 1 minuto.
+
+### Publicação no Instagram e no Facebook
+
+No imóvel, **Publicar nas redes** abre a postagem já pronta (fotos com a capa primeiro, contas conectadas e o texto com a descrição do imóvel, preço, local, link do site e código); falta só a data (ou publicar agora). Também em *Redes sociais → Nova publicação*.
+
+- **Conectar:** *Redes sociais → Contas conectadas → Entrar com o Facebook*. O sistema lista as Páginas e as contas do Instagram profissional ligadas a elas, e você escolhe quais usar. Requer um app da Meta (`META_APP_ID`, `META_APP_SECRET`); a tela mostra o passo a passo e a URI de redirecionamento a cadastrar. Em modo de desenvolvimento só quem tem função no app consegue entrar; para liberar a todos é preciso enviar o app para a **revisão da Meta**.
+- **Agendamento próprio:** o banco é a fonte da verdade (sobrevive a reinícios; não precisa de Redis) e há trava contra publicação duplicada com várias instâncias. Cada rede publica e falha separadamente, com até 3 tentativas para erros temporários e botão **Reenviar**.
+- **Instagram:** aceita só JPEG e proporção entre 4:5 e 1,91:1. O sistema gera sozinho uma versão JPEG recortada de cada foto (o original é preservado). Carrossel de até 10 fotos; texto de até 2.200 caracteres. As fotos precisam estar acessíveis publicamente (`API_PUBLIC_URL`).
+- Os tokens das Páginas ficam criptografados. Se a Meta invalidar um token, a conta aparece como *Expirada* e pede para reconectar.
 
 ### Fotos e mídias
 

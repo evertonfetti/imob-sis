@@ -28,6 +28,11 @@ export class JwtAuthGuard implements CanActivate {
     } catch {
       throw new AppException('AUTH_TOKEN_INVALID', 401);
     }
+    // Só tokens de acesso reais (com usuário e empresa) autenticam. Sem isto, o Prisma ignoraria um `id: undefined`
+    // e a consulta devolveria o primeiro usuário da empresa.
+    if (typeof payload.sub !== 'string' || !payload.sub || typeof payload.cid !== 'string' || !payload.cid) {
+      throw new AppException('AUTH_TOKEN_INVALID', 401);
+    }
 
     // Consulta a cada requisição: status e permissões nunca ficam desatualizados.
     const user = await this.prisma.user.findFirst({

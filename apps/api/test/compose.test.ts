@@ -36,7 +36,7 @@ describe('docker-compose.yml de produção', () => {
 
   it('todas as variáveis de ambiente que a API lê e que dependem do deploy estão no compose', () => {
     const env = readFileSync(path.resolve(__dirname, '../src/config/env.ts'), 'utf8');
-    const needed = ['API_PUBLIC_URL', 'SITE_URL', 'REDIS_URL', 'LOCAL_STORAGE_DIR', 'ENCRYPTION_KEY', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_PUBLIC_URL'];
+    const needed = ['API_PUBLIC_URL', 'SITE_URL', 'REDIS_URL', 'LOCAL_STORAGE_DIR', 'ENCRYPTION_KEY', 'META_APP_ID', 'META_APP_SECRET', 'S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_PUBLIC_URL'];
     const api = service('api');
     for (const key of needed) {
       expect(env, `${key} não é mais lida pela API`).toContain(key);

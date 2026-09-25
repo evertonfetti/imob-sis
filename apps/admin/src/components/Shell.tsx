@@ -1,6 +1,6 @@
 import {
   Building2, CalendarDays, Contact, Kanban, ListChecks, FileSignature, Gauge, Handshake, Home, Images, KeyRound, LogOut,
-  Megaphone, Menu, MessageCircle, Plug, ScrollText, Store, Tags, UserRound, Users, BarChart3, type LucideIcon,
+  Megaphone, Menu, MessageCircle, Share2, Plug, ScrollText, Store, Tags, UserRound, Users, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -31,6 +31,7 @@ const NAV: Group[] = [
   ] },
   { label: 'Marketing', items: [
     { label: 'Marketing', icon: Megaphone, to: '/marketing', perm: 'marketing.view' },
+    { label: 'Redes sociais', icon: Share2, to: '/redes-sociais', perm: 'marketing.view' },
     { label: 'Mídia / IA', icon: Images, perm: 'media.view' },
     { label: 'Relatórios', icon: BarChart3 },
   ] },

@@ -18,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PropertiesModule } from './properties/properties.module';
 import { PublicModule } from './public/public.module';
 import { RolesController } from './roles/roles.controller';
+import { SocialModule } from './social/social.module';
 import { StorageModule } from './storage/storage.module';
 import { UsersModule } from './users/users.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
@@ -45,6 +46,7 @@ export class AppModule {
         CrmModule,
         WhatsappModule,
         MarketingModule,
+        SocialModule,
         PublicModule,
         PropertiesModule,
       ],

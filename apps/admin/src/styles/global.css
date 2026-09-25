@@ -534,3 +534,44 @@ table.table { width: 100%; border-collapse: collapse; }
 .seg a:hover { color: var(--ink); }
 .seg a.active { color: var(--ink); }
 .seg a.active::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; }
+
+/* ---------- Redes sociais ---------- */
+.post-card { display: grid; grid-template-columns: 148px minmax(0, 1fr) auto; gap: 18px; padding: 18px 20px; border-bottom: 1px solid var(--line); align-items: start; }
+.post-card:last-child { border-bottom: 0; }
+@media (max-width: 800px) { .post-card { grid-template-columns: 96px minmax(0, 1fr); } .post-card .post-actions { grid-column: 1 / -1; } }
+.post-thumbs { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.post-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.post-thumbs .count { position: absolute; right: 6px; bottom: 6px; padding: 1px 8px; border-radius: 999px; background: rgb(29 28 26 / .78); color: #fff; font-size: 11.5px; }
+.post-caption { color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; margin: 4px 0 10px; }
+.targets { display: flex; flex-wrap: wrap; gap: 8px; }
+.target { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); font-size: 12.5px; }
+.target svg { width: 14px; height: 14px; }
+.target.ok { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+.target.bad { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+.target a { text-decoration: underline; text-underline-offset: 2px; }
+.post-actions { display: grid; gap: 6px; justify-items: stretch; min-width: 150px; }
+.acc { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.acc:last-child { border-bottom: 0; }
+.acc-pic { flex: none; width: 42px; height: 42px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; overflow: hidden; }
+.acc-pic img { width: 100%; height: 100%; object-fit: cover; }
+.acc-info { flex: 1; min-width: 0; }
+.acc-info strong { font-weight: 550; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compose { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+@media (max-width: 1100px) { .compose { grid-template-columns: 1fr; } }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.pick { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; border: 2px solid transparent; padding: 0; cursor: pointer; background: var(--surface-2); }
+.pick img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .15s; }
+.pick:not(.on) img { opacity: .55; }
+.pick.on { border-color: var(--accent); }
+.pick .num { position: absolute; top: 6px; left: 6px; min-width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--accent); color: var(--accent-ink); }
+.pick .cov { position: absolute; left: 6px; bottom: 6px; padding: 1px 8px; border-radius: 999px; background: rgb(29 28 26 / .78); color: #fff; font-size: 11px; }
+.acct-opt { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; cursor: pointer; background: var(--surface); }
+.acct-opt.on { border-color: var(--accent); background: var(--accent-soft); }
+.acct-opt input { accent-color: var(--accent); }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.preview { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+.preview-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-weight: 550; font-size: 13.5px; }
+.preview img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: var(--surface-2); }
+.preview-cap { padding: 10px 12px 14px; font-size: 13px; color: var(--ink-2); white-space: pre-line; max-height: 150px; overflow: hidden; }
+.counter { font-size: 12px; color: var(--muted); text-align: right; }
+.counter.over { color: var(--danger); font-weight: 500; }

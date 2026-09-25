@@ -8,3 +8,4 @@ export * from './public';
 export * from './crm';
 export * from './whatsapp';
 export * from './marketing';
+export * from './social';

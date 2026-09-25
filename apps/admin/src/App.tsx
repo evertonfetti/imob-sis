@@ -20,6 +20,8 @@ import { Owners } from './pages/Owners';
 import { Properties } from './pages/Properties';
 import { PropertyForm } from './pages/PropertyForm';
 import { Roles } from './pages/Roles';
+import { SocialComposer } from './pages/SocialComposer';
+import { SocialPosts } from './pages/SocialPosts';
 import { Users } from './pages/Users';
 
 function Protected() {
@@ -55,6 +57,9 @@ export function App() {
           <Route path="marketing/campanhas" element={<Guard perm="marketing.view"><MarketingCampaigns /></Guard>} />
           <Route path="marketing/origens" element={<Guard perm="marketing.view"><MarketingSources /></Guard>} />
           <Route path="marketing/conversoes" element={<Guard perm="marketing.view"><MarketingConversions /></Guard>} />
+          <Route path="redes-sociais" element={<Guard perm="marketing.view"><SocialPosts /></Guard>} />
+          <Route path="redes-sociais/nova" element={<Guard perm="marketing.manage"><SocialComposer /></Guard>} />
+          <Route path="redes-sociais/:id" element={<Guard perm="marketing.manage"><SocialComposer /></Guard>} />
           <Route path="clientes" element={<Guard perm="lead.view"><Customers /></Guard>} />
           <Route path="tarefas" element={<Guard perm="lead.view"><Tasks /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />
