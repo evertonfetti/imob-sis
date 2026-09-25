@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ContactForm } from '@/components/ContactForm';
 import { Gallery } from '@/components/Gallery';
+import { PixelEvent } from '@/components/PixelEvent';
 import { PropertyCard } from '@/components/PropertyCard';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { NotFoundError, getCompany, getProperty } from '@/lib/api';
@@ -160,7 +161,7 @@ export default async function PropertyPage({ params }: Params) {
                   </div>
                 )}
                 <h3>Tenho interesse</h3>
-                <ContactForm propertyId={p.id} defaultMessage={`Olá! Tenho interesse no imóvel ${p.code}. Gostaria de mais informações.`} />
+                <ContactForm propertyId={p.id} propertyCode={p.code} defaultMessage={`Olá! Tenho interesse no imóvel ${p.code}. Gostaria de mais informações.`} />
               </>
             )}
             {gone && <Link className="btn btn-primary btn-block" href={isRent ? '/alugar' : '/comprar'}>Ver imóveis disponíveis</Link>}
@@ -182,6 +183,7 @@ export default async function PropertyPage({ params }: Params) {
         </div>
       )}
 
+      <PixelEvent name="ViewContent" params={{ content_ids: [p.code], content_name: p.title, content_type: 'home_listing', ...(main.v ? { value: main.v, currency: 'BRL' } : {}) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbs) }} />
     </div>

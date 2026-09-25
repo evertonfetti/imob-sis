@@ -4,7 +4,9 @@ import '@fontsource-variable/newsreader';
 import './globals.css';
 import type { PublicCompany } from '@imob/types';
 import { Footer } from '@/components/Footer';
+import { ConsentBanner } from '@/components/ConsentBanner';
 import { Header } from '@/components/Header';
+import { MetaPixel } from '@/components/MetaPixel';
 import { TrackingCapture } from '@/components/TrackingCapture';
 import { getCompany } from '@/lib/api';
 import { siteUrl } from '@/lib/site';
@@ -12,7 +14,7 @@ import { siteUrl } from '@/lib/site';
 // O site lê dados da API a cada requisição (com cache de dados): nada é gerado no build.
 export const dynamic = 'force-dynamic';
 
-const FALLBACK: PublicCompany = { name: 'Imobiliária', tradeName: null, creci: null, email: null, phone: null, whatsapp: null, website: null, logoUrl: null, primaryColor: null, address: null };
+const FALLBACK: PublicCompany = { name: 'Imobiliária', tradeName: null, creci: null, email: null, phone: null, whatsapp: null, website: null, logoUrl: null, primaryColor: null, address: null, metaPixelId: null };
 
 async function company(): Promise<PublicCompany> {
   try { return await getCompany(); } catch { return FALLBACK; }
@@ -44,6 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main>{children}</main>
         <Footer company={c} />
         <TrackingCapture />
+        {c.metaPixelId && <><MetaPixel pixelId={c.metaPixelId} /><ConsentBanner /></>}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(org) }} />
       </body>
     </html>

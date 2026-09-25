@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 6 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM (funil, kanban, timeline, tarefas, distribuição) e WhatsApp (API oficial da Meta).
+**Status:** Blocos 1 a 7 concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API).
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -77,6 +77,15 @@ Os segredos ficam criptografados no banco (AES-256-GCM) e nunca voltam pela API.
 - **Recebimento:** toda mensagem valida a assinatura `X-Hub-Signature-256`. O cliente é reconhecido pelo telefone; se não houver lead aberto, um lead novo (origem WhatsApp) entra no funil, com o imóvel identificado pelo código (ex.: `IM0012`) e a campanha do clique no site.
 - **Envio:** dentro de 24 h da última mensagem do cliente vale texto livre; depois disso, só **modelos aprovados** na Meta. Falhas ficam visíveis e podem ser reenviadas.
 - Cada empresa usa o seu número: o webhook é roteado pelo `phone_number_id`.
+
+### Marketing (campanhas, Pixel e Conversions API)
+
+- **Relatórios** (*Marketing*): leads por dia, por canal, por fonte de anúncio e **por campanha** (`utm_campaign`): quantos leads, quantos foram qualificados, quantos fecharam, valor fechado e cliques no WhatsApp. Origens são comparadas sem diferenciar maiúsculas.
+- **Conexão com a Meta** (*Integrações → Meta Pixel e Conversions API*): ID do Pixel, token da CAPI e, se quiser, o código de teste. O token fica criptografado.
+- **Eventos enviados à Meta:** `Lead` (formulário do site), `Contact` (clique no WhatsApp) e, por etapa do funil, `QualifiedLead`, `Schedule` e `Purchase` (com o valor do imóvel). O mapeamento etapa → evento é editável em *Marketing → Conversões*. Cada evento é enviado uma vez por lead, sem bloquear o CRM: vai para uma fila com até 3 tentativas; falhas ficam visíveis e podem ser reenviadas.
+- **Privacidade (LGPD):** e-mail, telefone e nome vão sempre com hash (SHA-256), e **somente de visitantes que aceitaram** o aviso de cookies do site. O Pixel só é carregado após o aceite. Sem consentimento, o evento é registrado como *Ignorado* e nenhum dado pessoal é guardado nele.
+- **Sem duplicidade:** o navegador (Pixel) e o servidor (CAPI) usam o mesmo `event_id`, e a Meta conta uma vez.
+- O site guarda o ID do Pixel em cache por até 1 minuto: depois de conectar, o aviso de cookies e o Pixel aparecem em até 1 minuto.
 
 ### Fotos e mídias
 

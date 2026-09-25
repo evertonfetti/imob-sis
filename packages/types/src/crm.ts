@@ -7,17 +7,17 @@ export const STAGE_TYPES = ['OPEN', 'WON', 'LOST'] as const;
 export type StageType = (typeof STAGE_TYPES)[number];
 
 /** Estágios iniciais (spec §28). `qualifies`: entrar aqui dispara o evento lead.qualified. */
-export const DEFAULT_STAGES: { name: string; color: string; type: StageType; qualifies?: boolean }[] = [
+export const DEFAULT_STAGES: { name: string; color: string; type: StageType; qualifies?: boolean; metaEvent?: 'QualifiedLead' | 'Schedule' | 'Purchase' }[] = [
   { name: 'Novo', color: '#8a8578', type: 'OPEN' },
   { name: 'Contato iniciado', color: '#7f8fa0', type: 'OPEN' },
   { name: 'Contato realizado', color: '#6f8f8a', type: 'OPEN' },
-  { name: 'Qualificado', color: '#4f7a6a', type: 'OPEN', qualifies: true },
+  { name: 'Qualificado', color: '#4f7a6a', type: 'OPEN', qualifies: true, metaEvent: 'QualifiedLead' },
   { name: 'Imóveis apresentados', color: '#8c8a5a', type: 'OPEN' },
-  { name: 'Visita agendada', color: '#a7864d', type: 'OPEN' },
+  { name: 'Visita agendada', color: '#a7864d', type: 'OPEN', metaEvent: 'Schedule' },
   { name: 'Visita realizada', color: '#b07a4a', type: 'OPEN' },
   { name: 'Proposta', color: '#9a6a5a', type: 'OPEN' },
   { name: 'Negociação', color: '#8a5a6a', type: 'OPEN' },
-  { name: 'Fechado', color: '#3f6b52', type: 'WON' },
+  { name: 'Fechado', color: '#3f6b52', type: 'WON', metaEvent: 'Purchase' },
   { name: 'Perdido', color: '#9b3f2e', type: 'LOST' },
 ];
 
@@ -106,6 +106,8 @@ export type ChangeStageInput = z.infer<typeof changeStageSchema>;
 export const updateStageSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome').max(40).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use o formato #RRGGBB').optional(),
+  // Evento enviado à Meta quando um lead entra nesta etapa (null = nenhum).
+  metaEvent: z.enum(['QualifiedLead', 'Schedule', 'Purchase']).nullable().optional(),
 });
 
 export const listLeadsSchema = z.object({
@@ -154,7 +156,7 @@ export const listTasksSchema = z.object({
 });
 
 // ---------- Formato das respostas ----------
-export interface StageDto { id: string; name: string; position: number; color: string; type: StageType; qualifies: boolean }
+export interface StageDto { id: string; name: string; position: number; color: string; type: StageType; qualifies: boolean; metaEvent: string | null }
 export interface BoardCard {
   id: string;
   customer: { id: string; name: string; phone: string | null };

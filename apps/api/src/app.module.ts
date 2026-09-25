@@ -11,6 +11,7 @@ import { CompanyModule } from './company/company.module';
 import { ENV, Env } from './config/env';
 import { HealthController } from './health/health.controller';
 import { CrmModule } from './crm/crm.module';
+import { MarketingModule } from './marketing/marketing.module';
 import { MediaModule } from './media/media.module';
 import { OwnersModule } from './owners/owners.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -43,6 +44,7 @@ export class AppModule {
         MediaModule,
         CrmModule,
         WhatsappModule,
+        MarketingModule,
         PublicModule,
         PropertiesModule,
       ],

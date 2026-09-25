@@ -3,7 +3,8 @@
 import { MessageCircle } from 'lucide-react';
 import { waNumber } from '@/lib/format';
 import { browserApi } from '@/lib/site';
-import { getTracking } from '@/lib/tracking';
+import { pixelTrack } from '@/lib/pixel';
+import { getTracking, marketingFields, newEventId } from '@/lib/tracking';
 
 /**
  * Link do WhatsApp. Antes de abrir a conversa registra o clique (com a origem da visita),
@@ -18,10 +19,12 @@ export function WhatsAppButton({ whatsapp, message, propertyId, className = 'btn
 
   function track() {
     const t = getTracking();
+    const eventId = newEventId();
+    pixelTrack('Contact', {}, eventId);
     try {
       void fetch(`${browserApi()}/public/whatsapp-click`, {
         method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ propertyId: propertyId ?? null, ...t }),
+        body: JSON.stringify({ propertyId: propertyId ?? null, ...t, ...marketingFields(eventId) }),
       }).catch(() => undefined);
     } catch { /* ignora */ }
   }

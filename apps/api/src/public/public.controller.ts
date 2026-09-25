@@ -42,7 +42,7 @@ export class PublicController {
 
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('whatsapp-click') @HttpCode(204)
-  async click(@Body(new ZodPipe(whatsappClickSchema)) body: WhatsappClickInput) {
-    await this.svc.whatsappClick(body);
+  async click(@Body(new ZodPipe(whatsappClickSchema)) body: WhatsappClickInput, @Ctx() ctx: ReqCtx) {
+    await this.svc.whatsappClick(body, ctx);
   }
 }

@@ -53,6 +53,26 @@ export function captureTracking() {
   } catch { /* navegação privada ou storage bloqueado: o site segue funcionando */ }
 }
 
+export type Consent = 'granted' | 'denied' | null;
+const CONSENT_KEY = 'imob.consent';
+
+export function getConsent(): Consent {
+  try { const v = localStorage.getItem(CONSENT_KEY); return v === 'granted' || v === 'denied' ? v : null; } catch { return null; }
+}
+
+export function setConsent(v: 'granted' | 'denied') {
+  try { localStorage.setItem(CONSENT_KEY, v); } catch { /* sem storage: vale só nesta página */ }
+  window.dispatchEvent(new CustomEvent('imob:consent', { detail: v }));
+}
+
+/** ID único do evento: o mesmo valor vai ao Pixel (navegador) e ao servidor (CAPI) para a Meta contar uma vez só. */
+export const newEventId = () => uuid();
+
+/** Campos de marketing que acompanham o formulário e o clique no WhatsApp. */
+export function marketingFields(eventId: string) {
+  return { eventId, pageUrl: location.href.slice(0, 500), marketingConsent: getConsent() === 'granted' };
+}
+
 export function getTracking(): Tracking {
   try {
     const t = read();

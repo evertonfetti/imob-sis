@@ -30,7 +30,7 @@ const NAV: Group[] = [
     { label: 'Propostas', icon: FileSignature, perm: 'proposal.view' },
   ] },
   { label: 'Marketing', items: [
-    { label: 'Campanhas', icon: Megaphone, perm: 'marketing.view' },
+    { label: 'Marketing', icon: Megaphone, to: '/marketing', perm: 'marketing.view' },
     { label: 'Mídia / IA', icon: Images, perm: 'media.view' },
     { label: 'Relatórios', icon: BarChart3 },
   ] },

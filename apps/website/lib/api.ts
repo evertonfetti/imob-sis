@@ -19,7 +19,7 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const getCompany = () => get<PublicCompany>('/public/company', 300);
+export const getCompany = () => get<PublicCompany>('/public/company', 60);
 export const getFilters = () => get<Filters>('/public/filters', 120);
 export const getProperty = (slug: string) => get<PublicPropertyDetail>(`/public/properties/${encodeURIComponent(slug)}`, 60);
 export const getSitemap = () => get<{ slug: string; updatedAt: string }[]>('/public/sitemap', 300);

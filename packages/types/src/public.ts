@@ -62,6 +62,10 @@ export const publicLeadSchema = z.object({
   fbclid: attr, fbc: attr, fbp: attr, gclid: attr,
   landingPage: attr, referrer: attr,
   campaignId: attr, adsetId: attr, adId: attr,
+  // Mesmo ID do evento do Pixel no navegador: a Meta junta Pixel + CAPI em um só (deduplicação).
+  eventId: z.string().trim().max(80).optional().nullable(),
+  pageUrl: attr,
+  marketingConsent: z.boolean().optional(),
 });
 export type PublicLeadInput = z.infer<typeof publicLeadSchema>;
 
@@ -72,6 +76,9 @@ export const whatsappClickSchema = z.object({
   utmSource: attr, utmMedium: attr, utmCampaign: attr, utmContent: attr, utmTerm: attr,
   fbclid: attr, fbc: attr, fbp: attr, gclid: attr,
   landingPage: attr, referrer: attr,
+  eventId: z.string().trim().max(80).optional().nullable(),
+  pageUrl: attr,
+  marketingConsent: z.boolean().optional(),
 });
 export type WhatsappClickInput = z.infer<typeof whatsappClickSchema>;
 
@@ -87,6 +94,7 @@ export interface PublicCompany {
   logoUrl: string | null;
   primaryColor: string | null;
   address: string | null;
+  metaPixelId: string | null;
 }
 
 export interface PublicPropertyCard {

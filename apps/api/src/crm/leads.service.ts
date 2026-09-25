@@ -45,7 +45,7 @@ export interface NewLeadCore {
   notes?: string | null;
   extra?: Partial<Pick<CreateLeadInput, 'budgetMin' | 'budgetMax' | 'purpose' | 'city' | 'neighborhood' | 'bedrooms' | 'purchaseTimeline'>>;
   consentAt?: Date;
-  attribution?: Record<string, string | null>;
+  attribution?: Record<string, string | boolean | null>;
   propertyDefaults?: { purpose?: string | null; city?: string | null; neighborhood?: string | null; bedrooms?: number | null; brokerId?: string | null; code?: string | null };
 }
 

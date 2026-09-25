@@ -105,6 +105,7 @@ enum TaskStatus {
 
 enum IntegrationProvider {
   WHATSAPP
+  META_CAPI
 }
 
 enum ConversationChannel {
@@ -128,6 +129,13 @@ enum MessageStatus {
   DELIVERED
   READ
   FAILED
+}
+
+enum MarketingEventStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 enum UserStatus {
@@ -175,6 +183,7 @@ model Company {
   integrations       Integration[]
   conversations      Conversation[]
   messages           Message[]
+  marketingEvents    MarketingEvent[]
 
   @@map("companies")
 }
@@ -512,9 +521,10 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company       Company        @relation(fields: [companyId], references: [id])
-  leads         Lead[]
-  conversations Conversation[]
+  company         Company          @relation(fields: [companyId], references: [id])
+  leads           Lead[]
+  conversations   Conversation[]
+  marketingEvents MarketingEvent[]
 
   @@index([companyId, phone])
   @@index([companyId, email])
@@ -550,16 +560,17 @@ model Lead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company       Company            @relation(fields: [companyId], references: [id])
-  customer      Customer           @relation(fields: [customerId], references: [id])
-  property      Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  broker        User?              @relation(fields: [brokerId], references: [id])
-  stage         PipelineStage?     @relation(fields: [stageId], references: [id])
-  attribution   LeadAttribution?
-  timeline      TimelineEvent[]
-  stageHistory  LeadStageHistory[]
-  tasks         Task[]
-  conversations Conversation[]
+  company         Company            @relation(fields: [companyId], references: [id])
+  customer        Customer           @relation(fields: [customerId], references: [id])
+  property        Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  broker          User?              @relation(fields: [brokerId], references: [id])
+  stage           PipelineStage?     @relation(fields: [stageId], references: [id])
+  attribution     LeadAttribution?
+  timeline        TimelineEvent[]
+  stageHistory    LeadStageHistory[]
+  tasks           Task[]
+  conversations   Conversation[]
+  marketingEvents MarketingEvent[]
 
   @@index([companyId, createdAt])
   @@index([companyId, status])
@@ -574,21 +585,27 @@ model Lead {
 model LeadAttribution {
   leadId String @id
 
-  utmSource   String?
-  utmMedium   String?
-  utmCampaign String?
-  utmContent  String?
-  utmTerm     String?
-  fbclid      String?
-  fbc         String?
-  fbp         String?
-  gclid       String?
-  landingPage String?
-  referrer    String?
-  campaignId  String?
-  adsetId     String?
-  adId        String?
-  createdAt   DateTime @default(now())
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  fbclid           String?
+  fbc              String?
+  fbp              String?
+  gclid            String?
+  landingPage      String?
+  referrer         String?
+  campaignId       String?
+  adsetId          String?
+  adId             String?
+  // Dados do navegador guardados na criação: o evento de conversão pode ser enviado dias depois.
+  clientIp         String?
+  clientUserAgent  String?
+  eventId          String?
+  pageUrl          String?
+  marketingConsent Boolean  @default(false)
+  createdAt        DateTime @default(now())
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
@@ -602,19 +619,24 @@ model WhatsAppClick {
   sessionId  String?
   visitorId  String?
 
-  utmSource   String?
-  utmMedium   String?
-  utmCampaign String?
-  utmContent  String?
-  utmTerm     String?
-  fbclid      String?
-  fbc         String?
-  fbp         String?
-  gclid       String?
-  landingPage String?
-  referrer    String?
-  leadId      String?
-  createdAt   DateTime @default(now())
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  fbclid           String?
+  fbc              String?
+  fbp              String?
+  gclid            String?
+  landingPage      String?
+  referrer         String?
+  leadId           String?
+  clientIp         String?
+  clientUserAgent  String?
+  eventId          String?
+  pageUrl          String?
+  marketingConsent Boolean  @default(false)
+  createdAt        DateTime @default(now())
 
   company  Company   @relation(fields: [companyId], references: [id])
   property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
@@ -648,6 +670,8 @@ model PipelineStage {
   type       StageType @default(OPEN)
   // Entrar neste estágio dispara o evento lead.qualified (usado pelo Marketing/CAPI).
   qualifies  Boolean   @default(false)
+  // Evento da Meta (CAPI) disparado quando um lead entra na etapa: QualifiedLead | Schedule | Purchase.
+  metaEvent  String?
 
   pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   leads    Lead[]
@@ -800,4 +824,33 @@ model Message {
   @@unique([companyId, externalId])
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+// ---------- Bloco 7 — Marketing / Meta CAPI ----------
+// Histórico de tudo que o sistema tenta enviar à Meta: permite descobrir rápido quando ela rejeita um evento.
+model MarketingEvent {
+  id        String               @id @default(uuid(7))
+  companyId String
+  leadId    String?
+  provider  String               @default("META_CAPI")
+  eventName String
+  // Mesmo ID usado no Pixel do navegador (deduplicação).
+  eventId   String
+  status    MarketingEventStatus @default(PENDING)
+  payload   Json?
+  response  Json?
+  error     String?
+  attempts  Int                  @default(0)
+  createdAt DateTime             @default(now())
+  sentAt    DateTime?
+
+  company    Company   @relation(fields: [companyId], references: [id])
+  lead       Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  customerId String?
+
+  @@unique([companyId, provider, eventId])
+  @@index([companyId, createdAt])
+  @@index([leadId, eventName])
+  @@map("marketing_events")
 }

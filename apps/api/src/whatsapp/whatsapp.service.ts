@@ -145,7 +145,8 @@ export class WhatsappService {
             attribution: click ? {
               utmSource: click.utmSource, utmMedium: click.utmMedium, utmCampaign: click.utmCampaign, utmContent: click.utmContent, utmTerm: click.utmTerm,
               fbclid: click.fbclid, fbc: click.fbc, fbp: click.fbp, gclid: click.gclid, landingPage: click.landingPage, referrer: click.referrer,
-            } : undefined,
+              clientIp: click.clientIp, clientUserAgent: click.clientUserAgent, eventId: click.eventId, pageUrl: click.pageUrl, marketingConsent: click.marketingConsent,
+            } as never : undefined,
           });
           lead = created.lead;
           if (click) await tx.whatsAppClick.update({ where: { id: click.id }, data: { leadId: lead.id } });

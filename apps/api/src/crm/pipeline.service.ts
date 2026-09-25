@@ -21,8 +21,8 @@ export class PipelineService {
     return { id: p.id, name: p.name, stages: p.stages.map((s) => this.dto(s)) };
   }
 
-  dto(s: { id: string; name: string; position: number; color: string; type: string; qualifies: boolean }): StageDto {
-    return { id: s.id, name: s.name, position: s.position, color: s.color, type: s.type as StageType, qualifies: s.qualifies };
+  dto(s: { id: string; name: string; position: number; color: string; type: string; qualifies: boolean; metaEvent?: string | null }): StageDto {
+    return { id: s.id, name: s.name, position: s.position, color: s.color, type: s.type as StageType, qualifies: s.qualifies, metaEvent: s.metaEvent ?? null };
   }
 
   async board(user: AuthedUser, f: BoardFilters): Promise<{ pipeline: { id: string; name: string }; columns: BoardColumn[] }> {

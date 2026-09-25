@@ -16,6 +16,8 @@ const schema = z.object({
   SITE_URL: z.string().optional(),
   // Chave para criptografar credenciais de integrações. Sem ela, deriva-se do JWT_ACCESS_SECRET.
   ENCRYPTION_KEY: z.string().min(32, 'ENCRYPTION_KEY precisa ter 32+ caracteres').optional(),
+  // Espera entre as tentativas de envio à Meta (cresce exponencialmente). Configurável para testes.
+  MARKETING_RETRY_DELAY_MS: z.coerce.number().default(5000),
   WHATSAPP_GRAPH_URL: z.string().default('https://graph.facebook.com'),
   WHATSAPP_API_VERSION: z.string().default('v22.0'),
   PUBLIC_COMPANY_ID: z.string().uuid().optional(),

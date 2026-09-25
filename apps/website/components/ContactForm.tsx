@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from 'react';
 import { browserApi } from '@/lib/site';
-import { getTracking } from '@/lib/tracking';
+import { pixelTrack } from '@/lib/pixel';
+import { getTracking, marketingFields, newEventId } from '@/lib/tracking';
 
-interface Props { propertyId?: string; defaultMessage?: string; cta?: string }
+interface Props { propertyId?: string; propertyCode?: string; defaultMessage?: string; cta?: string }
 
 function maskPhone(v: string) {
   const d = v.replace(/\D/g, '').slice(0, 11);
@@ -14,7 +15,7 @@ function maskPhone(v: string) {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export function ContactForm({ propertyId, defaultMessage = '', cta = 'Enviar mensagem' }: Props) {
+export function ContactForm({ propertyId, propertyCode, defaultMessage = '', cta = 'Enviar mensagem' }: Props) {
   const [state, setState] = useState<'idle' | 'sending' | 'ok' | 'error'>('idle');
   const [error, setError] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -24,16 +25,21 @@ export function ContactForm({ propertyId, defaultMessage = '', cta = 'Enviar men
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     setState('sending'); setError(''); setFields({});
+    const eventId = newEventId();
     try {
       const res = await fetch(`${browserApi()}/public/leads`, {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name: f.get('name'), phone: f.get('phone'), email: f.get('email') || null, message: f.get('message') || null,
           propertyId: propertyId ?? null, consent: f.get('consent') === 'on', website: f.get('website') ?? '',
-          ...getTracking(),
+          ...getTracking(), ...marketingFields(eventId),
         }),
       });
-      if (res.ok) { setState('ok'); return; }
+      if (res.ok) {
+        pixelTrack('Lead', propertyCode ? { content_ids: [propertyCode], content_type: 'home_listing' } : {}, eventId);
+        setState('ok');
+        return;
+      }
       const data = await res.json().catch(() => ({}));
       if (Array.isArray(data.details)) setFields(Object.fromEntries(data.details.map((d: { field: string; message: string }) => [d.field, d.message])));
       setError(data.message ?? 'Não foi possível enviar agora. Tente novamente.');

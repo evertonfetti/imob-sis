@@ -19,3 +19,6 @@ export function decryptJson<T = Record<string, string>>(payload: string, key: Bu
   decipher.setAuthTag(Buffer.from(tag, 'base64'));
   return JSON.parse(Buffer.concat([decipher.update(Buffer.from(data, 'base64')), decipher.final()]).toString('utf8')) as T;
 }
+
+/** Chave usada para criptografar credenciais: ENCRYPTION_KEY, ou (na falta dela) derivada do JWT_ACCESS_SECRET. */
+export const secretKeyFor = (env: { ENCRYPTION_KEY?: string; JWT_ACCESS_SECRET: string }) => deriveKey(env.ENCRYPTION_KEY ?? env.JWT_ACCESS_SECRET);

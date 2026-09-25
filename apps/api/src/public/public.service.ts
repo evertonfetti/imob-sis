@@ -10,6 +10,9 @@ import type { ReqCtx } from '../common/request-context';
 import { normalizePhone } from '../common/util';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MarketingEvents } from '../marketing/marketing.events';
+import { MetaIntegrationService } from '../marketing/meta-integration.service';
 import { PublicCompanyService } from './public-company.service';
 
 /** O que aparece no site: publicado e ainda disponível (ou reservado). Vendidos/alugados só pela URL direta. */
@@ -32,6 +35,8 @@ export class PublicService {
     private readonly company: PublicCompanyService,
     private readonly storage: StorageService,
     private readonly leads: LeadsService,
+    private readonly metaIntegration: MetaIntegrationService,
+    private readonly events: EventEmitter2,
   ) {}
 
   // ---------- Apresentação ----------
@@ -60,6 +65,7 @@ export class PublicService {
       name: c.name, tradeName: c.tradeName, creci: c.creci, email: c.email ?? branch?.email ?? null,
       phone: c.phone ?? branch?.phone ?? null, whatsapp: c.whatsapp ?? branch?.whatsapp ?? null,
       website: c.website, logoUrl: c.logoUrl, primaryColor: c.primaryColor, address: address || null,
+      metaPixelId: await this.metaIntegration.publicPixelId(id),
     };
   }
 
@@ -239,6 +245,9 @@ export class PublicService {
           fbclid: clean(input.fbclid), fbc: clean(input.fbc), fbp: clean(input.fbp), gclid: clean(input.gclid),
           landingPage: clean(input.landingPage), referrer: clean(input.referrer),
           campaignId: clean(input.campaignId), adsetId: clean(input.adsetId), adId: clean(input.adId),
+          // Guardados agora: a conversão pode ir à Meta dias depois, quando o visitante já saiu do site.
+          clientIp: ctx.ip ?? null, clientUserAgent: ctx.userAgent ?? null, eventId: clean(input.eventId), pageUrl: clean(input.pageUrl),
+          marketingConsent: input.marketingConsent === true,
         },
       });
     });
@@ -247,19 +256,23 @@ export class PublicService {
     return { ok: true };
   }
 
-  async whatsappClick(input: WhatsappClickInput) {
+  async whatsappClick(input: WhatsappClickInput, ctx: ReqCtx) {
     const companyId = await this.company.id();
     const property = input.propertyId
       ? await this.prisma.property.findFirst({ where: { id: input.propertyId, companyId, published: true }, select: { id: true } })
       : null;
-    await this.prisma.whatsAppClick.create({
+    const click = await this.prisma.whatsAppClick.create({
       data: {
         companyId, propertyId: property?.id ?? null, sessionId: clean(input.sessionId), visitorId: clean(input.visitorId),
         utmSource: clean(input.utmSource), utmMedium: clean(input.utmMedium), utmCampaign: clean(input.utmCampaign),
         utmContent: clean(input.utmContent), utmTerm: clean(input.utmTerm),
         fbclid: clean(input.fbclid), fbc: clean(input.fbc), fbp: clean(input.fbp), gclid: clean(input.gclid),
         landingPage: clean(input.landingPage), referrer: clean(input.referrer),
+        clientIp: ctx.ip ?? null, clientUserAgent: ctx.userAgent ?? null, eventId: clean(input.eventId), pageUrl: clean(input.pageUrl),
+        marketingConsent: input.marketingConsent === true,
       },
     });
+    // O Marketing decide se o clique vira um evento Contact na Meta (consentimento, Meta conectada...).
+    try { await this.events.emitAsync(MarketingEvents.WhatsappClicked, { companyId, clickId: click.id }); } catch { /* nunca atrapalha o visitante */ }
   }
 }

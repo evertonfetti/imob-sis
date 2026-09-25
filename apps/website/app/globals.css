@@ -268,3 +268,9 @@ video.v { width: 100%; border-radius: 16px; background: #000; max-height: 520px;
 .notfound { text-align: center; padding: 120px 0; }
 .notfound h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(34px, 5vw, 56px); letter-spacing: -.03em; }
 .notfound p { color: var(--muted); margin: 12px 0 28px; }
+
+/* ---------- Aviso de cookies ---------- */
+.consent-banner { position: fixed; z-index: 90; left: 16px; bottom: 16px; width: min(440px, calc(100% - 32px)); display: grid; gap: 12px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 16px; box-shadow: var(--shadow-lg); font-size: 14px; color: var(--ink-2); }
+.consent-banner p { line-height: 1.5; }
+.consent-actions { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 1040px) { .consent-banner { bottom: 88px; } }

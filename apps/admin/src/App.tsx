@@ -12,8 +12,10 @@ import { Customers } from './pages/Customers';
 import { LeadDetail } from './pages/LeadDetail';
 import { Integrations } from './pages/Integrations';
 import { Leads } from './pages/Leads';
+import { MarketingCampaigns, MarketingOverview, MarketingSources } from './pages/Marketing';
 import { Pipeline } from './pages/Pipeline';
 import { Tasks } from './pages/Tasks';
+import { MarketingConversions } from './pages/MarketingConversions';
 import { Owners } from './pages/Owners';
 import { Properties } from './pages/Properties';
 import { PropertyForm } from './pages/PropertyForm';
@@ -49,6 +51,10 @@ export function App() {
           <Route path="leads/:id" element={<Guard perm="lead.view"><LeadDetail /></Guard>} />
           <Route path="conversas/:id?" element={<Guard perm="lead.view"><Conversations /></Guard>} />
           <Route path="integracoes" element={<Guard perm="admin.company"><Integrations /></Guard>} />
+          <Route path="marketing" element={<Guard perm="marketing.view"><MarketingOverview /></Guard>} />
+          <Route path="marketing/campanhas" element={<Guard perm="marketing.view"><MarketingCampaigns /></Guard>} />
+          <Route path="marketing/origens" element={<Guard perm="marketing.view"><MarketingSources /></Guard>} />
+          <Route path="marketing/conversoes" element={<Guard perm="marketing.view"><MarketingConversions /></Guard>} />
           <Route path="clientes" element={<Guard perm="lead.view"><Customers /></Guard>} />
           <Route path="tarefas" element={<Guard perm="lead.view"><Tasks /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />

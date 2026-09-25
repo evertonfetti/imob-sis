@@ -16,7 +16,7 @@ export async function ensureDefaultPipeline(prisma: Pick<PrismaClient, 'pipeline
         name: 'Funil comercial',
         stages: {
           create: DEFAULT_STAGES.map((s, position) => ({
-            name: s.name, position, color: s.color, type: s.type, qualifies: s.qualifies ?? false,
+            name: s.name, position, color: s.color, type: s.type, qualifies: s.qualifies ?? false, metaEvent: s.metaEvent ?? null,
           })),
         },
       },
