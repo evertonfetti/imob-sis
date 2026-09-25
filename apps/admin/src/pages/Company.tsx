@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Plus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
 import { AgentActivityCard, AgentCard, KnowledgeCard, AgentTestCard } from '../components/AgentSettings';
 import { AiAccountsCard, AiDefaultsCard } from '../components/AiAccounts';
@@ -16,7 +17,9 @@ interface Branch {
 }
 
 export function CompanyPage() {
-  const [tab, setTab] = useState<'company' | 'branches' | 'alerts' | 'images' | 'agent'>('company');
+  const [sp] = useSearchParams();
+  const initial = (['branches', 'alerts', 'images', 'agent'] as const).find((t) => t === sp.get('aba'));
+  const [tab, setTab] = useState<'company' | 'branches' | 'alerts' | 'images' | 'agent'>(initial ?? 'company');
   return (
     <>
       <PageHeader title="Empresa e filiais" subtitle="Dados institucionais e unidades de atendimento." />

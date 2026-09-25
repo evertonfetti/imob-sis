@@ -51,6 +51,10 @@ export class AiController {
   @Get('ai/status') @RequirePermissions('media.ai_edit')
   status(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.settings.status(ctx.user!.companyId); }
 
+  /** Painel "Mídia / IA": números das fotos, o que precisa de atenção e as últimas edições por IA. */
+  @Get('media/overview') @RequirePermissions('media.view')
+  overview(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.images.overview(ctx.user!); }
+
   @Get('media/:id/versions') @RequirePermissions('media.view')
   versions(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.images.versions(ctx.user!, id); }
 

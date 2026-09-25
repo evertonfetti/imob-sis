@@ -147,3 +147,15 @@ export interface WatermarkDto {
   /** Fotos publicadas com uma versão anterior da marca (precisam ser reaplicadas). */
   outdatedPhotos: number; totalPhotos: number;
 }
+
+// ---------- Painel Mídia / IA ----------
+export interface MediaOverviewDto {
+  totals: { images: number; aiModified: number; failed: number; processing: number; propertiesWithoutPhotos: number; watermark: { enabled: boolean; outdated: number } };
+  usage: { month: string; generations: number; cost: number; monthlyLimit: number };
+  recent: {
+    id: string; mediaId: string; property: { id: string; code: string; title: string }; operation: AiOperation; status: 'QUEUED' | 'PROCESSING' | 'READY' | 'FAILED';
+    provider: string; model: string | null; active: boolean; cost: number | null; error: string | null; userName: string | null;
+    thumbUrl: string | null; originalUrl: string | null; createdAt: string;
+  }[];
+  attention: { propertyId: string; code: string; title: string; reason: string; photos: number }[];
+}

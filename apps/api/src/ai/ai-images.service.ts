@@ -3,7 +3,7 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import sharp from 'sharp';
 import {
-  AI_GENERATIVE_ONLY, type AiOperation, type CreateGenerationInput, type MediaGenerationDto, type MediaVersionsDto,
+  AI_GENERATIVE_ONLY, resolveWatermark, type AiOperation, type CreateGenerationInput, type MediaGenerationDto, type MediaOverviewDto, type MediaVersionsDto,
 } from '@imob/types';
 import { AuditService } from '../audit/audit.service';
 import { AppException, notFound } from '../common/app-exception';
@@ -81,6 +81,50 @@ export class AiImagesService implements OnModuleInit, OnModuleDestroy {
     const ids = [...new Set(gens.map((g) => g.accountId).filter((x): x is string => !!x))];
     const accounts = new Map((ids.length ? await this.prisma.aiAccount.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : []).map((a) => [a.id, a.name]));
     return { mediaId, originalUrl: this.storage.publicUrl(m.originalKey), activeGenerationId: m.activeGenerationId, generations: gens.map((g) => this.dto(g, m.activeGenerationId, accounts)) };
+  }
+
+  // ---------- Painel Mídia / IA ----------
+  async overview(user: AuthedUser): Promise<MediaOverviewDto> {
+    const { companyId } = user;
+    const img = { companyId, type: 'IMAGE' as const };
+    const [images, aiModified, failed, processing, company, usage, limit, gens, thin, failedRows] = await Promise.all([
+      this.prisma.propertyMedia.count({ where: { ...img, status: 'READY' } }),
+      this.prisma.propertyMedia.count({ where: { ...img, aiModified: true } }),
+      this.prisma.propertyMedia.count({ where: { ...img, status: 'FAILED' } }),
+      this.prisma.propertyMedia.count({ where: { ...img, status: { in: ['PENDING', 'PROCESSING'] } } }),
+      this.prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { watermarkSettings: true, watermarkRevision: true, logoKey: true } }),
+      this.settings.usage(companyId), this.settings.monthlyLimit(companyId),
+      this.prisma.mediaGeneration.findMany({ where: { companyId }, orderBy: { createdAt: 'desc' }, take: 18, include: { media: { select: { activeGenerationId: true, thumbnailKey: true, processedKey: true, property: { select: { id: true, code: true, title: true } } } } } }),
+      // Imóveis publicados com poucas fotos ou sem foto pronta.
+      this.prisma.property.findMany({ where: { companyId, published: true, status: { in: ['AVAILABLE', 'RESERVED'] } }, select: { id: true, code: true, title: true, _count: { select: { media: { where: { type: 'IMAGE', status: 'READY' } } } } }, take: 300 }),
+      this.prisma.propertyMedia.findMany({ where: { ...img, status: 'FAILED' }, select: { property: { select: { id: true, code: true, title: true } } }, take: 20 }),
+    ]);
+    const wm = resolveWatermark(company.watermarkSettings);
+    const effective = wm.enabled && !!company.logoKey;
+    const outdated = await this.prisma.propertyMedia.count({ where: { ...img, status: 'READY', ...(effective ? { OR: [{ watermarkRevision: null }, { watermarkRevision: { not: company.watermarkRevision } }] } : { watermarkRevision: { not: null } }) } });
+    const users = await this.prisma.user.findMany({ where: { companyId, id: { in: [...new Set(gens.map((g) => g.userId).filter((x): x is string => !!x))] } }, select: { id: true, name: true } });
+    const names = new Map(users.map((u) => [u.id, u.name]));
+    const url = (k: string | null) => (k ? this.storage.publicUrl(k) : null);
+
+    const attention: MediaOverviewDto['attention'] = [];
+    for (const p of thin) {
+      const n = p._count.media;
+      if (n === 0) attention.push({ propertyId: p.id, code: p.code, title: p.title, reason: 'Publicado sem nenhuma foto pronta', photos: 0 });
+      else if (n < 5) attention.push({ propertyId: p.id, code: p.code, title: p.title, reason: `Só ${n} ${n === 1 ? 'foto' : 'fotos'}: anúncios com 5 ou mais fotos chamam mais atenção`, photos: n });
+    }
+    for (const f of failedRows) if (!attention.some((a) => a.propertyId === f.property.id && a.reason.startsWith('Foto'))) attention.push({ propertyId: f.property.id, code: f.property.code, title: f.property.title, reason: 'Foto com falha no processamento', photos: 0 });
+    attention.sort((a, b) => a.photos - b.photos);
+
+    return {
+      totals: { images, aiModified, failed, processing, propertiesWithoutPhotos: thin.filter((p) => p._count.media === 0).length, watermark: { enabled: effective, outdated } },
+      usage: { ...usage, monthlyLimit: limit },
+      recent: gens.map((g) => ({
+        id: g.id, mediaId: g.mediaId, property: g.media.property, operation: g.operation, status: g.status, provider: g.provider, model: g.model, active: g.media.activeGenerationId === g.id,
+        cost: g.cost == null ? null : Number(g.cost), error: g.error, userName: g.userId ? (names.get(g.userId) ?? null) : null,
+        thumbUrl: url(g.thumbKey), originalUrl: url(g.media.thumbnailKey ?? g.media.processedKey), createdAt: g.createdAt.toISOString(),
+      })),
+      attention: attention.slice(0, 12),
+    };
   }
 
   // ---------- Pedido ----------

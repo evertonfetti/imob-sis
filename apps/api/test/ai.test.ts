@@ -428,6 +428,33 @@ describe('versões por IA: escolha do modelo, original preservado, aprovação e
   });
 });
 
+describe('painel Mídia / IA', () => {
+  it('resume as fotos, as edições recentes e o que precisa de atenção, só da própria empresa', async () => {
+    // imóvel publicado com só 2 fotos → deve aparecer em "precisa de atenção"
+    const thin = (await call('POST', '/properties', 'admin', { title: 'Poucas fotos', purpose: 'SALE', typeId, salePrice: 500000, city: 'Bauru', neighborhood: 'Centro' })).json();
+    for (let i = 0; i < 2; i++) await uploadPhoto(app, tk.admin!, thin.id, { buffer: await solid(900 + i, 600, [120, 130, 140]) });
+    await call('POST', `/properties/${thin.id}/publish`, 'admin');
+    const r = await call('GET', '/media/overview', 'admin');
+    expect(r.statusCode).toBe(200);
+    const o = r.json();
+    expect(o.totals.images).toBeGreaterThan(3);
+    expect(o.totals.watermark).toMatchObject({ enabled: false });
+    expect(o.usage).toMatchObject({ monthlyLimit: expect.any(Number), generations: expect.any(Number) });
+    expect(o.recent.length).toBeGreaterThan(3);
+    expect(o.recent[0]).toMatchObject({ property: { id: expect.any(String), code: expect.any(String) }, operation: expect.any(String), status: expect.any(String) });
+    expect(new Date(o.recent[0].createdAt).getTime()).toBeGreaterThanOrEqual(new Date(o.recent.at(-1).createdAt).getTime()); // mais recentes primeiro
+    expect(o.attention.find((a: { propertyId: string }) => a.propertyId === thin.id)).toMatchObject({ photos: 2, reason: expect.stringContaining('Só 2 fotos') });
+    expect(o.attention.some((a: { propertyId: string }) => a.propertyId === prop.id)).toBe(false); // este tem 5+ fotos
+    expect((await call('GET', '/media/overview', 'marketing')).statusCode).toBe(200);
+    expect((await call('GET', '/media/overview', 'broker')).statusCode).toBe(200); // ver mídias basta
+
+    const b = (await call('GET', '/media/overview', 'adminB')).json();
+    expect(b.totals).toMatchObject({ images: 0, aiModified: 0, failed: 0 });
+    expect(b.recent).toEqual([]);
+    expect(b.attention).toEqual([]);
+  });
+});
+
 // Fila real (BullMQ + Redis). Só roda quando TEST_REDIS_URL aponta para um Redis disponível.
 describe.skipIf(!process.env.TEST_REDIS_URL)('fila BullMQ da IA', () => {
   it('a edição roda em segundo plano (a requisição volta antes) e a aprovação é renderizada pela fila de mídia', async () => {

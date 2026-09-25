@@ -738,3 +738,13 @@ input[type=range].slider { width: 100%; accent-color: var(--accent); }
 .test-chat .bubble.out { align-self: flex-end; }
 .test-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
 .test-meta details { width: 100%; font-size: 12.5px; }
+.gen-grid { display: grid; gap: 14px; padding: 16px 20px 20px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.gen-card { display: grid; gap: 8px; color: inherit; text-decoration: none; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.gen-card:hover { border-color: var(--faint); }
+.gen-pic { position: relative; aspect-ratio: 4 / 3; background: var(--surface-2); }
+.gen-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gen-status { position: absolute; top: 8px; left: 8px; }
+.gen-active { position: absolute; top: 8px; right: 8px; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.gen-body { display: grid; gap: 2px; padding: 0 12px 12px; min-width: 0; }
+.gen-body .card-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 900px) { .stats[style] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }

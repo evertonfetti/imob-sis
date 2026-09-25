@@ -17,6 +17,7 @@ import { MarketingCampaigns, MarketingOverview, MarketingSources } from './pages
 import { Pipeline } from './pages/Pipeline';
 import { Tasks } from './pages/Tasks';
 import { MarketingConversions } from './pages/MarketingConversions';
+import { MediaHub } from './pages/MediaHub';
 import { Owners } from './pages/Owners';
 import { Properties } from './pages/Properties';
 import { Proposals } from './pages/Proposals';
@@ -67,6 +68,7 @@ export function App() {
           <Route path="agenda" element={<Guard perm="visit.view"><Agenda /></Guard>} />
           <Route path="propostas" element={<Guard perm="proposal.view"><Proposals /></Guard>} />
           <Route path="relatorios" element={<Guard perm="lead.view"><Reports /></Guard>} />
+          <Route path="midia" element={<Guard perm="media.view"><MediaHub /></Guard>} />
           <Route path="tarefas" element={<Guard perm="lead.view"><Tasks /></Guard>} />
           <Route path="proprietarios" element={<Guard perm="property.edit"><Owners /></Guard>} />
           <Route path="catalogo" element={<Guard perm="property.edit"><Catalog /></Guard>} />
