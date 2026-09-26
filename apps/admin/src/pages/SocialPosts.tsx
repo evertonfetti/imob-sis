@@ -185,7 +185,7 @@ function AccountsTab({ status }: { status: string | null }) {
 }
 
 function ChooseModal({ pending, onClose, onDone }: { pending: SocialAccountDto[]; onClose: () => void; onDone: () => void }) {
-  const [sel, setSel] = useState<string[]>(pending.map((p) => p.id));
+  const [sel, setSel] = useState<string[]>([]);
   const [err, setErr] = useState<unknown>(null);
   const save = useMutation({ mutationFn: (ids: string[]) => api('/social/accounts/activate', { method: 'POST', body: { accountIds: ids } }), onSuccess: onDone, onError: setErr });
   const toggle = (id: string) => setSel(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
@@ -193,7 +193,7 @@ function ChooseModal({ pending, onClose, onDone }: { pending: SocialAccountDto[]
     <Modal title="Quais contas você quer usar?" onClose={() => save.mutate([])}
       footer={<><Button onClick={() => save.mutate([])} disabled={save.isPending}>Nenhuma</Button><Button variant="primary" onClick={() => save.mutate(sel)} disabled={!sel.length || save.isPending}>Conectar {sel.length} {sel.length === 1 ? 'conta' : 'contas'}</Button></>}>
       {err != null && <div className="alert" style={{ marginBottom: 12 }}>{errorMessage(err)}</div>}
-      <p className="card-sub" style={{ marginBottom: 14 }}>Encontramos estas Páginas e contas do Instagram. As que você não marcar são esquecidas e o acesso delas é descartado.</p>
+      <p className="card-sub" style={{ marginBottom: 14 }}>Encontramos estas Páginas e contas do Instagram. Marque só as que vai usar: as que ficarem sem marca são esquecidas e o acesso delas é descartado.</p>
       <div style={{ display: 'grid', gap: 8 }}>
         {pending.map((a) => (
           <label key={a.id} className={`acct-opt ${sel.includes(a.id) ? 'on' : ''}`}>
