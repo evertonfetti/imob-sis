@@ -3,7 +3,7 @@ import {
   type PropertyPurpose, type PropertyStatus,
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Images, Share2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Images, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Badge, Button, Field, Input, Select, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
@@ -62,11 +62,19 @@ const toApi = (f: Form, canEdit: boolean) => ({
   showExactAddress: f.showExactAddress, featured: f.featured, featureIds: f.featureIds,
 });
 
-function Section({ title, desc, children }: { title: string; desc?: string; children: ReactNode }) {
+function Section({ title, desc, children, collapsible, badge }: { title: string; desc?: string; children: ReactNode; collapsible?: boolean; badge?: ReactNode }) {
+  const [open, setOpen] = useState(!collapsible);
   return (
     <section className="card">
-      <div className="card-head"><div><div className="section-title">{title}</div>{desc && <div className="section-desc">{desc}</div>}</div></div>
-      <div className="section-body">{children}</div>
+      <div className="card-head">
+        <div><div className="section-title">{title}</div>{desc && <div className="section-desc">{desc}</div>}</div>
+        {collapsible && (
+          <button type="button" className="btn btn-sm" aria-expanded={open} onClick={() => setOpen(!open)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {badge}{open ? 'Recolher' : 'Expandir'}<ChevronDown size={16} style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }} />
+          </button>
+        )}
+      </div>
+      {open && <div className="section-body">{children}</div>}
     </section>
   );
 }
@@ -271,7 +279,7 @@ export function PropertyForm() {
               </Section>
 
               {!isNew && canEdit && (
-                <Section title="Histórico">
+                <Section title="Histórico" collapsible badge={history.data?.length ? <span className="card-sub">{history.data.length} registros ·</span> : null}>
                   {history.isLoading ? <SkeletonRows rows={3} /> : !history.data?.length ? <span className="card-sub">Nenhuma alteração registrada.</span> : (
                     <ul className="hist">
                       {history.data.map((h) => (
