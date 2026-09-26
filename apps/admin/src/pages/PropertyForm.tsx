@@ -84,6 +84,57 @@ const ACTION_LABEL: Record<string, string> = {
   SOCIAL_PUBLISHED: 'Publicado nas redes', MEDIA_ADDED: 'Arquivo adicionado', MEDIA_REMOVED: 'Arquivo removido', COVER_CHANGED: 'Capa alterada',
 };
 
+
+const FIELD_LABEL: Record<string, string> = {
+  title: 'Título', shortDescription: 'Resumo', description: 'Descrição', purpose: 'Finalidade', status: 'Situação', typeId: 'Tipo', subtype: 'Subtipo',
+  salePrice: 'Valor de venda', rentPrice: 'Valor do aluguel', condominiumFee: 'Condomínio', propertyTax: 'IPTU', minimumNegotiationPrice: 'Valor mínimo de negociação',
+  bedrooms: 'Dormitórios', suites: 'Suítes', bathrooms: 'Banheiros', parkingSpaces: 'Vagas', totalArea: 'Área total', usefulArea: 'Área útil', builtArea: 'Área construída', landArea: 'Área do terreno',
+  zipCode: 'CEP', address: 'Endereço', number: 'Número', complement: 'Complemento', neighborhood: 'Bairro', city: 'Cidade', state: 'UF', latitude: 'Latitude', longitude: 'Longitude',
+  showExactAddress: 'Mostrar endereço exato no site', featured: 'Destaque', brokerId: 'Corretor responsável', branchId: 'Filial', ownerId: 'Proprietário', featureIds: 'Características',
+  published: 'Publicado no site', publishedAt: 'Publicado no site', archivedAt: 'Arquivado',
+};
+const MONEY_FIELDS = new Set(['salePrice', 'rentPrice', 'condominiumFee', 'propertyTax', 'minimumNegotiationPrice']);
+const AREA_FIELDS = new Set(['totalArea', 'usefulArea', 'builtArea', 'landArea']);
+const LONG_TEXT = new Set(['description', 'shortDescription']);
+const HIDDEN = new Set(['slug', 'updatedAt', 'createdAt', 'id', 'companyId', 'code', 'publishedAt', 'archivedAt', 'coverKey']);
+
+type Lookup = (field: string, id: string) => string | undefined;
+
+/** Traduz o registro técnico de uma alteração em frases: "Valor de venda: de R$ 250.000,00 para R$ 352.014,00". */
+function describeChanges(before: Record<string, unknown> | null, after: Record<string, unknown> | null, lookup: Lookup, featureName: (id: string) => string): string[] {
+  const b = before ?? {}, a = after ?? {};
+  const show = (k: string, v: unknown): string => {
+    if (v == null || v === '') return '';
+    if (MONEY_FIELDS.has(k)) return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    if (AREA_FIELDS.has(k)) return `${Number(v).toLocaleString('pt-BR')} m²`;
+    if (typeof v === 'boolean') return v ? 'sim' : 'não';
+    if (k === 'purpose') return PURPOSE_LABELS[v as PropertyPurpose] ?? String(v);
+    if (k === 'status') return STATUS_LABELS[v as PropertyStatus] ?? String(v);
+    if (k.endsWith('Id')) return lookup(k, String(v)) ?? 'não identificado';
+    return String(v);
+  };
+  const lines: string[] = [];
+  for (const k of new Set([...Object.keys(b), ...Object.keys(a)])) {
+    if (HIDDEN.has(k)) continue;
+    const label = FIELD_LABEL[k] ?? k;
+    if (k === 'featureIds') {
+      const was = (b[k] as string[] | undefined) ?? [], now = (a[k] as string[] | undefined) ?? [];
+      const added = now.filter((x) => !was.includes(x)).map(featureName), removed = was.filter((x) => !now.includes(x)).map(featureName);
+      if (added.length) lines.push(`Características adicionadas: ${added.join(', ')}`);
+      if (removed.length) lines.push(`Características removidas: ${removed.join(', ')}`);
+      continue;
+    }
+    if (k === 'published') { lines.push(a[k] ? 'Publicado no site' : 'Retirado do site'); continue; }
+    if (LONG_TEXT.has(k)) { lines.push(`${label} alterada`); continue; }
+    const from = show(k, b[k]), to = show(k, a[k]);
+    if (from === to) continue;
+    if (!from) lines.push(`${label}: preenchido com ${to}`);
+    else if (!to) lines.push(`${label}: removido (era ${from})`);
+    else lines.push(`${label}: de ${from} para ${to}`);
+  }
+  return lines;
+}
+
 export function PropertyForm() {
   const { id } = useParams();
   const isNew = !id;
@@ -114,6 +165,10 @@ export function PropertyForm() {
   const text = (k: keyof Form) => ({ value: f[k] as string, onChange: (e: { target: { value: string } }) => set(k, e.target.value as never) });
   const fe = fieldErrors(err);
 
+  const lookup: Lookup = (field, val) => ({
+    typeId: types.data?.find((x) => x.id === val)?.name, brokerId: options.data?.brokers.find((x) => x.id === val)?.name,
+    branchId: branches.data?.find((x) => x.id === val)?.name, ownerId: owners.data?.items.find((x) => x.id === val)?.name,
+  } as Record<string, string | undefined>)[field];
   const refresh = () => { qc.invalidateQueries({ queryKey: ['properties'] }); qc.invalidateQueries({ queryKey: ['property', id] }); qc.invalidateQueries({ queryKey: ['property-history', id] }); };
 
   const save = useMutation({
@@ -286,10 +341,8 @@ export function PropertyForm() {
                         <li key={h.id}>
                           <div><b style={{ fontWeight: 500 }}>{ACTION_LABEL[h.action] ?? h.action}</b> <span className="card-sub">por {h.userName ?? 'Sistema'} · {dateTime(h.createdAt)}</span></div>
                           {h.action === 'UPDATE' && (
-                            <div className="diff">
-                              {Object.keys({ ...h.before, ...h.after }).map((k) => (
-                                <div key={k}><b>{k}</b> {h.before && k in h.before && <span className="rm">− {typeof h.before[k] === 'object' ? JSON.stringify(h.before[k]) : String(h.before[k])}</span>} {h.after && k in h.after && <span className="add">+ {typeof h.after[k] === 'object' ? JSON.stringify(h.after[k]) : String(h.after[k])}</span>}</div>
-                              ))}
+                            <div className="diff" style={{ fontFamily: 'inherit', fontSize: 13, marginTop: 4 }}>
+                              {describeChanges(h.before, h.after, lookup, (fid) => features.data?.find((x) => x.id === fid)?.name ?? 'característica removida').map((line) => <div key={line}>{line}</div>)}
                             </div>
                           )}
                         </li>
