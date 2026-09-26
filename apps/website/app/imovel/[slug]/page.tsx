@@ -7,6 +7,7 @@ import { Gallery } from '@/components/Gallery';
 import { PixelEvent } from '@/components/PixelEvent';
 import { PropertyCard } from '@/components/PropertyCard';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
+import { ShareButton } from '@/components/ShareButton';
 import { NotFoundError, getCompany, getProperty } from '@/lib/api';
 import { area, brl, purposeLabel, truncate } from '@/lib/format';
 import { siteUrl } from '@/lib/site';
@@ -153,6 +154,7 @@ export default async function PropertyPage({ params }: Params) {
             {!gone && (
               <>
                 <WhatsAppButton whatsapp={company.whatsapp} message={waMsg} propertyId={p.id} className="btn btn-wa btn-block" />
+                <ShareButton title={p.title} code={p.code} />
                 <hr />
                 {p.broker && (
                   <div className="broker">

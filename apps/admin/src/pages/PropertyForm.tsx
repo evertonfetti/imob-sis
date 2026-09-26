@@ -4,7 +4,7 @@ import {
 } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Images, Share2 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Badge, Button, Field, Input, Select, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
 import { ApiError, api } from '../lib/api';
@@ -135,16 +135,28 @@ export function PropertyForm() {
   });
 
   // ViaCEP: preenche endereço a partir do CEP.
-  async function lookupCep() {
-    const cep = f.zipCode.replace(/\D/g, '');
-    if (cep.length !== 8) return;
+  // Ao completar os 8 dígitos, busca sozinho e preenche endereço, bairro, cidade e UF (sobrescreve: o CEP digitado manda).
+  const [cepState, setCepState] = useState<'idle' | 'loading' | 'notfound'>('idle');
+  const lastCep = useRef('');
+  async function lookupCep(raw: string) {
+    const cep = raw.replace(/\D/g, '');
+    if (cep.length !== 8 || cep === lastCep.current) return;
+    lastCep.current = cep;
+    setCepState('loading');
     try {
       const r = await (await fetch(`https://viacep.com.br/ws/${cep}/json/`)).json();
-      if (r.erro) return;
-      setF((x) => ({ ...x, address: x.address || r.logradouro || '', neighborhood: x.neighborhood || r.bairro || '', city: x.city || r.localidade || '', state: x.state || r.uf || '' }));
+      if (r.erro) { setCepState('notfound'); return; }
+      setF((x) => ({ ...x, address: r.logradouro || x.address, neighborhood: r.bairro || x.neighborhood, city: r.localidade || x.city, state: r.uf || x.state }));
       setDirty(true);
-    } catch { /* o preenchimento manual continua disponível */ }
+      setCepState('idle');
+    } catch { setCepState('idle'); /* o preenchimento manual continua disponível */ }
   }
+  const onCep = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 8);
+    const masked = d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+    set('zipCode', masked);
+    if (d.length < 8) { lastCep.current = ''; setCepState('idle'); } else void lookupCep(d);
+  };
 
   if (!isNew && prop.isLoading) return <div className="card"><SkeletonRows rows={10} /></div>;
   if (!isNew && prop.error) return <div className="alert">{errorMessage(prop.error)}</div>;
@@ -230,7 +242,7 @@ export function PropertyForm() {
 
               <Section title="Endereço">
                 <div className="form-grid g3">
-                  <Field label="CEP"><Input value={f.zipCode} onChange={(e) => set('zipCode', e.target.value)} onBlur={lookupCep} placeholder="00000-000" /></Field>
+                  <Field label="CEP" error={cepState === 'notfound' ? 'CEP não encontrado. Preencha o endereço manualmente.' : undefined} hint={cepState === 'loading' ? 'Buscando endereço…' : 'Digite o CEP e o endereço é preenchido sozinho.'}><Input inputMode="numeric" value={f.zipCode} onChange={(e) => onCep(e.target.value)} placeholder="00000-000" /></Field>
                   <Field label="Endereço" className="span-2"><Input {...text('address')} /></Field>
                   <Field label="Número"><Input {...text('number')} /></Field>
                   <Field label="Complemento" className="span-2"><Input {...text('complement')} /></Field>
@@ -292,7 +304,7 @@ export function PropertyForm() {
                     <div className="card-sub">{p.published ? `No site desde ${dateTime(p.publishedAt)}` : 'Não publicado no site.'}</div>
                   )}
                   <label className="check"><input type="checkbox" checked={f.featured} onChange={(e) => set('featured', e.target.checked)} /><span>Imóvel em destaque<small>Aparece com prioridade no site.</small></span></label>
-                  {!isNew && p.published && can('marketing.manage') && (
+                  {!isNew && can('marketing.manage') && (
                     <Button type="button" block onClick={() => nav(`/redes-sociais/nova?imovel=${p.id}`)}><Share2 /> Publicar nas redes</Button>
                   )}
                   {!isNew && can('property.publish') && (

@@ -9,3 +9,11 @@ export function pixelTrack(name: string, params: Record<string, unknown> = {}, e
     if (fbq) fbq('track', name, params, eventId ? { eventID: eventId } : undefined);
   } catch { /* nunca atrapalha o visitante */ }
 }
+
+/** Evento personalizado (fora do catálogo padrão da Meta), ex.: ShareProperty. */
+export function pixelTrackCustom(name: string, params: Record<string, unknown> = {}) {
+  try {
+    const fbq = (window as unknown as { fbq?: Fbq }).fbq;
+    if (fbq) fbq('trackCustom', name, params);
+  } catch { /* nunca atrapalha o visitante */ }
+}
