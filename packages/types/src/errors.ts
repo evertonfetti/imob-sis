@@ -98,6 +98,16 @@ export const ERROR_CODES = {
   WHATSAPP_TEST_FAILED: 'Não foi possível validar as credenciais com a Meta.',
   WHATSAPP_MEDIA_UNAVAILABLE: 'Não foi possível baixar o arquivo desta mensagem.',
   MESSAGE_NOT_RETRYABLE: 'Somente mensagens enviadas que falharam podem ser reenviadas.',
+  // Licenciamento (Bloco 11): usado tanto pela instalação do cliente quanto pelo servidor de licenças.
+  LICENSE_SUSPENDED: 'A licença deste sistema está suspensa. Fale com o suporte.',
+  LICENSE_LIMIT_REACHED: 'O plano contratado atingiu o limite deste recurso.',
+  LICENSE_KEY_INVALID: 'Chave de licença inválida.',
+  LICENSE_FINGERPRINT_MISMATCH: 'Esta chave de licença já está em uso por outra instalação.',
+  LICENSE_CLIENT_INVALID: 'O cliente informado não existe.',
+  LICENSE_PLAN_INVALID: 'O plano informado não existe.',
+  LICENSE_PLAN_IN_USE: 'Este plano tem licenças ativas e não pode ser removido.',
+  LICENSE_PLAN_KEY_TAKEN: 'Já existe um plano com esta chave.',
+  LICENSE_STATUS_INVALID: 'Não é possível mudar a licença para este status.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

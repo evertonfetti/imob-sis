@@ -1,0 +1,58 @@
+# Infraestrutura do SERVIDOR DE LICENÇAS (Bloco 11 / SaaS) — só sua, do dono da plataforma.
+# Isto NUNCA vai para a VPS de um cliente: é o sistema que emite e controla as licenças que os
+# clientes usam (veja docker-compose.yml, variáveis LICENSE_SERVER_URL / LICENSE_KEY).
+# Implantação (Easypanel → Serviço "Docker Compose", igual ao stack principal):
+#   license-api    → porta 3433   (ex.: licencas-api.suaplataforma.com.br)
+#   license-panel  → porta 80     (ex.: licencas.suaplataforma.com.br)
+# Variáveis: defina na aba "Ambiente" (veja .env.license.example).
+
+services:
+  license-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: license
+      POSTGRES_PASSWORD: "${LICENSE_POSTGRES_PASSWORD:?defina LICENSE_POSTGRES_PASSWORD}"
+      POSTGRES_DB: license
+    volumes:
+      - license_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U license -d license"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  license-api:
+    build:
+      context: .
+      dockerfile: apps/license-api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      license-postgres:
+        condition: service_healthy
+    expose:
+      - "3433"
+    environment:
+      NODE_ENV: production
+      LICENSE_API_PORT: "3433"
+      LICENSE_DATABASE_URL: postgresql://license:${LICENSE_POSTGRES_PASSWORD}@license-postgres:5432/license
+      JWT_ACCESS_SECRET: "${LICENSE_JWT_ACCESS_SECRET:?defina LICENSE_JWT_ACCESS_SECRET (32+ caracteres)}"
+      LICENSE_PANEL_URL: "${LICENSE_PANEL_URL:?defina LICENSE_PANEL_URL (URL pública do painel master)}"
+      SEED_STAFF_EMAIL: ${SEED_STAFF_EMAIL:-}
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-}
+      SEED_STAFF_NAME: ${SEED_STAFF_NAME:-}
+
+  license-panel:
+    build:
+      context: .
+      dockerfile: apps/license-panel/Dockerfile
+      args:
+        VITE_API_URL: ${LICENSE_API_PUBLIC_URL}/v1
+    restart: unless-stopped
+    depends_on:
+      - license-api
+    expose:
+      - "80"
+
+volumes:
+  license_pgdata:

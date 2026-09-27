@@ -1,0 +1,179 @@
+// Bloco 11 (SaaS) — Fase 1. Banco próprio do servidor de licenças (apps/license-api).
+// Nunca roda na VPS do cliente: fica só na sua infraestrutura (docker-compose.license.yml).
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StaffStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+/// Ciclo de vida de uma licença. TRIALING e ACTIVE liberam o uso; os demais bloqueiam a instalação do cliente.
+enum LicenseStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELED
+}
+
+/// Quem acessa o painel master (só você e sua equipe — não é um usuário de uma imobiliária).
+model StaffUser {
+  id           String      @id @default(uuid(7))
+  name         String
+  email        String      @unique
+  passwordHash String
+  status       StaffStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+
+  refreshTokens RefreshToken[]
+  events        LicenseEvent[]
+  resetTokens   PasswordResetToken[]
+
+  @@index([status])
+
+  @@map("staff_users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid(7))
+  staffId   String
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  staff StaffUser @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid(7))
+  staffId   String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  staff StaffUser @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@map("password_reset_tokens")
+}
+
+/// Uma imobiliária cliente (a empresa que você atende, dona da VPS onde o sistema roda).
+model Client {
+  id           String   @id @default(uuid(7))
+  name         String
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  licenses License[]
+
+  @@map("clients")
+}
+
+/// Plano contratado: nome, preço e limites (a forma dos limites é livre — o cliente lê e aplica).
+model Plan {
+  id              String          @id @default(uuid(7))
+  key             String          @unique
+  name            String
+  priceCents      Int
+  billingInterval BillingInterval @default(MONTHLY)
+  /// Ex.: { "maxUsers": 10, "maxProperties": 500, "maxSocialAccounts": 6, "maxAiAccounts": 3, "aiAgent": true }
+  limits          Json
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  licenses License[]
+
+  @@map("plans")
+}
+
+/// Uma instalação (uma VPS) de um cliente. A chave é o segredo que a instalação usa para se identificar.
+model License {
+  id        String        @id @default(uuid(7))
+  clientId  String
+  planId    String
+  keyHash   String        @unique
+  /// Só os 4 últimos caracteres, para reconhecer a chave sem guardar o valor completo (a versão completa só existiu na criação).
+  keyPreview String
+  status    LicenseStatus @default(TRIALING)
+
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  suspendedAt      DateTime?
+  suspendReason    String?
+
+  /// Impressão da instalação: fixada na primeira confirmação bem-sucedida. Evita a mesma chave em duas VPS.
+  instanceFingerprint String?
+  instanceVersion     String?
+  instanceUrl         String?
+  lastSeenAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client   Client          @relation(fields: [clientId], references: [id])
+  plan     Plan            @relation(fields: [planId], references: [id])
+  usage    UsageSnapshot[]
+  events   LicenseEvent[]
+
+  @@index([clientId])
+  @@index([status])
+  @@map("licenses")
+}
+
+/// Contagem de uso que a instalação do cliente reporta a cada confirmação (para acompanhar consumo, não para cobrar ainda).
+model UsageSnapshot {
+  id         String   @id @default(uuid(7))
+  licenseId  String
+  reportedAt DateTime @default(now())
+  /// Ex.: { "users": 4, "properties": 120, "socialAccounts": 2, "aiAccounts": 1, "whatsappSendsMonth": 340 }
+  counts     Json
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId, reportedAt])
+  @@map("usage_snapshots")
+}
+
+/// Linha do tempo de uma licença: criada, suspensa, plano trocado etc. Serve de auditoria simples do painel master.
+model LicenseEvent {
+  id        String    @id @default(uuid(7))
+  licenseId String?
+  staffId   String?
+  type      String
+  message   String
+  data      Json?
+  createdAt DateTime  @default(now())
+
+  license License?   @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  staff   StaffUser? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  @@index([licenseId, createdAt])
+  @@map("license_events")
+}

@@ -1328,3 +1328,23 @@ model AiAgentRun {
   @@index([conversationId, createdAt])
   @@map("ai_agent_runs")
 }
+
+/// Bloco 11 (SaaS) — Fase 1. Uma linha só (a instalação inteira, não por empresa): o que o servidor de
+/// licenças respondeu da última vez. Sem LICENSE_SERVER_URL configurado, este módulo não roda e o sistema
+/// funciona normalmente — esta tabela existe pronta para quando a licença for ativada.
+model LicenseState {
+  id            String    @id @default("singleton")
+  /// Gerado sozinho na primeira confirmação e guardado aqui: sobrevive a reinícios do container.
+  fingerprint   String?
+  status        String    @default("ACTIVE")
+  ok            Boolean   @default(true)
+  planName      String?
+  limits        Json?
+  message       String?
+  lastCheckedAt DateTime?
+  lastOkAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("license_state")
+}

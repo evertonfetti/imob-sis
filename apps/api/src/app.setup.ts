@@ -4,8 +4,10 @@ import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
 import { RequestMethod } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { ERROR_CODES } from '@imob/types';
 import { AppModule } from './app.module';
 import { Env } from './config/env';
+import { LicenseService } from './license/license.service';
 
 export function buildAdapter(env: Env) {
   return new FastifyAdapter({
@@ -42,6 +44,16 @@ export async function configureApp(app: NestFastifyApplication, env: Env) {
   app.getHttpAdapter().getInstance().addContentTypeParser('*', (_req: unknown, payload: unknown, done: (e: Error | null, b?: unknown) => void) => done(null, payload));
   app.getHttpAdapter().getInstance().addHook('onSend', async (req, reply) => {
     reply.header('x-request-id', req.id);
+  });
+
+  // Bloco 11 (SaaS): licença suspensa bloqueia tudo, inclusive o login — antes de qualquer rota, guard ou controller rodar.
+  const license = app.get(LicenseService);
+  app.getHttpAdapter().getInstance().addHook('onRequest', async (req, reply) => {
+    if (req.method === 'OPTIONS' || req.url.split('?')[0] === '/api/v1/health') return;
+    if (!license.isBlocked()) return;
+    reply.code(402).send({
+      statusCode: 402, code: 'LICENSE_SUSPENDED', message: license.getState().message ?? ERROR_CODES.LICENSE_SUSPENDED, requestId: String(req.id),
+    });
   });
 }
 

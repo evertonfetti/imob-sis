@@ -13,3 +13,4 @@ export * from './commercial';
 export * from './intelligence';
 export * from './ai';
 export * from './agent';
+export * from './license';

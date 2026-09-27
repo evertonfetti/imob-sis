@@ -15,6 +15,7 @@ import { AiModule } from './ai/ai.module';
 import { CommercialModule } from './commercial/commercial.module';
 import { IntelligenceModule } from './intelligence/intelligence.module';
 import { CrmModule } from './crm/crm.module';
+import { LicenseModule } from './license/license.module';
 import { MarketingModule } from './marketing/marketing.module';
 import { MediaModule } from './media/media.module';
 import { OwnersModule } from './owners/owners.module';
@@ -39,6 +40,7 @@ export class AppModule {
         }),
         EventEmitterModule.forRoot(),
         PrismaModule,
+        LicenseModule,
         AuditModule,
         StorageModule,
         AuthModule,

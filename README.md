@@ -3,13 +3,16 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas).
+**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas). Bloco 11 (SaaS) — Fase 1 concluída: servidor de licenças, painel master e bloqueio por licença na instalação do cliente (veja a seção "Licenciamento" abaixo). Fases 2 (cobrança automática via Mercado Pago) e 3 (limites de plano aplicados a cada recurso) ainda não implementadas.
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
 apps/admin      React + Vite (painel)
 apps/website    Next.js (site público)
-packages/database  Prisma (schema, migrations, seed/bootstrap)
+apps/license-api    NestJS + Fastify — servidor de licenças (Bloco 11 / SaaS). Só sua infra, não vai para o cliente.
+apps/license-panel  React + Vite — painel master (clientes, planos, licenças). Idem: só sua infra.
+packages/database          Prisma (schema, migrations, seed/bootstrap) — banco de cada instalação de cliente
+packages/license-database  Prisma (schema, migrations, seed/bootstrap) — banco do servidor de licenças
 packages/types     Permissões, schemas zod e códigos de erro compartilhados
 ```
 
@@ -144,3 +147,21 @@ Health check: `/api/v1/health`.
 Depois do primeiro acesso, troque a senha do administrador e remova `SEED_ADMIN_PASSWORD` do ambiente.
 
 > Desenvolvimento local: `docker compose -f docker-compose.dev.yml up -d` (PostgreSQL, Redis e MinIO).
+
+### Licenciamento (Bloco 11 / SaaS) — opcional, só para quem revende o sistema
+
+Você instala uma cópia por cliente, cada uma em sua própria VPS/domínio (o `docker-compose.yml` acima). O
+licenciamento é **opcional** e roda numa infraestrutura **separada, só sua**: um servidor de licenças
+(`apps/license-api` + `apps/license-panel`, subidos com `docker-compose.license.yml` e `.env.license.example`,
+como um segundo serviço Docker Compose no Easypanel) onde você cria clientes, planos e licenças, e vê o uso de
+cada instalação.
+
+- **Sem `LICENSE_SERVER_URL`/`LICENSE_KEY`** no `.env` de um cliente: o licenciamento fica desativado e o
+  sistema funciona normalmente — é o caso de qualquer instalação sem revenda.
+- **Com as duas variáveis preenchidas:** a instalação confirma com o seu servidor a cada poucas horas (chave
+  gerada no painel master ao criar a licença). Sem conseguir confirmar por alguns dias (rede fora, ex.), continua
+  funcionando com a última resposta conhecida; se o servidor recusar a chave, ou a licença estiver suspensa,
+  a instalação bloqueia tudo — inclusive o login — mostrando o motivo ao usuário.
+- Cada chave se vincula à primeira instalação que confirmar com ela; usá-la em outra VPS sem liberar o vínculo
+  no painel master é recusado (evita duas instalações com a mesma chave).
+- Health check do servidor de licenças: `/v1/health`.

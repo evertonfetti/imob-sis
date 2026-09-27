@@ -26,17 +26,36 @@ export const session = {
   },
 };
 
+// Bloco 11 (SaaS): a API bloqueia TODA requisição (login incluído) quando a licença está suspensa.
+// Isto é global e independe de sessão: mesmo a tela de login precisa saber para mostrar o aviso certo.
+let licenseBlockMessage: string | null = null;
+let licenseListeners: Array<(msg: string | null) => void> = [];
+export const licenseBlock = {
+  get: () => licenseBlockMessage,
+  subscribe(fn: (msg: string | null) => void) {
+    licenseListeners.push(fn);
+    return () => { licenseListeners = licenseListeners.filter((l) => l !== fn); };
+  },
+};
+function setLicenseBlock(msg: string | null) {
+  if (msg === licenseBlockMessage) return;
+  licenseBlockMessage = msg;
+  licenseListeners.forEach((l) => l(msg));
+}
+
 async function raw(path: string, init: RequestInit & { token?: string | null } = {}) {
   const headers = new Headers(init.headers);
   if (init.body) headers.set('content-type', 'application/json');
   if (init.token) headers.set('authorization', `Bearer ${init.token}`);
   const res = await fetch(BASE + path, { ...init, headers });
-  if (res.status === 204) return undefined;
+  if (res.status === 204) { setLicenseBlock(null); return undefined; }
   const data = await res.json().catch(() => undefined);
   if (!res.ok) {
     const e = (data ?? {}) as Partial<ApiErrorBody>;
+    if (e.code === 'LICENSE_SUSPENDED') setLicenseBlock(e.message ?? 'A licença deste sistema está suspensa.');
     throw new ApiError(res.status, e.code ?? 'HTTP_ERROR', e.message ?? 'Não foi possível concluir a operação.', e.requestId, e.details);
   }
+  setLicenseBlock(null);
   return data;
 }
 

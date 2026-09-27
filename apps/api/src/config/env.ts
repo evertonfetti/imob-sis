@@ -43,6 +43,13 @@ const schema = z.object({
   S3_ACCESS_KEY: z.string().optional(),
   S3_SECRET_KEY: z.string().optional(),
   S3_PUBLIC_URL: z.string().optional(),
+  // Bloco 11 (SaaS) — Fase 1: licenciamento. Sem LICENSE_SERVER_URL, o módulo fica desativado (sempre liberado).
+  LICENSE_SERVER_URL: z.string().optional(),
+  LICENSE_KEY: z.string().optional(),
+  LICENSE_CHECK_INTERVAL_MS: z.coerce.number().default(6 * 3600_000),
+  // Sem confirmar com o servidor por este prazo, a instalação passa a se tratar como suspensa.
+  LICENSE_GRACE_DAYS: z.coerce.number().default(7),
+  LICENSE_SUPPORT_CONTACT: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;
