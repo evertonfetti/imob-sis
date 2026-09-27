@@ -217,10 +217,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .g-thumb:hover img { transform: scale(1.05); }
 .g-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(29 28 26 / .55); color: #fff; font-weight: 600; font-size: 18px; }
 @media (max-width: 640px) { .g-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } .g-strip .g-thumb:nth-child(n+4) { display: none; } .g-main { border-radius: 16px; height: auto; aspect-ratio: 4 / 3; } }
-.lightbox { position: fixed; inset: 0; z-index: 100; background: rgb(15 18 17 / .96); display: grid; grid-template-rows: auto 1fr auto; color: #f2f1ec; }
+.lightbox { position: fixed; inset: 0; height: 100dvh; z-index: 100; background: rgb(15 18 17 / .96); display: grid; grid-template-rows: auto 1fr auto; color: #f2f1ec; }
 .lb-top { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; font-size: 14px; }
-.lb-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 0 64px; }
-.lb-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+/* overflow: auto é uma rede de segurança — com o corpo da página travado enquanto o visualizador está aberto,
+   sem isso uma foto que não coubesse (proporção incomum, navegador antigo) ficaria cortada e sem jeito de ver o resto. */
+.lb-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 0 64px; overflow: auto; overscroll-behavior: contain; }
+.lb-stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 6px; }
 .lb-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgb(255 255 255 / .12); color: #fff; cursor: pointer; }
 .lb-btn:hover { background: rgb(255 255 255 / .24); }
 .lb-btn svg { width: 22px; height: 22px; }
