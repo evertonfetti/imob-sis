@@ -1,10 +1,11 @@
-import { KeyRound, LogOut, ScrollText, Users } from 'lucide-react';
+import { KeyRound, LogOut, ScrollText, Settings as SettingsIcon, Users } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 
 const NAV = [
   { label: 'Clientes', icon: Users, to: '/' },
   { label: 'Planos', icon: ScrollText, to: '/planos' },
+  { label: 'Configurações', icon: SettingsIcon, to: '/configuracoes' },
 ];
 
 export function Shell() {

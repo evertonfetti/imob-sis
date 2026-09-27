@@ -173,10 +173,12 @@ cada instalação.
 - Com a cobrança ativa, cada licença tem um **modo**: **Automática** (padrão) ou **Manual** (você continua
   controlando essa licença específica na mão, mesmo com o Mercado Pago configurado — útil para um cliente que
   paga por fora).
-- No modo automático, o servidor gera sozinho a próxima fatura `BILLING_ADVANCE_DAYS` dias antes do fim do teste
-  ou do período pago — um link único (Checkout Pro) que aceita **Pix, boleto e cartão**. O pagamento aprovado
-  chega por webhook (assinatura verificada) e ativa a licença, estendendo o período automaticamente.
-- Fatura vencida: a licença entra em **Pagamento atrasado**; sem pagar em `BILLING_GRACE_DAYS` dias, é suspensa
-  sozinha. No painel master, "Gerar cobrança agora" cria uma fatura avulsa a qualquer momento.
+- No modo automático, o servidor gera sozinho a próxima fatura alguns dias antes do fim do teste ou do período
+  pago — um link único (Checkout Pro) que aceita **Pix, boleto e cartão**. O pagamento aprovado chega por
+  webhook (assinatura verificada) e ativa a licença, estendendo o período automaticamente.
+- Fatura vencida: a licença entra em **Pagamento atrasado**; sem pagar dentro do prazo de tolerância, é
+  suspensa sozinha. Os dois prazos (aviso e tolerância, padrão 5 e 5 dias) são ajustáveis em **Configurações**,
+  dentro do próprio painel master — não são variável de ambiente. No painel, "Gerar cobrança agora" cria uma
+  fatura avulsa a qualquer momento.
 - Configure em developers.mercadopago.com.br → Suas integrações: o `MP_ACCESS_TOKEN` de produção e, em
   "Webhooks", a assinatura secreta (`MP_WEBHOOK_SECRET`) — sem ela, notificações são recusadas por segurança.

@@ -17,10 +17,7 @@ const schema = z.object({
   MP_WEBHOOK_SECRET: z.string().optional(),
   MP_API_URL: z.string().default('https://api.mercadopago.com'),
   LICENSE_API_PUBLIC_URL: z.string().optional(),
-  // Quantos dias antes do fim do período (ou do fim do teste) a próxima fatura é gerada sozinha.
-  BILLING_ADVANCE_DAYS: z.coerce.number().default(5),
-  // Fatura vencida há mais desses dias sem pagamento: a licença é suspensa automaticamente.
-  BILLING_GRACE_DAYS: z.coerce.number().default(5),
+  // Os prazos (aviso e tolerância) ficam no banco (tabela BillingSettings), ajustáveis no painel master.
   BILLING_TICK_MS: z.coerce.number().default(3600_000),
 });
 

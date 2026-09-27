@@ -31,7 +31,7 @@ function fakeFetch(input: string | URL, init?: RequestInit) {
 
 beforeAll(async () => {
   await resetAndSeed();
-  app = await bootApp({ MP_ACCESS_TOKEN: 'token-de-teste', MP_WEBHOOK_SECRET: SECRET, LICENSE_API_PUBLIC_URL: 'https://licencas-api.teste', BILLING_ADVANCE_DAYS: '5', BILLING_GRACE_DAYS: '5' });
+  app = await bootApp({ MP_ACCESS_TOKEN: 'token-de-teste', MP_WEBHOOK_SECRET: SECRET, LICENSE_API_PUBLIC_URL: 'https://licencas-api.teste' });
   token = (await login(app, 'staff@teste.com')).body.accessToken;
 });
 afterAll(async () => { await app.close(); await prisma.$disconnect(); });
@@ -131,6 +131,22 @@ describe('cobrança (Mercado Pago)', () => {
     const after = (await call('GET', `/licenses/${license.id}`)).json();
     expect(after.status).toBe('SUSPENDED');
     expect(after.invoices[0].status).toBe('EXPIRED');
+  });
+
+  it('prazos são configuráveis pelo painel master, sem variável de ambiente', async () => {
+    const before = (await call('GET', '/billing/settings')).json();
+    expect(before).toMatchObject({ advanceDays: 5, graceDays: 5 });
+
+    const updated = (await call('PATCH', '/billing/settings', { advanceDays: 10, graceDays: 2 })).json();
+    expect(updated).toMatchObject({ advanceDays: 10, graceDays: 2 });
+
+    // Um teste que termina em 8 dias só entra na janela de aviso com o novo prazo (10 dias), não com o antigo (5).
+    const { license } = await planClientLicense(9900, 8);
+    await app.get(BillingService).tick();
+    const inv = (await call('GET', `/licenses/${license.id}`)).json().invoices[0];
+    expect(inv).toBeTruthy();
+
+    await call('PATCH', '/billing/settings', { advanceDays: 5, graceDays: 5 }); // devolve o padrão para não afetar os outros testes
   });
 
   it('licença em modo manual não recebe fatura nem suspensão automática', async () => {

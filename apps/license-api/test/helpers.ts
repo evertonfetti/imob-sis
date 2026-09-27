@@ -18,7 +18,7 @@ export async function bootApp(extra: Record<string, string> = {}) {
 export async function resetAndSeed() {
   const prisma = createPrismaClient(process.env.TEST_LICENSE_DATABASE_URL!);
   await prisma.$executeRawUnsafe(
-    'TRUNCATE license_events, usage_snapshots, licenses, plans, clients, refresh_tokens, password_reset_tokens, staff_users CASCADE',
+    'TRUNCATE license_events, usage_snapshots, invoices, licenses, plans, clients, refresh_tokens, password_reset_tokens, staff_users, billing_settings CASCADE',
   );
   await prisma.staffUser.create({ data: { name: 'Staff', email: 'staff@teste.com', passwordHash: await hash(PASSWORD) } });
   await prisma.$disconnect();

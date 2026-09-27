@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { BillingInterval, InvoiceDto } from '@imob/types';
+import type { BillingInterval, BillingSettingsDto, BillingSettingsInput, InvoiceDto } from '@imob/types';
 import { AppException, notFound } from '../common/app-exception';
 import type { AuthedStaff } from '../common/request-context';
 import { ENV, Env } from '../config/env';
@@ -23,6 +23,18 @@ export class BillingService {
     return this.mp.configured;
   }
 
+  /** Prazos configuráveis pelo painel master (sem precisar mexer em variável de ambiente nem reiniciar). */
+  async getSettings(): Promise<BillingSettingsDto> {
+    const row = await this.prisma.billingSettings.upsert({ where: { id: 'singleton' }, create: {}, update: {} });
+    return { advanceDays: row.advanceDays, graceDays: row.graceDays, updatedAt: row.updatedAt.toISOString() };
+  }
+
+  async updateSettings(input: BillingSettingsInput, staff: AuthedStaff): Promise<BillingSettingsDto> {
+    const row = await this.prisma.billingSettings.upsert({ where: { id: 'singleton' }, create: input, update: input });
+    await this.log_(null, 'billing_settings_changed', `Prazos de cobrança atualizados: aviso de ${input.advanceDays} dias antes do vencimento, tolerância de ${input.graceDays} dias após vencer.`, staff.id);
+    return { advanceDays: row.advanceDays, graceDays: row.graceDays, updatedAt: row.updatedAt.toISOString() };
+  }
+
   private dto(i: { id: string; periodStart: Date; periodEnd: Date; amountCents: number; status: string; dueAt: Date; checkoutUrl: string | null; paidAt: Date | null; createdAt: Date }): InvoiceDto {
     return {
       id: i.id, periodStart: i.periodStart.toISOString(), periodEnd: i.periodEnd.toISOString(), amountCents: i.amountCents,
@@ -31,7 +43,7 @@ export class BillingService {
     };
   }
 
-  private async log_(licenseId: string, type: string, message: string, staffId?: string) {
+  private async log_(licenseId: string | null, type: string, message: string, staffId?: string) {
     await this.prisma.licenseEvent.create({ data: { licenseId, staffId, type, message } });
   }
 
@@ -89,6 +101,7 @@ export class BillingService {
   /** Rotina periódica: gera faturas que estão se aproximando do vencimento e trata as que venceram sem pagamento. */
   async tick(now = new Date()) {
     if (!this.mp.configured) return;
+    const { advanceDays, graceDays } = await this.getSettings();
 
     const dueSoon = await this.prisma.license.findMany({
       where: { billingMode: 'AUTO', status: { in: ['TRIALING', 'ACTIVE', 'PAST_DUE'] }, plan: { priceCents: { gt: 0 } } },
@@ -98,7 +111,7 @@ export class BillingService {
       const basis = lic.currentPeriodEnd ?? lic.trialEndsAt;
       if (!basis) continue;
       const daysLeft = (basis.getTime() - now.getTime()) / 86_400_000;
-      if (daysLeft > this.env.BILLING_ADVANCE_DAYS) continue;
+      if (daysLeft > advanceDays) continue;
       if (await this.prisma.invoice.findFirst({ where: { licenseId: lic.id, status: 'PENDING' } })) continue;
       try {
         await this.createInvoice(lic.id);
@@ -111,14 +124,14 @@ export class BillingService {
     for (const inv of overdue) {
       const lic = inv.license;
       if (lic.billingMode !== 'AUTO' || lic.status === 'SUSPENDED' || lic.status === 'CANCELED') continue;
-      const graceDeadline = new Date(inv.dueAt.getTime() + this.env.BILLING_GRACE_DAYS * 86_400_000);
+      const graceDeadline = new Date(inv.dueAt.getTime() + graceDays * 86_400_000);
       if (now >= graceDeadline) {
         await this.prisma.invoice.update({ where: { id: inv.id }, data: { status: 'EXPIRED' } });
         await this.prisma.license.update({ where: { id: lic.id }, data: { status: 'SUSPENDED', suspendedAt: now, suspendReason: 'Fatura vencida sem pagamento.' } });
         await this.log_(lic.id, 'suspended_unpaid', `Licença suspensa: fatura de ${BRL(inv.amountCents)} vencida em ${dateLabel(inv.dueAt)} sem pagamento.`);
       } else if (lic.status === 'ACTIVE') {
         await this.prisma.license.update({ where: { id: lic.id }, data: { status: 'PAST_DUE' } });
-        await this.log_(lic.id, 'past_due', `Fatura de ${BRL(inv.amountCents)} vencida em ${dateLabel(inv.dueAt)}. Prazo de tolerância antes de suspender: ${this.env.BILLING_GRACE_DAYS} dias.`);
+        await this.log_(lic.id, 'past_due', `Fatura de ${BRL(inv.amountCents)} vencida em ${dateLabel(inv.dueAt)}. Prazo de tolerância antes de suspender: ${graceDays} dias.`);
       }
     }
   }

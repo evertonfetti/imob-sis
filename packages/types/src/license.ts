@@ -79,6 +79,15 @@ export interface LocalLicenseState {
   lastOkAt: string | null;
 }
 
+export const billingSettingsInputSchema = z.object({
+  advanceDays: z.number().int().min(1).max(90),
+  graceDays: z.number().int().min(1).max(90),
+});
+export type BillingSettingsInput = z.infer<typeof billingSettingsInputSchema>;
+export interface BillingSettingsDto extends BillingSettingsInput {
+  updatedAt: string;
+}
+
 // ---------- Painel master (apps/license-panel) ----------
 export const planInputSchema = z.object({
   key: z.string().trim().min(2).max(40).regex(/^[a-z0-9-]+$/, 'Use letras minúsculas, números e hífen'),

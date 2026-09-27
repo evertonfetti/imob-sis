@@ -42,11 +42,10 @@ services:
       SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-}
       SEED_STAFF_NAME: ${SEED_STAFF_NAME:-}
       # Cobrança automática (Fase 2) — opcional. Sem MP_ACCESS_TOKEN, gerencie licenças manualmente (Fase 1).
+      # Os prazos (aviso e tolerância) não são variável de ambiente: ajuste em Configurações, no painel master.
       LICENSE_API_PUBLIC_URL: ${LICENSE_API_PUBLIC_URL:-}
       MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
       MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
-      BILLING_ADVANCE_DAYS: ${BILLING_ADVANCE_DAYS:-5}
-      BILLING_GRACE_DAYS: ${BILLING_GRACE_DAYS:-5}
 
   license-panel:
     build:

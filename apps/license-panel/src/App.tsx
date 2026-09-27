@@ -7,6 +7,7 @@ import { Clients } from './pages/Clients';
 import { LicenseDetail } from './pages/LicenseDetail';
 import { Login } from './pages/Login';
 import { Plans } from './pages/Plans';
+import { Settings } from './pages/Settings';
 
 function Protected() {
   const { staff, loading } = useAuth();
@@ -25,6 +26,7 @@ export function App() {
           <Route path="clientes/:id" element={<ClientDetail />} />
           <Route path="licencas/:id" element={<LicenseDetail />} />
           <Route path="planos" element={<Plans />} />
+          <Route path="configuracoes" element={<Settings />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

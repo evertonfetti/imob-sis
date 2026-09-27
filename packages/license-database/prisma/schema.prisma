@@ -217,3 +217,16 @@ model LicenseEvent {
   @@index([licenseId, createdAt])
   @@map("license_events")
 }
+
+/// Uma linha só: prazos da cobrança automática, ajustáveis no painel master sem precisar mexer em variável
+/// de ambiente nem reiniciar nada.
+model BillingSettings {
+  id          String   @id @default("singleton")
+  /// Quantos dias antes do vencimento a próxima fatura é gerada sozinha.
+  advanceDays Int      @default(5)
+  /// Fatura vencida há mais desses dias sem pagamento: a licença é suspensa automaticamente.
+  graceDays   Int      @default(5)
+  updatedAt   DateTime @updatedAt
+
+  @@map("billing_settings")
+}
