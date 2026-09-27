@@ -113,6 +113,12 @@ model Plan {
   @@map("plans")
 }
 
+/// Fase 2: cobrança automática (Mercado Pago) ou controle manual (staff muda o status na mão, como na Fase 1).
+enum BillingMode {
+  AUTO
+  MANUAL
+}
+
 /// Uma instalação (uma VPS) de um cliente. A chave é o segredo que a instalação usa para se identificar.
 model License {
   id        String        @id @default(uuid(7))
@@ -122,6 +128,7 @@ model License {
   /// Só os 4 últimos caracteres, para reconhecer a chave sem guardar o valor completo (a versão completa só existiu na criação).
   keyPreview String
   status    LicenseStatus @default(TRIALING)
+  billingMode BillingMode @default(AUTO)
 
   trialEndsAt      DateTime?
   currentPeriodEnd DateTime?
@@ -141,10 +148,43 @@ model License {
   plan     Plan            @relation(fields: [planId], references: [id])
   usage    UsageSnapshot[]
   events   LicenseEvent[]
+  invoices Invoice[]
 
   @@index([clientId])
   @@index([status])
   @@map("licenses")
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  EXPIRED
+  CANCELED
+}
+
+/// Uma cobrança (um período de um plano pago) gerada no Mercado Pago (Checkout Pro: Pix, boleto ou cartão).
+model Invoice {
+  id          String        @id @default(uuid(7))
+  licenseId   String
+  periodStart DateTime
+  periodEnd   DateTime
+  amountCents Int
+  status      InvoiceStatus @default(PENDING)
+  dueAt       DateTime
+
+  mpPreferenceId String?
+  mpPaymentId    String?
+  checkoutUrl    String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  license License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@index([licenseId, createdAt])
+  @@index([status, dueAt])
+  @@map("invoices")
 }
 
 /// Contagem de uso que a instalação do cliente reporta a cada confirmação (para acompanhar consumo, não para cobrar ainda).

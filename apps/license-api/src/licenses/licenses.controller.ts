@@ -1,7 +1,8 @@
 import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, UnauthorizedException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
-  heartbeatSchema, licenseInputSchema, licenseStatusInputSchema, type HeartbeatInput, type LicenseInput, type LicenseStatusInput,
+  billingModeInputSchema, heartbeatSchema, licenseInputSchema, licenseStatusInputSchema,
+  type BillingModeInput, type HeartbeatInput, type LicenseInput, type LicenseStatusInput,
 } from '@imob/types';
 import { z } from 'zod';
 import { Public } from '../common/decorators';
@@ -37,6 +38,16 @@ export class LicensesController {
   @Patch(':id/plan')
   changePlan(@Param('id') id: string, @Body(new ZodPipe(planIdSchema)) body: { planId: string }, @CurrentStaff() staff: AuthedStaff) {
     return this.svc.changePlan(id, body.planId, staff);
+  }
+
+  @Patch(':id/billing-mode')
+  setBillingMode(@Param('id') id: string, @Body(new ZodPipe(billingModeInputSchema)) body: BillingModeInput, @CurrentStaff() staff: AuthedStaff) {
+    return this.svc.setBillingMode(id, body.billingMode, staff);
+  }
+
+  @Post(':id/invoices')
+  createInvoice(@Param('id') id: string, @CurrentStaff() staff: AuthedStaff) {
+    return this.svc.createInvoice(id, staff);
   }
 
   // ---------- Chamado pela instalação do cliente (autenticação: a própria chave, não um funcionário) ----------

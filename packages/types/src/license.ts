@@ -129,11 +129,35 @@ export interface ClientDto {
 export interface LicenseSummaryDto {
   id: string; status: LicenseStatus; planName: string; keyPreview: string; lastSeenAt: string | null; currentPeriodEnd: string | null;
 }
+
+// ---------- Fase 2: cobrança (Mercado Pago) ----------
+export const BILLING_MODES = ['AUTO', 'MANUAL'] as const;
+export type BillingMode = (typeof BILLING_MODES)[number];
+export const BILLING_MODE_LABELS: Record<BillingMode, string> = {
+  AUTO: 'Automática (Mercado Pago)', MANUAL: 'Manual (você controla o status)',
+};
+
+export const INVOICE_STATUSES = ['PENDING', 'PAID', 'EXPIRED', 'CANCELED'] as const;
+export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {
+  PENDING: 'Aguardando pagamento', PAID: 'Paga', EXPIRED: 'Vencida', CANCELED: 'Cancelada',
+};
+
+export interface InvoiceDto {
+  id: string; periodStart: string; periodEnd: string; amountCents: number; status: InvoiceStatus;
+  dueAt: string; checkoutUrl: string | null; paidAt: string | null; createdAt: string;
+}
+
+export const billingModeInputSchema = z.object({ billingMode: z.enum(BILLING_MODES) });
+export type BillingModeInput = z.infer<typeof billingModeInputSchema>;
+
 export interface LicenseDetailDto extends LicenseSummaryDto {
   clientId: string; clientName: string; planId: string; trialEndsAt: string | null; suspendedAt: string | null; suspendReason: string | null;
   instanceFingerprint: string | null; instanceVersion: string | null; instanceUrl: string | null; createdAt: string;
+  billingMode: BillingMode; billingEnabled: boolean;
   usage: { reportedAt: string; counts: UsageCounts }[];
   events: { id: string; type: string; message: string; createdAt: string; staffName: string | null }[];
+  invoices: InvoiceDto[];
 }
 /** Só aparece na resposta da criação (ou de "gerar nova chave") — depois disso, só o preview. */
 export interface LicenseCreatedDto extends LicenseDetailDto {

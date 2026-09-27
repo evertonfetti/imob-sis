@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';
 import cors from '@fastify/cors';
+import { RequestMethod } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from './app.module';
 import { Env } from './config/env';
@@ -25,7 +26,8 @@ export function buildAdapter(env: Env) {
 }
 
 export async function configureApp(app: NestFastifyApplication, env: Env) {
-  app.setGlobalPrefix('v1');
+  // Webhook do Mercado Pago fica fora do prefixo: /webhooks/mercadopago
+  app.setGlobalPrefix('v1', { exclude: [{ path: 'webhooks/(.*)', method: RequestMethod.ALL }] });
   await app.register(helmet);
   await app.register(cors, {
     // O painel master é a única origem do navegador; a instalação do cliente chama o heartbeat servidor-a-servidor (sem CORS).

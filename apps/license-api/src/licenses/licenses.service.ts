@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import type {
-  HeartbeatInput, HeartbeatResponse, LicenseCreatedDto, LicenseDetailDto, LicenseInput, LicenseStatus, LicenseStatusInput, PlanLimits,
+  BillingMode, HeartbeatInput, HeartbeatResponse, InvoiceDto, LicenseCreatedDto, LicenseDetailDto, LicenseInput, LicenseStatus, LicenseStatusInput, PlanLimits,
 } from '@imob/types';
 import { LICENSE_OK_STATUSES } from '@imob/types';
+import { BillingService } from '../billing/billing.service';
 import { AppException, notFound } from '../common/app-exception';
 import type { AuthedStaff } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,16 +19,18 @@ const include = {
   plan: { select: { name: true } },
   usage: { orderBy: { reportedAt: 'desc' as const }, take: 20 },
   events: { orderBy: { createdAt: 'desc' as const }, take: 30, include: { staff: { select: { name: true } } } },
+  invoices: { orderBy: { createdAt: 'desc' as const }, take: 20 },
 };
 type LicenseRow = NonNullable<Awaited<ReturnType<PrismaService['license']['findFirst']>>> & {
   client: { name: string }; plan: { name: string };
   usage: { reportedAt: Date; counts: unknown }[];
   events: { id: string; type: string; message: string; createdAt: Date; staff: { name: string } | null }[];
+  invoices: { id: string; periodStart: Date; periodEnd: Date; amountCents: number; status: string; dueAt: Date; checkoutUrl: string | null; paidAt: Date | null; createdAt: Date }[];
 };
 
 @Injectable()
 export class LicensesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly billing: BillingService) {}
 
   private detailDto(l: LicenseRow): LicenseDetailDto {
     return {
@@ -36,9 +39,13 @@ export class LicensesService {
       clientId: l.clientId, clientName: l.client.name, planId: l.planId, trialEndsAt: l.trialEndsAt?.toISOString() ?? null,
       suspendedAt: l.suspendedAt?.toISOString() ?? null, suspendReason: l.suspendReason,
       instanceFingerprint: l.instanceFingerprint, instanceVersion: l.instanceVersion, instanceUrl: l.instanceUrl,
-      createdAt: l.createdAt.toISOString(),
+      createdAt: l.createdAt.toISOString(), billingMode: l.billingMode as BillingMode, billingEnabled: this.billing.configured,
       usage: l.usage.map((u) => ({ reportedAt: u.reportedAt.toISOString(), counts: (u.counts ?? {}) as HeartbeatInput['counts'] })),
       events: l.events.map((e) => ({ id: e.id, type: e.type, message: e.message, createdAt: e.createdAt.toISOString(), staffName: e.staff?.name ?? null })),
+      invoices: l.invoices.map((i) => ({
+        id: i.id, periodStart: i.periodStart.toISOString(), periodEnd: i.periodEnd.toISOString(), amountCents: i.amountCents,
+        status: i.status as InvoiceDto['status'], dueAt: i.dueAt.toISOString(), checkoutUrl: i.checkoutUrl, paidAt: i.paidAt?.toISOString() ?? null, createdAt: i.createdAt.toISOString(),
+      })),
     };
   }
 
@@ -112,6 +119,18 @@ export class LicensesService {
     return this.detailDto(updated as unknown as LicenseRow);
   }
 
+  async setBillingMode(id: string, billingMode: BillingMode, staff: AuthedStaff) {
+    const current = await this.load(id);
+    if (billingMode === current.billingMode) return this.detailDto(current);
+    const updated = await this.prisma.license.update({ where: { id }, data: { billingMode }, include });
+    await this.log(id, 'billing_mode_changed', billingMode === 'MANUAL' ? 'Cobrança automática desativada: você controla o status desta licença.' : 'Cobrança automática reativada.', staff.id);
+    return this.detailDto(updated as unknown as LicenseRow);
+  }
+
+  createInvoice(id: string, staff: AuthedStaff) {
+    return this.billing.createInvoice(id, staff);
+  }
+
   async changePlan(id: string, planId: string, staff: AuthedStaff) {
     const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
     if (!plan) throw new AppException('LICENSE_PLAN_INVALID', 400);
@@ -131,11 +150,20 @@ export class LicensesService {
     }
 
     let status = row.status;
-    // Teste vencido sem virar plano pago: passa a bloquear sozinho, sem depender de ação manual.
+    // Teste vencido sem virar plano pago: passa a bloquear sozinho, sem depender de ação manual. Se já existe uma
+    // fatura aguardando pagamento (cobrança automática gerou com antecedência), dá o mesmo prazo de tolerância da
+    // cobrança em vez de suspender na hora — quem cobra decide quando suspende, para não haver dois prazos diferentes.
     if (status === 'TRIALING' && row.trialEndsAt && row.trialEndsAt < new Date()) {
-      status = 'SUSPENDED';
-      await this.prisma.license.update({ where: { id: row.id }, data: { status, suspendedAt: new Date(), suspendReason: 'Período de teste encerrado.' } });
-      await this.log(row.id, 'trial_expired', 'Período de teste encerrado sem conversão para plano pago.');
+      const openInvoice = await this.prisma.invoice.findFirst({ where: { licenseId: row.id, status: 'PENDING' } });
+      if (openInvoice) {
+        status = 'PAST_DUE';
+        await this.prisma.license.update({ where: { id: row.id }, data: { status } });
+        await this.log(row.id, 'trial_expired', 'Período de teste encerrado; aguardando pagamento da primeira fatura.');
+      } else {
+        status = 'SUSPENDED';
+        await this.prisma.license.update({ where: { id: row.id }, data: { status, suspendedAt: new Date(), suspendReason: 'Período de teste encerrado.' } });
+        await this.log(row.id, 'trial_expired', 'Período de teste encerrado sem conversão para plano pago.');
+      }
     }
 
     await this.prisma.license.update({

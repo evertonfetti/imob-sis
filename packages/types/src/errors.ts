@@ -108,6 +108,12 @@ export const ERROR_CODES = {
   LICENSE_PLAN_IN_USE: 'Este plano tem licenças ativas e não pode ser removido.',
   LICENSE_PLAN_KEY_TAKEN: 'Já existe um plano com esta chave.',
   LICENSE_STATUS_INVALID: 'Não é possível mudar a licença para este status.',
+  // Cobrança (Fase 2)
+  BILLING_NOT_CONFIGURED: 'O Mercado Pago ainda não foi configurado neste servidor (MP_ACCESS_TOKEN).',
+  BILLING_PLAN_FREE: 'Este plano não tem preço definido; não há o que cobrar.',
+  BILLING_INVOICE_OPEN: 'Já existe uma fatura em aberto para esta licença.',
+  BILLING_INVOICE_INVALID: 'Fatura não encontrada.',
+  BILLING_WEBHOOK_INVALID: 'Notificação do Mercado Pago inválida.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

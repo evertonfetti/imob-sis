@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas). Bloco 11 (SaaS) — Fase 1 concluída: servidor de licenças, painel master e bloqueio por licença na instalação do cliente (veja a seção "Licenciamento" abaixo). Fases 2 (cobrança automática via Mercado Pago) e 3 (limites de plano aplicados a cada recurso) ainda não implementadas.
+**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas). Bloco 11 (SaaS) — Fases 1 e 2 concluídas: servidor de licenças, painel master, bloqueio por licença na instalação do cliente e cobrança automática via Mercado Pago (Pix, boleto e cartão) — veja a seção "Licenciamento" abaixo. Fase 3 (limites de plano aplicados a cada recurso do sistema) ainda não implementada.
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -165,3 +165,18 @@ cada instalação.
 - Cada chave se vincula à primeira instalação que confirmar com ela; usá-la em outra VPS sem liberar o vínculo
   no painel master é recusado (evita duas instalações com a mesma chave).
 - Health check do servidor de licenças: `/v1/health`.
+
+**Cobrança automática (Mercado Pago) — Fase 2, opcional:**
+
+- Sem `MP_ACCESS_TOKEN`/`MP_WEBHOOK_SECRET` no ambiente do `license-api`: nada muda, você continua criando e
+  suspendendo licenças na mão (Fase 1). Preencha as duas para ativar.
+- Com a cobrança ativa, cada licença tem um **modo**: **Automática** (padrão) ou **Manual** (você continua
+  controlando essa licença específica na mão, mesmo com o Mercado Pago configurado — útil para um cliente que
+  paga por fora).
+- No modo automático, o servidor gera sozinho a próxima fatura `BILLING_ADVANCE_DAYS` dias antes do fim do teste
+  ou do período pago — um link único (Checkout Pro) que aceita **Pix, boleto e cartão**. O pagamento aprovado
+  chega por webhook (assinatura verificada) e ativa a licença, estendendo o período automaticamente.
+- Fatura vencida: a licença entra em **Pagamento atrasado**; sem pagar em `BILLING_GRACE_DAYS` dias, é suspensa
+  sozinha. No painel master, "Gerar cobrança agora" cria uma fatura avulsa a qualquer momento.
+- Configure em developers.mercadopago.com.br → Suas integrações: o `MP_ACCESS_TOKEN` de produção e, em
+  "Webhooks", a assinatura secreta (`MP_WEBHOOK_SECRET`) — sem ela, notificações são recusadas por segurança.

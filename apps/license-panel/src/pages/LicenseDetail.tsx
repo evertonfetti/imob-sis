@@ -1,14 +1,17 @@
-import type { LicenseCreatedDto, LicenseDetailDto, LicenseStatus, PlanDto, UsageCounts } from '@imob/types';
-import { LICENSE_STATUSES, LICENSE_STATUS_LABELS, PLAN_LIMIT_LABELS } from '@imob/types';
+import type { BillingMode, InvoiceStatus, LicenseCreatedDto, LicenseDetailDto, LicenseStatus, PlanDto, UsageCounts } from '@imob/types';
+import { BILLING_MODE_LABELS, INVOICE_STATUS_LABELS, LICENSE_STATUSES, LICENSE_STATUS_LABELS, PLAN_LIMIT_LABELS } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, KeyRound, Unlink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, KeyRound, Receipt, Unlink } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Badge, Button, Field, Modal, Select, SkeletonRows, errorMessage } from '../components/ui';
 import { api } from '../lib/api';
 
 const statusTone = (s: string) => (s === 'ACTIVE' || s === 'TRIALING' ? 'ok' : s === 'PAST_DUE' ? 'warn' : 'danger') as 'ok' | 'warn' | 'danger';
+const invoiceTone = (s: InvoiceStatus) => (s === 'PAID' ? 'ok' : s === 'PENDING' ? 'warn' : 'danger') as 'ok' | 'warn' | 'danger';
+const brl = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = (v: string | null) => (v ? new Date(v).toLocaleString('pt-BR') : '—');
+const dateOnly = (v: string) => new Date(v).toLocaleDateString('pt-BR');
 const COUNT_LABELS: Record<keyof UsageCounts, string> = {
   users: 'usuários', properties: 'imóveis', branches: 'filiais', socialAccounts: 'contas de redes sociais', aiAccounts: 'contas de IA', whatsappSendsMonth: 'envios de WhatsApp no mês',
 };
@@ -31,6 +34,14 @@ export function LicenseDetail() {
   });
   const resetFingerprint = useMutation({
     mutationFn: () => api(`/licenses/${id}/reset-fingerprint`, { method: 'POST' }),
+    onSuccess: refresh, onError: setErr,
+  });
+  const createInvoice = useMutation({
+    mutationFn: () => api(`/licenses/${id}/invoices`, { method: 'POST' }),
+    onSuccess: refresh, onError: setErr,
+  });
+  const toggleBilling = useMutation({
+    mutationFn: (billingMode: BillingMode) => api(`/licenses/${id}/billing-mode`, { method: 'PATCH', body: { billingMode } }),
     onSuccess: refresh, onError: setErr,
   });
 
@@ -64,6 +75,49 @@ export function LicenseDetail() {
           <Button disabled={regenerate.isPending} onClick={() => { if (confirm('Gerar uma nova chave? A chave atual para de funcionar imediatamente.')) regenerate.mutate(); }}><KeyRound size={16} /> Gerar nova chave</Button>
           <Button disabled={resetFingerprint.isPending} onClick={() => { if (confirm('Liberar o vínculo? A próxima instalação a confirmar com esta chave assume o lugar da atual.')) resetFingerprint.mutate(); }}><Unlink size={16} /> Liberar vínculo</Button>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-head">
+          <div><div className="card-title">Cobrança</div><div className="card-sub">{BILLING_MODE_LABELS[l.billingMode]}</div></div>
+          <Badge {...(l.billingMode === 'AUTO' ? { tone: 'accent' as const } : {})}>{l.billingMode === 'AUTO' ? 'Automática' : 'Manual'}</Badge>
+        </div>
+        {!l.billingEnabled ? (
+          <div className="card-pad card-sub">O Mercado Pago ainda não foi configurado neste servidor (variável <code>MP_ACCESS_TOKEN</code>). Até lá, controle o status manualmente acima.</div>
+        ) : (
+          <div className="card-pad" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Button disabled={createInvoice.isPending} onClick={() => createInvoice.mutate()}><Receipt size={16} /> Gerar cobrança agora</Button>
+            <Button disabled={toggleBilling.isPending} onClick={() => toggleBilling.mutate(l.billingMode === 'AUTO' ? 'MANUAL' : 'AUTO')}>
+              {l.billingMode === 'AUTO' ? 'Passar para manual' : 'Voltar para automática'}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-head"><div className="card-title">Faturas</div></div>
+        {l.invoices.length === 0 ? <div className="card-pad card-sub">Nenhuma fatura ainda.</div> : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead><tr><th>Período</th><th>Valor</th><th>Status</th><th>Vencimento</th><th></th></tr></thead>
+              <tbody>
+                {l.invoices.map((inv) => (
+                  <tr key={inv.id}>
+                    <td className="card-sub">{dateOnly(inv.periodStart)} – {dateOnly(inv.periodEnd)}</td>
+                    <td>{brl(inv.amountCents)}</td>
+                    <td><Badge tone={invoiceTone(inv.status)}>{INVOICE_STATUS_LABELS[inv.status]}</Badge></td>
+                    <td className="card-sub">{inv.paidAt ? `Paga em ${dt(inv.paidAt)}` : dateOnly(inv.dueAt)}</td>
+                    <td className="actions">
+                      {inv.status === 'PENDING' && inv.checkoutUrl && (
+                        <a className="btn" href={inv.checkoutUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Link de pagamento</a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>

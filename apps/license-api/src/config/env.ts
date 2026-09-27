@@ -12,6 +12,16 @@ const schema = z.object({
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET precisa ter 32+ caracteres'),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().default(900),
   REFRESH_TTL_DAYS: z.coerce.number().default(30),
+  // Fase 2 (cobrança). Sem MP_ACCESS_TOKEN, a cobrança automática fica desativada: crie/gerencie licenças manualmente.
+  MP_ACCESS_TOKEN: z.string().optional(),
+  MP_WEBHOOK_SECRET: z.string().optional(),
+  MP_API_URL: z.string().default('https://api.mercadopago.com'),
+  LICENSE_API_PUBLIC_URL: z.string().optional(),
+  // Quantos dias antes do fim do período (ou do fim do teste) a próxima fatura é gerada sozinha.
+  BILLING_ADVANCE_DAYS: z.coerce.number().default(5),
+  // Fatura vencida há mais desses dias sem pagamento: a licença é suspensa automaticamente.
+  BILLING_GRACE_DAYS: z.coerce.number().default(5),
+  BILLING_TICK_MS: z.coerce.number().default(3600_000),
 });
 
 export type Env = z.infer<typeof schema>;
