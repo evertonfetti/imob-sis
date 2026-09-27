@@ -1,7 +1,9 @@
 # Contexto de build: raiz do repositório (Build Path "/", Dockerfile "apps/license-panel/Dockerfile")
 # Infraestrutura só sua: nunca vai para a VPS do cliente (veja docker-compose.license.yml).
 FROM node:22-slim AS build
-RUN corepack enable
+# Baixa o pnpm agora, antes de copiar o código: fica em cache e não depende da rede a cada deploy
+# (só refaz se o Dockerfile mudar). Mantenha a versão igual ao "packageManager" do package.json.
+RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 WORKDIR /app
 COPY . .
 ARG VITE_API_URL=/v1

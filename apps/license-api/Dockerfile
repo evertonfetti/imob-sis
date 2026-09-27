@@ -2,7 +2,9 @@
 # Infraestrutura só sua: nunca vai para a VPS do cliente (veja docker-compose.license.yml).
 FROM node:22-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN corepack enable
+# Baixa o pnpm agora, antes de copiar o código: fica em cache e não depende da rede a cada deploy
+# (só refaz se o Dockerfile mudar). Mantenha a versão igual ao "packageManager" do package.json.
+RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 WORKDIR /app
 COPY . .
 # `prisma generate` só precisa de uma URL de formato válido, não conecta ao banco.

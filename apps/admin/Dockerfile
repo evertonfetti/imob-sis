@@ -1,6 +1,8 @@
 # Contexto de build: raiz do repositório (Easypanel: Build Path "/", Dockerfile "apps/admin/Dockerfile")
 FROM node:22-slim AS build
-RUN corepack enable
+# Baixa o pnpm agora, antes de copiar o código: fica em cache e não depende da rede a cada deploy
+# (só refaz se o Dockerfile mudar). Mantenha a versão igual ao "packageManager" do package.json.
+RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
 WORKDIR /app
 COPY . .
 # URL pública da API, embutida no build. Ex.: https://api.seudominio.com.br/api/v1
