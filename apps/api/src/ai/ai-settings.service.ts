@@ -9,6 +9,7 @@ import { AppException, notFound } from '../common/app-exception';
 import { decryptJson, encryptJson, secretKeyFor } from '../common/crypto';
 import type { AuthedCtx } from '../common/request-context';
 import { ENV, Env } from '../config/env';
+import { LicenseService } from '../license/license.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeminiProvider, type HttpConfig } from './providers/gemini.provider';
 import { LocalProvider } from './providers/local.provider';
@@ -38,7 +39,7 @@ const isProvider = (p: string): p is AiProviderId => (AI_PROVIDERS as readonly s
 @Injectable()
 export class AiSettingsService {
   private readonly key: Buffer;
-  constructor(@Inject(ENV) private readonly env: Env, private readonly prisma: PrismaService, private readonly audit: AuditService) { this.key = secretKeyFor(env); }
+  constructor(@Inject(ENV) private readonly env: Env, private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly license: LicenseService) { this.key = secretKeyFor(env); }
 
   // ---------- Construção dos provedores ----------
   private build(provider: AiProviderId, model: string, apiKey: string, costUsd: number): AIImageProvider {
@@ -164,6 +165,7 @@ export class AiSettingsService {
 
   async createAccount(ctx: AuthedCtx, input: AiAccountInput) {
     const { companyId } = ctx.user;
+    this.license.assertLimit('maxAiAccounts', await this.prisma.aiAccount.count({ where: { companyId, active: true } }));
     await this.discover(input.provider, input.apiKey); // prova que a chave vale antes de guardar
     for (const m of input.models) this.assertKind(input.provider, m.kind);
     const seen = new Set<string>();

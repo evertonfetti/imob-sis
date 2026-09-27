@@ -1,8 +1,13 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { HeartbeatResponse, LicenseStatus, PlanLimits, UsageCounts } from '@imob/types';
+import { AppException } from '../common/app-exception';
 import { ENV, Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
+
+const LIMIT_LABELS: Record<Exclude<keyof PlanLimits, 'aiAgent' | 'maxWhatsappSendsMonth'>, string> = {
+  maxUsers: 'usuários', maxProperties: 'imóveis', maxBranches: 'filiais', maxSocialAccounts: 'contas de redes sociais', maxAiAccounts: 'contas de IA',
+};
 
 /** Estado em memória, consultado a cada requisição (barato) — a versão persistida no banco é só para sobreviver a reinícios. */
 export interface LicenseState {
@@ -37,6 +42,25 @@ export class LicenseService implements OnModuleInit, OnModuleDestroy {
 
   isBlocked(): boolean {
     return this.enabled && !this.state.ok;
+  }
+
+  /**
+   * Fase 3: limite do plano. Sem licenciamento (instalação não revendida), nunca bloqueia — os limites só
+   * valem para quem está de fato licenciado. `adding` é quantos registros a operação está tentando criar
+   * de uma vez (1 para a maioria dos casos; mais de 1 para uma ativação em lote).
+   */
+  assertLimit(key: keyof typeof LIMIT_LABELS, currentCount: number, adding = 1): void {
+    if (!this.enabled) return;
+    const max = this.state.limits[key];
+    if (max == null) return;
+    if (currentCount + adding > max) {
+      throw new AppException('LICENSE_LIMIT_REACHED', 403, `O plano contratado permite até ${max} ${LIMIT_LABELS[key]}. Fale com o suporte para aumentar o limite.`);
+    }
+  }
+
+  /** Recurso liga/desliga (não é uma contagem): sem licenciamento, sempre liberado. */
+  hasFeature(key: 'aiAgent'): boolean {
+    return !this.enabled || this.state.limits[key] === true;
   }
 
   async onModuleInit() {

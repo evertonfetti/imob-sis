@@ -3,7 +3,7 @@
 Monorepo (pnpm) — NestJS + Fastify + Prisma/PostgreSQL, admin em React/Vite e site em Next.js.
 Roadmap e escopo: fundação → imóveis → fotos → site → CRM → WhatsApp → marketing → IA → comercial → SaaS.
 
-**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas). Bloco 11 (SaaS) — Fases 1 e 2 concluídas: servidor de licenças, painel master, bloqueio por licença na instalação do cliente e cobrança automática via Mercado Pago (Pix, boleto e cartão) — veja a seção "Licenciamento" abaixo. Fase 3 (limites de plano aplicados a cada recurso do sistema) ainda não implementada.
+**Status:** Blocos 1 a 10 e IA de imagens concluídos — fundação (auth, RBAC, multiempresa, auditoria), imóveis/proprietários/catálogo, fotos, site público, CRM, WhatsApp (API oficial da Meta) e marketing (campanhas, Pixel e Conversions API) publicação/agendamento no Instagram e Facebook comercial (visitas, agenda e propostas) e inteligência (score, matching, relatórios e alertas). **Bloco 11 (SaaS) completo** — servidor de licenças, painel master, bloqueio por licença na instalação do cliente, cobrança automática via Mercado Pago (Pix, boleto e cartão) e limites de plano aplicados nos pontos reais do sistema (usuários, imóveis, contas de redes sociais/IA, agente de atendimento) — veja a seção "Licenciamento" abaixo.
 
 ```
 apps/api        NestJS + Fastify (API /api/v1)
@@ -182,3 +182,11 @@ cada instalação.
   fatura avulsa a qualquer momento.
 - Configure em developers.mercadopago.com.br → Suas integrações: o `MP_ACCESS_TOKEN` de produção e, em
   "Webhooks", a assinatura secreta (`MP_WEBHOOK_SECRET`) — sem ela, notificações são recusadas por segurança.
+
+**Limites do plano (Fase 3):** aplicados na própria instalação do cliente (`apps/api`), só quando ela está de
+fato licenciada (`LICENSE_SERVER_URL`/`LICENSE_KEY` preenchidos) — sem isso, nenhum limite existe, é o
+comportamento de sempre. Recursos limitados hoje: **usuários** (`maxUsers`), **imóveis** (`maxProperties`),
+**contas de redes sociais** (`maxSocialAccounts`), **contas de IA** (`maxAiAccounts`) e o **agente de
+atendimento por IA** (`aiAgent`, liga/desliga). Atingir o limite bloqueia só criar um novo registro — nada do
+que já existe é afetado — com uma mensagem explicando o limite do plano. `maxWhatsappSendsMonth` e `maxBranches`
+continuam só informativos (aparecem no uso reportado, mas nada bloqueia ainda).

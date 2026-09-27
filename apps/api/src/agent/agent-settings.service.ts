@@ -4,13 +4,14 @@ import { AiSettingsService, monthStart } from '../ai/ai-settings.service';
 import { AuditService } from '../audit/audit.service';
 import { AppException } from '../common/app-exception';
 import type { AuthedCtx } from '../common/request-context';
+import { LicenseService } from '../license/license.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationsService } from '../whatsapp/integrations.service';
 
 /** Configuração do agente de atendimento por IA (por empresa). */
 @Injectable()
 export class AgentSettingsService {
-  constructor(private readonly prisma: PrismaService, private readonly ai: AiSettingsService, private readonly audit: AuditService, private readonly whatsapp: IntegrationsService) {}
+  constructor(private readonly prisma: PrismaService, private readonly ai: AiSettingsService, private readonly audit: AuditService, private readonly whatsapp: IntegrationsService, private readonly license: LicenseService) {}
 
   async get(companyId: string): Promise<AgentSettings> {
     const c = await this.prisma.company.findUnique({ where: { id: companyId }, select: { agentSettings: true } });
@@ -39,6 +40,9 @@ export class AgentSettingsService {
     const { companyId } = ctx.user;
     const before = await this.get(companyId);
     const next = { ...before, ...input };
+    if (input.enabled && !before.enabled && !this.license.hasFeature('aiAgent')) {
+      throw new AppException('LICENSE_LIMIT_REACHED', 403, 'O plano contratado não inclui o agente de atendimento por IA. Fale com o suporte.');
+    }
     if (next.modelId && !(await this.ai.textChoice(companyId, next.modelId))) throw new AppException('AGENT_MODEL_INVALID', 400);
     if (next.enabled && !next.modelId) throw new AppException('AGENT_MODEL_REQUIRED', 400);
     await this.prisma.company.update({ where: { id: companyId }, data: { agentSettings: next } });

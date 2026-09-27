@@ -6,6 +6,7 @@ import { AppException, notFound } from '../common/app-exception';
 import { decryptJson, encryptJson, secretKeyFor } from '../common/crypto';
 import type { AuthedCtx } from '../common/request-context';
 import { ENV, Env } from '../config/env';
+import { LicenseService } from '../license/license.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialApiError, SocialGraph } from './social.client';
 
@@ -21,7 +22,7 @@ export class SocialAccountsService {
   private readonly log = new Logger('SocialAccounts');
   private readonly key: Buffer;
 
-  constructor(@Inject(ENV) private readonly env: Env, private readonly prisma: PrismaService, private readonly audit: AuditService) {
+  constructor(@Inject(ENV) private readonly env: Env, private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly license: LicenseService) {
     this.key = secretKeyFor(env);
   }
 
@@ -211,6 +212,7 @@ export class SocialAccountsService {
     const { companyId } = ctx.user;
     const chosen = await this.prisma.socialAccount.findMany({ where: { id: { in: ids }, companyId, connectedById: ctx.user.id, status: 'PENDING' } }); // só as contas que você acabou de conectar
     if (chosen.length !== new Set(ids).size) throw new AppException('SOCIAL_ACCOUNT_INVALID', 400);
+    if (chosen.length) this.license.assertLimit('maxSocialAccounts', await this.prisma.socialAccount.count({ where: { companyId, status: 'ACTIVE' } }), chosen.length);
     await this.prisma.$transaction([
       this.prisma.socialAccount.updateMany({ where: { id: { in: ids }, companyId, connectedById: ctx.user.id }, data: { status: 'ACTIVE' } }),
       this.prisma.socialAccount.deleteMany({ where: { companyId, connectedById: ctx.user.id, status: 'PENDING', id: { notIn: ids } } }),

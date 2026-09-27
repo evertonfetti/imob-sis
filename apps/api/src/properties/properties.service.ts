@@ -6,6 +6,7 @@ import { AuditService, diff, sanitize } from '../audit/audit.service';
 import { AppException, notFound } from '../common/app-exception';
 import type { AuthedCtx, AuthedUser } from '../common/request-context';
 import { blankToNull } from '../common/util';
+import { LicenseService } from '../license/license.service';
 import { MediaService } from '../media/media.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -58,6 +59,7 @@ export class PropertiesService {
     private readonly storage: StorageService,
     private readonly mediaService: MediaService,
     private readonly events: EventEmitter2,
+    private readonly license: LicenseService,
   ) {}
 
   /** Resposta da API: adiciona a URL da capa (miniatura) e o total de mídias. */
@@ -184,6 +186,7 @@ export class PropertiesService {
     await this.assertRefs(companyId, input);
     this.assertPrices(input);
     if (input.status === 'ARCHIVED') throw new AppException('PROPERTY_STATUS_INVALID', 400);
+    this.license.assertLimit('maxProperties', await this.prisma.property.count({ where: { companyId, status: { not: 'ARCHIVED' } } }));
 
     const { featureIds = [], ...fields } = input;
     const created = await this.prisma.$transaction(async (tx) => {

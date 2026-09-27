@@ -66,4 +66,42 @@ describe('LicenseService', () => {
     expect(svc.isBlocked()).toBe(true);
     expect(svc.getState().message).toMatch(/suporte@teste.com/);
   });
+
+  describe('Fase 3: limites do plano', () => {
+    async function withLimits(limits: Record<string, unknown>) {
+      vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ status: 'ACTIVE', ok: true, planKey: 'x', planName: 'X', limits, message: null }), { status: 200 }));
+      const svc = new LicenseService(env(), fakePrisma({}));
+      await svc.onModuleInit();
+      return svc;
+    }
+
+    it('sem limite definido para o recurso, nunca bloqueia', async () => {
+      const svc = await withLimits({ maxUsers: 5 }); // maxSocialAccounts nem aparece
+      expect(() => svc.assertLimit('maxSocialAccounts', 999)).not.toThrow();
+    });
+
+    it('bloqueia exatamente ao atingir o limite (e libera um a menos)', async () => {
+      const svc = await withLimits({ maxSocialAccounts: 3 });
+      expect(() => svc.assertLimit('maxSocialAccounts', 2)).not.toThrow(); // 3ª conta: cabe
+      expect(() => svc.assertLimit('maxSocialAccounts', 3)).toThrow(); // 4ª conta: não cabe
+    });
+
+    it('lote (adding > 1): considera todas de uma vez, não uma por uma', async () => {
+      const svc = await withLimits({ maxSocialAccounts: 5 });
+      expect(() => svc.assertLimit('maxSocialAccounts', 3, 2)).not.toThrow(); // 3 existentes + 2 novas = 5: cabe
+      expect(() => svc.assertLimit('maxSocialAccounts', 3, 3)).toThrow(); // 3 + 3 = 6: não cabe
+    });
+
+    it('recurso liga/desliga (aiAgent): ausente bloqueia, true libera', async () => {
+      expect((await withLimits({})).hasFeature('aiAgent')).toBe(false);
+      expect((await withLimits({ aiAgent: true })).hasFeature('aiAgent')).toBe(true);
+    });
+
+    it('sem licenciamento, nem limite nem recurso liga/desliga bloqueiam', async () => {
+      const svc = new LicenseService(env({ LICENSE_SERVER_URL: undefined }), fakePrisma({}));
+      await svc.onModuleInit();
+      expect(() => svc.assertLimit('maxUsers', 999_999)).not.toThrow();
+      expect(svc.hasFeature('aiAgent')).toBe(true);
+    });
+  });
 });

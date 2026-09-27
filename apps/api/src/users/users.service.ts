@@ -4,6 +4,7 @@ import type { CreateUserInput, Pagination, UpdateUserInput } from '@imob/types';
 import { AuditService, diff, sanitize } from '../audit/audit.service';
 import { AppException, notFound } from '../common/app-exception';
 import type { AuthedCtx } from '../common/request-context';
+import { LicenseService } from '../license/license.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const include = { role: true, branch: { select: { id: true, name: true } } } as const;
@@ -15,7 +16,7 @@ function present(u: { passwordHash: string; role: { key: string; name: string } 
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly license: LicenseService) {}
 
   async list(companyId: string, q: Pagination) {
     const where = {
@@ -70,6 +71,7 @@ export class UsersService {
     if (await this.prisma.user.findUnique({ where: { email: input.email } })) {
       throw new AppException('USER_EMAIL_TAKEN', 409);
     }
+    this.license.assertLimit('maxUsers', await this.prisma.user.count({ where: { companyId, status: 'ACTIVE' } }));
     const created = await this.prisma.user.create({
       data: {
         companyId,
