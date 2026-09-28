@@ -222,7 +222,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* overflow: auto é uma rede de segurança — com o corpo da página travado enquanto o visualizador está aberto,
    sem isso uma foto que não coubesse (proporção incomum, navegador antigo) ficaria cortada e sem jeito de ver o resto. */
 .lb-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 0 64px; overflow: auto; overscroll-behavior: contain; }
-.lb-stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 6px; }
+.lb-stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 6px; cursor: zoom-in; }
+/* Tamanho real: sai do "encaixar e centralizar" (que corta o alcance da rolagem) para um bloco simples que
+   rola normalmente a partir do canto superior esquerdo — assim dá para chegar em qualquer parte da foto. */
+.lb-stage.zoomed { display: block; padding: 0; }
+.lb-stage.zoomed img { max-width: none; max-height: none; border-radius: 0; cursor: zoom-out; margin: auto; }
+@media (max-width: 640px) { .lb-stage.zoomed { padding-top: 0; } }
 .lb-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgb(255 255 255 / .12); color: #fff; cursor: pointer; }
 .lb-btn:hover { background: rgb(255 255 255 / .24); }
 .lb-btn svg { width: 22px; height: 22px; }
