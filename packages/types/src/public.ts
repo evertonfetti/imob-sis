@@ -131,7 +131,10 @@ export interface PublicMedia {
   caption: string | null;
   width: number | null;
   height: number | null;
+  /** Versão em alta (2400px), usada ao ampliar a foto. */
   url: string;
+  /** Versão de página (1600px): é a que o site carrega na galeria. */
+  mediumUrl: string;
   thumbnailUrl: string | null;
   /** Foto editada por IA: o site avisa o visitante. */
   aiModified: boolean;

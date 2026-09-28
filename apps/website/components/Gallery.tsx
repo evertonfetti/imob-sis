@@ -48,7 +48,8 @@ export function Gallery({ media, title }: { media: PublicMedia[]; title: string 
     <>
       <div className="gallery">
         <button type="button" className="g-main" onClick={() => setOpen(0)} aria-label={`Ampliar fotos de ${title}`}>
-          <img src={media[0]!.url} alt={media[0]!.caption ?? title} fetchPriority="high" />
+          {/* Na página vai a versão de 1600px; a de 2400px só ao ampliar. */}
+          <img src={media[0]!.mediumUrl} alt={media[0]!.caption ?? title} fetchPriority="high" />
           {media[0]!.aiModified && <span className="g-ai">Imagem editada digitalmente</span>}
           {n > 1 && <span className="g-count"><Images />{n} fotos</span>}
         </button>

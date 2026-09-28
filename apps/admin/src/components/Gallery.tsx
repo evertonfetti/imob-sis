@@ -151,7 +151,8 @@ export function Gallery({ propertyId }: { propertyId: string }) {
                   onDragEnd={() => { setDragId(null); if (!reorder.isPending) setOrder(null); }}>
                   <div className="tile-img">
                     {(m.type === 'IMAGE' || m.type === 'TOUR_360' || m.contentType.startsWith('image/')) && (m.thumbnailUrl || m.processedUrl) ? (
-                      <img src={(m.isCover ? m.processedUrl : m.thumbnailUrl) ?? m.thumbnailUrl ?? m.processedUrl!} alt={m.caption ?? `Foto ${i + 1}`} loading="lazy" draggable={false} />
+                      /* A capa aparece maior e sem corte, então usa a versão de página (1600px) — nunca a de 2400px. */
+                      <img src={(m.isCover ? m.mediumUrl ?? m.processedUrl : m.thumbnailUrl) ?? m.thumbnailUrl ?? m.processedUrl!} alt={m.caption ?? `Foto ${i + 1}`} loading="lazy" draggable={false} />
                     ) : (
                       <div className="tile-file">{m.type === 'VIDEO' ? <Film /> : <FileText />}<span>{m.filename ?? MEDIA_TYPE_LABELS[m.type]}</span></div>
                     )}

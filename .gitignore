@@ -8,3 +8,6 @@ packages/database/src/generated
 packages/license-database/src/generated
 .turbo
 .data
+
+# Cache incremental do TypeScript: não deve ir para o repositório.
+*.tsbuildinfo

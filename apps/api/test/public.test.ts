@@ -1,7 +1,8 @@
 import { createPrismaClient } from '@imob/database';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { auth, bootApp, login, resetAndSeed, uploadPhoto } from './helpers';
+import sharp from 'sharp';
+import { auth, bootApp, login, makeImage, resetAndSeed, uploadPhoto } from './helpers';
 
 let app: NestFastifyApplication;
 let admin: { accessToken: string; user: { companyId: string } };
@@ -82,6 +83,31 @@ describe('site público: dados expostos', () => {
     await call('POST', `/properties/${p.id}/unpublish`, admin.accessToken);
     expect((await pub(`/properties/${p.slug}`)).statusCode).toBe(404);
     expect((await pub('/properties/nao-existe')).statusCode).toBe(404);
+  });
+
+  it('foto grande sai em três tamanhos: 1600px na página, 2400px ao ampliar e miniatura na capa', async () => {
+    const p = await makeProperty({ title: 'Casa Foto Grande' }, { publish: false, photo: false });
+    await uploadPhoto(app, admin.accessToken, p.id, { buffer: await makeImage(3000, 2000, 'jpeg'), contentType: 'image/jpeg' });
+    await call('POST', `/properties/${p.id}/publish`, admin.accessToken);
+    const detail = (await pub(`/properties/${p.slug}`)).json();
+    const [m] = detail.media;
+    expect(m.mediumUrl).not.toBe(m.url);
+
+    const side = async (url: string) => {
+      const res = await app.inject({ method: 'GET', url: new URL(url, 'http://x').pathname });
+      expect(res.headers['content-type']).toBe('image/webp');
+      const meta = await sharp(res.rawPayload).metadata();
+      return Math.max(meta.width!, meta.height!);
+    };
+    expect(await side(m.mediumUrl)).toBe(1600);
+    expect(await side(m.url)).toBe(2400);
+    // A capa da listagem nunca usa a versão em alta: miniatura de 480px e, no srcSet, a de página.
+    expect(detail.coverFullUrl).toBe(m.mediumUrl);
+
+    // Foto menor que 1600px não ganha arquivo intermediário: a versão publicada já é leve.
+    const q = await makeProperty({ title: 'Casa Foto Pequena' });
+    const small = (await pub(`/properties/${q.slug}`)).json().media[0];
+    expect(small.mediumUrl).toBe(small.url);
   });
 });
 

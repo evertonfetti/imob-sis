@@ -6,11 +6,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { stamp } from './watermark';
 import { StorageService } from '../storage/storage.service';
 
-const MAX_SIDE = 2400;   // maior lado da versão publicada
+const MAX_SIDE = 2400;    // maior lado da versão em alta, aberta só no zoom da foto
+const MEDIUM_SIDE = 1600; // versão servida nas páginas do site: mesma nitidez na tela, arquivo bem mais leve
 const THUMB = { width: 480, height: 360 };
 
 /**
- * Pipeline de imagem: original (ou versão de IA aprovada) → versão otimizada (WebP) + miniatura (WebP).
+ * Pipeline de imagem: original (ou versão de IA aprovada) → versão em alta (WebP) + versão de página + miniatura.
  */
 @Injectable()
 export class MediaProcessor {
@@ -60,19 +61,25 @@ export class MediaProcessor {
     const v = Date.now().toString(36); // chave nova a cada versão: navegador e CDN nunca servem a foto antiga
     const processedKey = `${base}/processed/${id}.${v}.webp`;
     const thumbnailKey = `${base}/thumb/${id}.${v}.webp`;
+    // Foto menor que a versão de página não ganha um arquivo intermediário: a publicada já é leve.
+    const bigger = resized.info.width > MEDIUM_SIDE || resized.info.height > MEDIUM_SIDE;
+    const mediumKey = bigger ? `${base}/medium/${id}.${v}.webp` : processedKey;
     await this.storage.write(processedKey, data, 'image/webp');
     await this.storage.write(thumbnailKey, thumb, 'image/webp');
+    // Reduz a partir da versão já carimbada: a marca d'água encolhe junto, na mesma proporção.
+    if (bigger) await this.storage.write(mediumKey, await sharp(full).resize({ width: MEDIUM_SIDE, height: MEDIUM_SIDE, fit: 'inside' }).webp({ quality: 80 }).toBuffer(), 'image/webp');
 
     await this.prisma.propertyMedia.update({
       where: { id: mediaId },
       data: {
-        status: 'READY', processedKey, thumbnailKey, width: resized.info.width, height: resized.info.height, processingError: null,
+        status: 'READY', processedKey, mediumKey, thumbnailKey, width: resized.info.width, height: resized.info.height, processingError: null,
         socialKey: null, // a versão JPEG do Instagram é refeita a partir desta
         watermarkRevision: useMark ? (company?.watermarkRevision ?? 0) : null, renderedGenerationId: gen?.id ?? null,
       },
     });
     // Só agora os arquivos da versão anterior podem sair.
-    for (const old of [media.processedKey, media.thumbnailKey, media.socialKey]) if (old && old !== processedKey && old !== thumbnailKey) await this.storage.delete(old).catch(() => undefined);
+    const keeping = [processedKey, mediumKey, thumbnailKey];
+    for (const old of [media.processedKey, media.mediumKey, media.thumbnailKey, media.socialKey]) if (old && !keeping.includes(old)) await this.storage.delete(old).catch(() => undefined);
   }
 
   async markFailed(mediaId: string, error: unknown) {

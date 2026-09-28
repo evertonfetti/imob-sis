@@ -7,6 +7,7 @@ import { Footer } from '@/components/Footer';
 import { ConsentBanner } from '@/components/ConsentBanner';
 import { Header } from '@/components/Header';
 import { MetaPixel } from '@/components/MetaPixel';
+import { PhotoGuard } from '@/components/PhotoGuard';
 import { TrackingCapture } from '@/components/TrackingCapture';
 import { getCompany } from '@/lib/api';
 import { siteUrl } from '@/lib/site';
@@ -46,6 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main>{children}</main>
         <Footer company={c} />
         <TrackingCapture />
+        <PhotoGuard />
         {c.metaPixelId && <><MetaPixel pixelId={c.metaPixelId} /><ConsentBanner /></>}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(org) }} />
       </body>

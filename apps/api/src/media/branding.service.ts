@@ -20,9 +20,11 @@ export class BrandingService {
     private readonly prisma: PrismaService, private readonly storage: StorageService, private readonly queue: MediaQueue, private readonly audit: AuditService,
   ) {}
 
+  /** Fotos que precisam ser geradas de novo: marca d'água de uma versão anterior, ou sem a versão de página (1600px). */
   private outdatedWhere(companyId: string, enabled: boolean, revision: number) {
     const target = enabled ? revision : null;
-    return { companyId, type: 'IMAGE' as const, status: 'READY' as const, ...(target === null ? { watermarkRevision: { not: null } } : { OR: [{ watermarkRevision: null }, { watermarkRevision: { not: target } }] }) };
+    const watermark = target === null ? { watermarkRevision: { not: null } } : { OR: [{ watermarkRevision: null }, { watermarkRevision: { not: target } }] };
+    return { companyId, type: 'IMAGE' as const, status: 'READY' as const, OR: [{ mediumKey: null }, watermark] };
   }
 
   async get(companyId: string): Promise<WatermarkDto> {

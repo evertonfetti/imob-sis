@@ -71,6 +71,8 @@ export interface MediaItem {
   processingError: string | null;
   originalUrl: string;
   processedUrl: string | null;
+  /** Versão de página (1600px): suficiente para ver a foto na tela, sem baixar a de 2400px. */
+  mediumUrl: string | null;
   thumbnailUrl: string | null;
   createdAt: string;
 }

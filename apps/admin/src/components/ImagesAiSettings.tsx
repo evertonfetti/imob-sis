@@ -97,17 +97,16 @@ export function WatermarkCard() {
             </>
           )}
         </div>
-        {d.hasLogo && (
-          <div className="toolbar" style={{ justifyContent: 'space-between', marginTop: 18, flexWrap: 'wrap' }}>
-            <div className="card-sub">
-              {d.outdatedPhotos ? <><strong>{d.outdatedPhotos}</strong> de {d.totalPhotos} fotos ainda estão com a versão anterior.</> : `${d.totalPhotos} ${d.totalPhotos === 1 ? 'foto' : 'fotos'} — todas atualizadas.`} Fotos novas já saem certas.
-            </div>
-            <div className="toolbar">
-              <Button type="button" onClick={() => apply.mutate()} disabled={apply.isPending || !d.outdatedPhotos || changed}>Aplicar nas fotos existentes</Button>
-              <Button type="button" variant="primary" onClick={() => save.mutate()} disabled={!changed || save.isPending}>{save.isPending ? 'Salvando…' : 'Salvar'}</Button>
-            </div>
+        {/* Vale mesmo sem logo: fotos antigas também são reprocessadas aqui para ganhar a versão leve usada no site. */}
+        <div className="toolbar" style={{ justifyContent: 'space-between', marginTop: 18, flexWrap: 'wrap' }}>
+          <div className="card-sub">
+            {d.outdatedPhotos ? <><strong>{d.outdatedPhotos}</strong> de {d.totalPhotos} fotos ainda estão com a versão anterior.</> : `${d.totalPhotos} ${d.totalPhotos === 1 ? 'foto' : 'fotos'} — todas atualizadas.`} Fotos novas já saem certas.
           </div>
-        )}
+          <div className="toolbar">
+            <Button type="button" onClick={() => apply.mutate()} disabled={apply.isPending || !d.outdatedPhotos || changed}>Atualizar fotos existentes</Button>
+            {d.hasLogo && <Button type="button" variant="primary" onClick={() => save.mutate()} disabled={!changed || save.isPending}>{save.isPending ? 'Salvando…' : 'Salvar'}</Button>}
+          </div>
+        </div>
       </div>
       {toast.node}
     </section>

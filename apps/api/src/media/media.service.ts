@@ -38,6 +38,7 @@ export class MediaService {
       originalUrl: this.storage.publicUrl(m.originalKey),
       // Vídeos/PDFs não passam pelo pipeline: a versão publicada é o próprio arquivo.
       processedUrl: url(m.processedKey) ?? (m.status === 'READY' && !processable ? this.storage.publicUrl(m.originalKey) : null),
+      mediumUrl: url(m.mediumKey ?? m.processedKey),
       thumbnailUrl: url(m.thumbnailKey),
       createdAt: m.createdAt.toISOString(),
     };

@@ -23,7 +23,7 @@ const clean = (v: string | null | undefined) => (v && v.trim() ? v.trim().slice(
 
 const coverInclude = {
   type: { select: { name: true } },
-  media: { where: { isCover: true, status: 'READY' as const }, take: 1, select: { thumbnailKey: true, processedKey: true } },
+  media: { where: { isCover: true, status: 'READY' as const }, take: 1, select: { thumbnailKey: true, mediumKey: true, processedKey: true } },
 } as const;
 
 type CardRow = Record<string, any>;
@@ -50,7 +50,8 @@ export class PublicService {
       bedrooms: p.bedrooms, suites: p.suites, bathrooms: p.bathrooms, parkingSpaces: p.parkingSpaces,
       totalArea: num(p.totalArea), usefulArea: num(p.usefulArea),
       neighborhood: p.neighborhood, city: p.city, state: p.state, featured: p.featured,
-      coverUrl: url(cover?.thumbnailKey ?? cover?.processedKey), coverFullUrl: url(cover?.processedKey ?? cover?.thumbnailKey),
+      // A capa grande é a versão de página (1600px), não a de 2400px: nenhuma tela do site mostra a capa maior que isso.
+      coverUrl: url(cover?.thumbnailKey ?? cover?.processedKey), coverFullUrl: url(cover?.mediumKey ?? cover?.processedKey ?? cover?.thumbnailKey),
       publishedAt: p.publishedAt?.toISOString() ?? null,
     };
   }
@@ -165,6 +166,8 @@ export class PublicService {
         .map((m) => ({
           id: m.id, type: m.type, caption: m.caption, width: m.width, height: m.height,
           url: this.storage.publicUrl(m.processedKey ?? m.originalKey),
+          // Fotos enviadas antes desta versão ainda não têm o arquivo de 1600px: até serem reprocessadas, seguem na de 2400px.
+          mediumUrl: this.storage.publicUrl(m.mediumKey ?? m.processedKey ?? m.originalKey),
           thumbnailUrl: m.thumbnailKey ? this.storage.publicUrl(m.thumbnailKey) : null,
           aiModified: m.aiModified,
         })),

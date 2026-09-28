@@ -13,7 +13,7 @@ export function PropertyCard({ p, prefer, priority }: { p: PublicPropertyCard; p
         {p.coverUrl ? (
           <img
             src={p.coverUrl}
-            srcSet={p.coverFullUrl && p.coverFullUrl !== p.coverUrl ? `${p.coverUrl} 480w, ${p.coverFullUrl} 2400w` : undefined}
+            srcSet={p.coverFullUrl && p.coverFullUrl !== p.coverUrl ? `${p.coverUrl} 480w, ${p.coverFullUrl} 1600w` : undefined}
             sizes="(min-width: 1040px) 400px, (min-width: 620px) 46vw, 92vw"
             alt={p.title}
             loading={priority ? 'eager' : 'lazy'}
