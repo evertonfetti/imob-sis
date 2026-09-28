@@ -219,14 +219,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (max-width: 640px) { .g-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } .g-strip .g-thumb:nth-child(n+4) { display: none; } .g-main { border-radius: 16px; height: auto; aspect-ratio: 4 / 3; } }
 .lightbox { position: fixed; inset: 0; height: 100dvh; z-index: 100; background: rgb(15 18 17 / .96); display: grid; grid-template-rows: auto 1fr auto; color: #f2f1ec; }
 .lb-top { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; font-size: 14px; }
-/* overflow: auto é uma rede de segurança — com o corpo da página travado enquanto o visualizador está aberto,
-   sem isso uma foto que não coubesse (proporção incomum, navegador antigo) ficaria cortada e sem jeito de ver o resto. */
-.lb-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 0 64px; overflow: auto; overscroll-behavior: contain; }
-.lb-stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 6px; cursor: zoom-in; }
+/* Ajustada à tela: sempre encaixa, sem barra de rolagem. Flexbox de propósito, não grid: um grid sem
+   colunas/linhas explícitas dimensiona a área da foto pelo conteúdo dela mesma, e "max-height: 100%"
+   vira uma referência circular que o navegador ignora — a foto passa a respeitar só a largura e pode
+   ficar mais alta que a tela. Flex não tem esse problema. */
+.lb-stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 0 64px; overflow: hidden; }
+.lb-stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; border-radius: 6px; }
+.lb-stage img.can-zoom { cursor: zoom-in; }
 /* Tamanho real: sai do "encaixar e centralizar" (que corta o alcance da rolagem) para um bloco simples que
    rola normalmente a partir do canto superior esquerdo — assim dá para chegar em qualquer parte da foto. */
-.lb-stage.zoomed { display: block; padding: 0; }
-.lb-stage.zoomed img { max-width: none; max-height: none; border-radius: 0; cursor: zoom-out; margin: auto; }
+.lb-stage.zoomed { display: block; padding: 0; overflow: auto; overscroll-behavior: contain; }
+.lb-stage.zoomed img { max-width: none; max-height: none; border-radius: 0; margin: auto; }
+.lb-stage.zoomed img.can-zoom { cursor: zoom-out; }
 @media (max-width: 640px) { .lb-stage.zoomed { padding-top: 0; } }
 .lb-btn { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgb(255 255 255 / .12); color: #fff; cursor: pointer; }
 .lb-btn:hover { background: rgb(255 255 255 / .24); }
