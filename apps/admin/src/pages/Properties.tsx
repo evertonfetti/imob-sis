@@ -1,8 +1,9 @@
 import { PROPERTY_PURPOSES, PURPOSE_LABELS, STATUS_LABELS, type Paginated, type PropertyStatus } from '@imob/types';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Home, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ImportExportButtons } from '../components/ImportExport';
 import { Badge, Button, Empty, Input, PageHeader, Select, SkeletonRows } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -33,6 +34,7 @@ export function statusBadge(p: { status: PropertyStatus }) {
 
 export function Properties() {
   const nav = useNavigate();
+  const qc = useQueryClient();
   const { can } = useAuth();
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
@@ -51,7 +53,10 @@ export function Properties() {
   return (
     <>
       <PageHeader title="Imóveis" subtitle="Todo o portfólio em um só lugar."
-        actions={can('property.create') && <Button variant="primary" onClick={() => nav('/imoveis/novo')}><Plus /> Novo imóvel</Button>} />
+        actions={can('property.create') && <>
+          <ImportExportButtons path="/properties" label="Imóveis" onImported={() => qc.invalidateQueries({ queryKey: ['properties'] })} />
+          <Button variant="primary" onClick={() => nav('/imoveis/novo')}><Plus /> Novo imóvel</Button>
+        </>} />
       <div className="seg" role="tablist">
         {TABS.map((t) => (
           <button key={t.key} role="tab" className={tab === t.key ? 'active' : ''} onClick={() => { setTab(t.key); reset(); }}>

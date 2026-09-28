@@ -97,3 +97,34 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
 
 export const publicApi = <T = unknown>(path: string, body?: unknown, method = 'POST') =>
   raw(path, { method, body: body === undefined ? undefined : JSON.stringify(body) }) as Promise<T>;
+
+/** Baixa um arquivo (ex.: planilha de exportação) autenticado e dispara o download no navegador. */
+export async function apiDownload(path: string, fallbackFilename: string): Promise<void> {
+  const call = async (token: string | null) => {
+    const headers = new Headers();
+    if (token) headers.set('authorization', `Bearer ${token}`);
+    const res = await fetch(BASE + path, { headers });
+    if (!res.ok) {
+      const data = await res.json().catch(() => undefined);
+      const e = (data ?? {}) as Partial<ApiErrorBody>;
+      throw new ApiError(res.status, e.code ?? 'HTTP_ERROR', e.message ?? 'Não foi possível baixar o arquivo.', e.requestId, e.details);
+    }
+    return res;
+  };
+  const s = session.get();
+  let res: Response;
+  try {
+    res = await call(s?.accessToken ?? null);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401 && s) res = await call((await refresh()).accessToken);
+    else throw e;
+  }
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackFilename;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}

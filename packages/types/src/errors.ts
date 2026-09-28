@@ -114,6 +114,9 @@ export const ERROR_CODES = {
   BILLING_INVOICE_OPEN: 'Já existe uma fatura em aberto para esta licença.',
   BILLING_INVOICE_INVALID: 'Fatura não encontrada.',
   BILLING_WEBHOOK_INVALID: 'Notificação do Mercado Pago inválida.',
+  // Importação/exportação em planilha
+  IMPORT_FILE_INVALID: 'Não foi possível ler a planilha. Envie um arquivo .xlsx válido, no formato do modelo.',
+  IMPORT_EMPTY: 'A planilha não tem nenhuma linha para importar.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente.',
 } as const;
 

@@ -6,6 +6,7 @@ import { type ChatMessage } from '../ai/text/text-provider';
 import { ENV, Env } from '../config/env';
 import { CrmEvents } from '../crm/crm.events';
 import { TasksService } from '../crm/tasks.service';
+import { parseMoney } from '../common/util';
 import { MatchingService } from '../intelligence/matching.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -20,17 +21,6 @@ const PROPERTY_CODE = /\bIM\d{4,}\b/gi;
 const HUMAN_REQUEST = /\b(atendente|humano|pessoa de verdade|(falar|conversar) com (um |uma |o |a )?(corretor|corretora|atendente|pessoa|humano|alguem)|quero (um|uma) (corretor|corretora)|chama(r)? (um |o |a )?(corretor|corretora))\b/;
 const VISIBLE = { published: true, status: { in: ['AVAILABLE', 'RESERVED'] as ('AVAILABLE' | 'RESERVED')[] } };
 const brl = (v: unknown) => (v == null ? null : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).replace(/\u00a0/g, ' '));
-/** "500.000", "R$ 1.500,50", 350000 → número (formato brasileiro: ponto separa milhar, vírgula os centavos). */
-export function parseMoney(v: unknown): number | null {
-  if (typeof v === 'number') return Number.isFinite(v) && v > 0 && v < 1e10 ? v : null;
-  if (typeof v !== 'string') return null;
-  let s = v.replace(/[^\d.,]/g, '');
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
-  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
-  const n = Number(s);
-  return Number.isFinite(n) && n > 0 && n < 1e10 ? n : null;
-}
-
 export interface AgentAction { type: 'send_photos' | 'handoff' | 'update_lead' | 'request_visit'; propertyCode?: string; max?: number; reason?: string; fields?: Record<string, unknown>; preferredTime?: string }
 interface Thought { reply: string; actions: AgentAction[]; inputTokens: number; outputTokens: number; costUsd: number; sources: { document: string; excerpt: string }[] }
 

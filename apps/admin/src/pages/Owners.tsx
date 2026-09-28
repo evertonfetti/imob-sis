@@ -1,7 +1,8 @@
-import { OWNER_TYPES, type OwnerInput, type Paginated } from '@imob/types';
+import { OWNER_TYPES, OWNER_TYPE_LABELS, type OwnerInput, type Paginated } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, UserRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { ImportExportButtons } from '../components/ImportExport';
 import { Badge, Button, Empty, Field, Input, Modal, PageHeader, Select, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -35,7 +36,10 @@ export function Owners() {
   return (
     <>
       <PageHeader title="Proprietários" subtitle="Quem é dono dos imóveis que você administra."
-        actions={can('property.create') && <Button variant="primary" onClick={() => setEditing('new')}><Plus /> Novo proprietário</Button>} />
+        actions={can('property.create') && <>
+          <ImportExportButtons path="/owners" label="Proprietários" onImported={() => qc.invalidateQueries({ queryKey: ['owners'] })} />
+          <Button variant="primary" onClick={() => setEditing('new')}><Plus /> Novo proprietário</Button>
+        </>} />
       <div className="card">
         <div className="card-head">
           <div className="input-icon" style={{ width: 320, maxWidth: '100%' }}>
@@ -51,7 +55,7 @@ export function Owners() {
                 {d.items.map((o) => (
                   <tr key={o.id}>
                     <td><strong style={{ fontWeight: 500 }}>{o.name}</strong><div className="card-sub">{o.document ?? 'Sem documento'}</div></td>
-                    <td><Badge plain>{o.type === 'PERSON' ? 'Pessoa física' : 'Empresa'}</Badge></td>
+                    <td><Badge plain>{OWNER_TYPE_LABELS[o.type as 'PERSON' | 'COMPANY']}</Badge></td>
                     <td className="card-sub">{o.phone ?? o.whatsapp ?? o.email ?? '—'}</td>
                     <td>{[o.city, o.state].filter(Boolean).join(' / ') || '—'}</td>
                     <td>{o._count?.properties ?? 0}</td>
@@ -102,7 +106,7 @@ export function OwnerModal({ owner, onClose, onSaved }: { owner: Owner | null; o
       footer={<><Button type="button" onClick={onClose}>Cancelar</Button><Button variant="primary" form="owner-form" disabled={save.isPending}>{save.isPending ? 'Salvando…' : 'Salvar'}</Button></>}>
       <form id="owner-form" className="form-grid" onSubmit={submit}>
         {err != null && !Object.keys(fe).length && <div className="alert span-2">{errorMessage(err)}</div>}
-        <Field label="Tipo"><Select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value as 'PERSON' | 'COMPANY' })}>{OWNER_TYPES.map((t) => <option key={t} value={t}>{t === 'PERSON' ? 'Pessoa física' : 'Empresa'}</option>)}</Select></Field>
+        <Field label="Tipo"><Select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value as 'PERSON' | 'COMPANY' })}>{OWNER_TYPES.map((t) => <option key={t} value={t}>{OWNER_TYPE_LABELS[t]}</option>)}</Select></Field>
         <Field label={f.type === 'PERSON' ? 'CPF' : 'CNPJ'}><Input {...bind('document')} /></Field>
         <Field label="Nome" className="span-2" error={fe.name}><Input required {...bind('name')} /></Field>
         <Field label="E-mail" error={fe.email}><Input type="email" {...bind('email')} /></Field>

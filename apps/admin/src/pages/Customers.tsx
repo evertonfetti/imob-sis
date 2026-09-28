@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Contact, Plus, Search } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { ImportExportButtons } from '../components/ImportExport';
 import { StagePill } from '../components/crm';
 import { Badge, Button, Empty, Field, Input, Modal, PageHeader, SkeletonRows, errorMessage, fieldErrors, useToast } from '../components/ui';
 import { api } from '../lib/api';
@@ -17,6 +18,7 @@ interface CustomerDetail extends Customer {
 export function Customers() {
   const { can } = useAuth();
   const toast = useToast();
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<string | 'new' | null>(null);
@@ -30,7 +32,10 @@ export function Customers() {
   return (
     <>
       <PageHeader title="Clientes" subtitle="Todas as pessoas que já entraram em contato ou foram cadastradas."
-        actions={can('lead.create') && <Button variant="primary" onClick={() => setOpen('new')}><Plus /> Novo cliente</Button>} />
+        actions={can('lead.create') && <>
+          <ImportExportButtons path="/customers" label="Clientes" onImported={() => qc.invalidateQueries({ queryKey: ['customers'] })} />
+          <Button variant="primary" onClick={() => setOpen('new')}><Plus /> Novo cliente</Button>
+        </>} />
       <div className="card">
         <div className="card-head">
           <div className="input-icon" style={{ width: 320, maxWidth: '100%' }}><Search /><Input placeholder="Buscar por nome, telefone ou e-mail" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} /></div>

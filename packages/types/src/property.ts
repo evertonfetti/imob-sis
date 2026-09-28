@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const PROPERTY_PURPOSES = ['SALE', 'RENT', 'SALE_AND_RENT'] as const;
 export const PROPERTY_STATUSES = ['DRAFT', 'AVAILABLE', 'RESERVED', 'SOLD', 'RENTED', 'INACTIVE', 'ARCHIVED'] as const;
 export const OWNER_TYPES = ['PERSON', 'COMPANY'] as const;
+export const OWNER_TYPE_LABELS: Record<(typeof OWNER_TYPES)[number], string> = { PERSON: 'Pessoa física', COMPANY: 'Empresa' };
 
 export type PropertyPurpose = (typeof PROPERTY_PURPOSES)[number];
 export type PropertyStatus = (typeof PROPERTY_STATUSES)[number];

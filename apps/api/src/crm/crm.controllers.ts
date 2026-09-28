@@ -1,14 +1,17 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
-  assignLeadSchema, boardQuerySchema, changeStageSchema, createLeadSchema, createTaskSchema, customerSchema, listLeadsSchema, listTasksSchema,
+  assignLeadSchema, boardQuerySchema, changeStageSchema, createLeadSchema, createTaskSchema, customerSchema,
+  importConfirmSchema, importUploadSchema, listLeadsSchema, listTasksSchema,
   noteSchema, paginationSchema, updateCustomerSchema, updateLeadSchema, updateStageSchema, updateTaskSchema,
-  type AssignLeadInput, type ChangeStageInput, type CreateLeadInput, type CreateTaskInput, type CustomerInput, type ListLeadsQuery,
-  type Pagination, type UpdateLeadInput,
+  type AssignLeadInput, type ChangeStageInput, type CreateLeadInput, type CreateTaskInput, type CustomerInput,
+  type ImportConfirmInput, type ImportUploadInput, type ListLeadsQuery, type Pagination, type UpdateLeadInput,
 } from '@imob/types';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { RequirePermissions } from '../common/decorators';
 import { AuthedCtx, Ctx, ReqCtx } from '../common/request-context';
 import { ZodPipe } from '../common/zod.pipe';
+import { CustomersImportExportService } from './customers-import-export.service';
 import { CustomersService } from './customers.service';
 import { LeadsService } from './leads.service';
 import { PipelineService } from './pipeline.service';
@@ -16,6 +19,8 @@ import { TasksService } from './tasks.service';
 
 const uuid = new ParseUUIDPipe();
 const c = (ctx: ReqCtx) => ctx as AuthedCtx;
+const origin = (req: FastifyRequest) => `${req.protocol}://${req.headers.host}`;
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 @Controller('leads')
 export class LeadsController {
@@ -65,13 +70,34 @@ export class PipelineController {
 
 @Controller('customers')
 export class CustomersController {
-  constructor(private readonly customers: CustomersService) {}
+  constructor(private readonly customers: CustomersService, private readonly importExport: CustomersImportExportService) {}
 
   @Get() @RequirePermissions('lead.view')
   list(@Ctx() ctx: ReqCtx, @Query(new ZodPipe(paginationSchema)) q: Pagination): Promise<unknown> { return this.customers.list(ctx.user!, q); }
 
   @Post() @RequirePermissions('lead.create')
   create(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(customerSchema)) body: CustomerInput): Promise<unknown> { return this.customers.create(c(ctx), body); }
+
+  // ---------- Importar / exportar em planilha ----------
+  @Get('export') @RequirePermissions('lead.view')
+  async export(@Ctx() ctx: ReqCtx, @Res() reply: FastifyReply) {
+    const buf = await this.importExport.export(ctx.user!.companyId);
+    reply.header('content-type', XLSX).header('content-disposition', 'attachment; filename="clientes.xlsx"').send(buf);
+  }
+
+  @Get('import/template') @RequirePermissions('lead.view')
+  async importTemplate(@Res() reply: FastifyReply) {
+    const buf = await this.importExport.template();
+    reply.header('content-type', XLSX).header('content-disposition', 'attachment; filename="modelo-clientes.xlsx"').send(buf);
+  }
+
+  @Post('import/upload-url') @HttpCode(200) @RequirePermissions('lead.create')
+  importUploadUrl(@Ctx() ctx: ReqCtx, @Req() req: FastifyRequest, @Body(new ZodPipe(importUploadSchema)) body: ImportUploadInput): Promise<unknown> {
+    return this.importExport.createUpload(ctx.user!.companyId, body, origin(req));
+  }
+
+  @Post('import') @HttpCode(200) @RequirePermissions('lead.create')
+  import(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(importConfirmSchema)) body: ImportConfirmInput): Promise<unknown> { return this.importExport.import(c(ctx), body); }
 
   @Get(':id') @RequirePermissions('lead.view')
   get(@Ctx() ctx: ReqCtx, @Param('id', uuid) id: string): Promise<unknown> { return this.customers.get(ctx.user!, id); }
