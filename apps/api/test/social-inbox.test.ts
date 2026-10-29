@@ -1,6 +1,7 @@
 import { createPrismaClient } from '@imob/database';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createHmac } from 'node:crypto';
+import dns from 'node:dns/promises';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { auth, bootApp, login, makeImage, resetAndSeed } from './helpers';
 
@@ -15,6 +16,8 @@ let companyId: string;
 let fbAccountId = '';
 let igAccountId = '';
 let seq = 0;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let dnsLookup: any;
 const prisma = createPrismaClient(process.env.TEST_DATABASE_URL ?? '');
 
 const call = (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, who: string, payload?: unknown) =>
@@ -42,7 +45,7 @@ const fetchStub = vi.fn(async (input: any, init: any = {}) => {
     sent.push({ to: body.recipient.id, text: body.message?.text, attachmentUrl: body.message?.attachment?.payload?.url });
     return json({ message_id: `mid.OUT${++seq}`, recipient_id: body.recipient.id });
   }
-  if (url.startsWith('https://cdn.teste.com.br/')) return new Response(new Uint8Array(png), { status: 200, headers: { 'content-type': 'image/jpeg' } }); // anexo simulado da Meta
+  if (url.startsWith('https://scontent.xx.fbcdn.net/')) return new Response(new Uint8Array(png), { status: 200, headers: { 'content-type': 'image/jpeg' } }); // anexo simulado da Meta
   if (/api\.openai\.com\/v1\/models/.test(url)) return json({ data: ['gpt-5.4', 'gpt-5.4-mini', 'gpt-image-1'].map((id) => ({ id })) });
   if (/api\.openai\.com\/v1\/chat\/completions/.test(url)) return json({ choices: [{ message: { role: 'assistant', content: JSON.stringify(llm()) } }], usage: { prompt_tokens: 500, completion_tokens: 50 } });
   return json({ error: { message: `sem rota simulada: ${path}` } }, 500);
@@ -73,6 +76,8 @@ const convOf = async (channel: 'FACEBOOK' | 'INSTAGRAM', externalId: string) => 
 beforeAll(async () => {
   png = await makeImage(64, 64, 'jpeg');
   vi.stubGlobal('fetch', fetchStub);
+  // A validação de SSRF confere o DNS do host do anexo; aqui simulamos a resolução sem depender de rede real.
+  dnsLookup = vi.spyOn(dns, 'lookup').mockResolvedValue([{ address: '157.240.1.1', family: 4 }] as never);
   await resetAndSeed();
   app = await bootApp(SOCIAL_ENV);
   tk.admin = (await login(app, 'admin.a@teste.com')).body.accessToken;
@@ -81,7 +86,7 @@ beforeAll(async () => {
   await connectAndActivate('admin');
 });
 afterEach(() => { sendFail = null; sent.length = 0; llm = () => ({ reply: 'Olá! Como posso ajudar?', actions: [] }); });
-afterAll(async () => { vi.unstubAllGlobals(); await app.close(); await prisma.$disconnect(); });
+afterAll(async () => { vi.unstubAllGlobals(); vi.restoreAllMocks(); await app.close(); await prisma.$disconnect(); });
 
 describe('webhook: verificação', () => {
   it('aceita o token de verificação do app do servidor e recusa qualquer outro', async () => {
@@ -115,7 +120,7 @@ describe('Messenger: recebimento', () => {
   });
 
   it('baixa e guarda o anexo da Meta (a URL dela expira)', async () => {
-    const r = await webhook('/webhooks/meta/messenger', fbEnvelope([{ sender: { id: 'psid-foto' }, recipient: { id: 'PAGE1' }, timestamp: Date.now(), message: { mid: `mid.IMG${++seq}`, attachments: [{ type: 'image', payload: { url: 'https://cdn.teste.com.br/foto.jpg' } }] } }]));
+    const r = await webhook('/webhooks/meta/messenger', fbEnvelope([{ sender: { id: 'psid-foto' }, recipient: { id: 'PAGE1' }, timestamp: Date.now(), message: { mid: `mid.IMG${++seq}`, attachments: [{ type: 'image', payload: { url: 'https://scontent.xx.fbcdn.net/foto.jpg' } }] } }]));
     expect(r.statusCode).toBe(200);
     const conv = await convOf('FACEBOOK', 'psid-foto');
     const thread = (await call('GET', `/conversations/${conv.id}`, 'admin')).json();
@@ -123,6 +128,23 @@ describe('Messenger: recebimento', () => {
     expect(msg.hasMedia).toBe(true);
     const media = (await call('GET', `/messages/${msg.id}/media`, 'admin')).json();
     expect(media.mime).toBe('image/jpeg');
+  });
+
+  it('nunca busca a URL de um anexo fora dos domínios da Meta, nem uma que resolva para rede interna (SSRF)', async () => {
+    // Host fora da lista permitida: nem chega a dar fetch.
+    const r1 = await webhook('/webhooks/meta/messenger', fbEnvelope([{ sender: { id: 'psid-ssrf-1' }, recipient: { id: 'PAGE1' }, timestamp: Date.now(), message: { mid: `mid.SSRF1-${++seq}`, attachments: [{ type: 'image', payload: { url: 'http://169.254.169.254/latest/meta-data/' } }] } }]));
+    expect(r1.statusCode).toBe(200);
+    expect((await convOf('FACEBOOK', 'psid-ssrf-1')).id).toBeTruthy();
+    const msg1 = (await call('GET', `/conversations/${(await convOf('FACEBOOK', 'psid-ssrf-1')).id}`, 'admin')).json().messages[0];
+    expect(msg1.hasMedia).toBe(false); // a mensagem é salva; só o anexo (perigoso) é descartado
+    expect(fetchStub).not.toHaveBeenCalledWith('http://169.254.169.254/latest/meta-data/', expect.anything());
+
+    // Host na lista permitida, mas o DNS resolve para um IP privado: também recusa.
+    dnsLookup.mockResolvedValueOnce([{ address: '10.0.0.5', family: 4 }] as never);
+    const r2 = await webhook('/webhooks/meta/messenger', fbEnvelope([{ sender: { id: 'psid-ssrf-2' }, recipient: { id: 'PAGE1' }, timestamp: Date.now(), message: { mid: `mid.SSRF2-${++seq}`, attachments: [{ type: 'image', payload: { url: 'https://scontent.xx.fbcdn.net/interna.jpg' } }] } }]));
+    expect(r2.statusCode).toBe(200);
+    const msg2 = (await call('GET', `/conversations/${(await convOf('FACEBOOK', 'psid-ssrf-2')).id}`, 'admin')).json().messages[0];
+    expect(msg2.hasMedia).toBe(false);
   });
 
   it('não duplica ao reenviar a mesma mensagem (idempotência pelo mid)', async () => {

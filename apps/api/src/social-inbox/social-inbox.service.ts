@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 import { resolveAgentSettings } from '@imob/types';
 import { AppException } from '../common/app-exception';
 import { LeadsService } from '../crm/leads.service';
@@ -13,6 +15,46 @@ import { SocialInboxEvents, type SocialInboxEvent } from './social-inbox.events'
 const SESSION_GAP_MS = 30 * 60_000;
 const PROPERTY_CODE = /\bIM\d{4,}\b/i;
 const ATTACHMENT_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'video/mp4': 'mp4', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'application/pdf': 'pdf' };
+// A URL do anexo vem do corpo do webhook (JSON), não de algo que escolhemos — tratamos como não confiável e só
+// buscamos se for mesmo um domínio de CDN da Meta, resolvendo para um IP público (nunca rede interna/loopback).
+const ATTACHMENT_HOST_SUFFIXES = ['.fbcdn.net', '.fbsbx.com', '.cdninstagram.com'];
+const MAX_REDIRECTS = 5;
+
+function isPrivateOrLoopbackIp(ip: string): boolean {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    return a === 127 || a === 10 || a === 0 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+  }
+  if (net.isIPv6(ip)) {
+    const low = ip.toLowerCase();
+    return low === '::1' || low === '::' || low.startsWith('fe80:') || low.startsWith('fc') || low.startsWith('fd') || low.startsWith('::ffff:127.') || low.startsWith('::ffff:10.') || low.startsWith('::ffff:192.168.');
+  }
+  return true; // formato não reconhecido: trata como inseguro
+}
+
+/** Valida host (lista de CDNs da Meta) e protocolo, e confere que o DNS não resolve para uma rede interna. */
+async function assertSafeAttachmentUrl(raw: string): Promise<URL> {
+  const u = new URL(raw);
+  if (u.protocol !== 'https:') throw new Error(`protocolo não permitido: ${u.protocol}`);
+  if (u.username || u.password) throw new Error('URL com credenciais embutidas não é permitida');
+  if (!ATTACHMENT_HOST_SUFFIXES.some((suf) => u.hostname === suf.slice(1) || u.hostname.endsWith(suf))) throw new Error(`host fora da lista de CDNs da Meta: ${u.hostname}`);
+  const records = await dns.lookup(u.hostname, { all: true });
+  if (!records.length || records.some((r) => isPrivateOrLoopbackIp(r.address))) throw new Error(`host resolve para um endereço não público: ${u.hostname}`);
+  return u;
+}
+
+/** Busca o anexo sem seguir redirecionamentos automaticamente — cada salto é revalidado (host + DNS) antes de seguir. */
+async function fetchAttachmentSafely(rawUrl: string): Promise<Response> {
+  let current = rawUrl;
+  for (let hop = 0; hop < MAX_REDIRECTS; hop++) {
+    const u = await assertSafeAttachmentUrl(current);
+    const res = await fetch(u.toString(), { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+    const location = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!location) return res;
+    current = new URL(location, u).toString();
+  }
+  throw new Error('excesso de redirecionamentos ao buscar o anexo');
+}
 
 type Row = Record<string, any>;
 
@@ -107,7 +149,7 @@ export class SocialInboxService {
     let mediaKey: string | null = null, mediaMime: string | null = null;
     if (parsed.attachmentUrl) {
       try {
-        const res = await fetch(parsed.attachmentUrl, { signal: AbortSignal.timeout(20_000) });
+        const res = await fetchAttachmentSafely(parsed.attachmentUrl);
         if (res.ok) {
           const mime = (res.headers.get('content-type') ?? 'application/octet-stream').split(';')[0]!;
           const buf = Buffer.from(await res.arrayBuffer());
