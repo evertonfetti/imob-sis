@@ -109,4 +109,16 @@ export class SocialGraph {
   async instagramPermalink(mediaId: string, token: string) {
     try { return (await this.call<{ permalink?: string }>(mediaId, { token, query: { fields: 'permalink' } })).permalink ?? null; } catch { return null; }
   }
+
+  // ---------- Mensagens (Messenger e Instagram Direct) ----------
+  /** O destinatário (PSID/IGSID) e o canal já estão implícitos no token: o token é o da Página/conta que recebeu a mensagem. */
+  async sendMessage(token: string, recipientId: string, message: { text?: string; attachmentUrl?: string }): Promise<{ message_id?: string; recipient_id?: string }> {
+    const body = { recipient: { id: recipientId }, message: message.text ? { text: message.text } : { attachment: { type: 'image', payload: { url: message.attachmentUrl } } } };
+    return this.call('me/messages', { method: 'POST', token, body });
+  }
+
+  /** Inscreve a Página (e, por tabela, o Instagram ligado a ela) para receber os campos informados no nosso webhook. */
+  async subscribePageWebhook(pageId: string, token: string, fields: string[]) {
+    return this.call<{ success?: boolean }>(`${pageId}/subscribed_apps`, { method: 'POST', token, query: { subscribed_fields: fields.join(',') } });
+  }
 }

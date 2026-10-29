@@ -5,6 +5,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Send, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import { timeAgo } from '../lib/format';
 import { SearchPicker } from './SearchPicker';
@@ -34,12 +35,19 @@ export function AgentCard({ onGoToAccounts }: { onGoToAccounts: () => void }) {
   return (
     <form className="card" onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
       <div className="card-head">
-        <div><div className="card-title">Agente de atendimento por IA</div><div className="card-sub">Atende os leads no WhatsApp na hora: conversa, tira dúvidas, envia fotos e chama uma pessoa quando precisa.</div></div>
+        <div><div className="card-title">Agente de atendimento por IA</div><div className="card-sub">Atende os leads no WhatsApp, no Messenger e no Instagram Direct na hora: conversa, tira dúvidas, envia fotos e chama uma pessoa quando precisa.</div></div>
         <Badge tone={d.settings.enabled ? 'ok' : undefined}>{d.settings.enabled ? 'Ativo' : 'Desativado'}</Badge>
       </div>
       <div className="section-body">
         {err && <div className="alert" style={{ marginBottom: 14 }}>{err}</div>}
-        {!d.whatsappConnected && <div className="alert" style={{ marginBottom: 14 }}>O WhatsApp ainda não está conectado. Configure em <strong>Integrações</strong> para o agente poder responder.</div>}
+        {!d.whatsappConnected && !d.facebookConnected && !d.instagramConnected ? (
+          <div className="alert" style={{ marginBottom: 14 }}>Nenhum canal conectado ainda. Configure o WhatsApp em <strong>Integrações</strong>, ou o Facebook/Instagram em <Link to="/redes-sociais?aba=contas">Redes sociais</Link>, para o agente poder responder.</div>
+        ) : (
+          <div className="card-sub" style={{ marginBottom: 14 }}>
+            Canais conectados: {[d.whatsappConnected && 'WhatsApp', d.facebookConnected && 'Messenger', d.instagramConnected && 'Instagram'].filter(Boolean).join(' · ') || 'nenhum'}.
+            {(!d.facebookConnected || !d.instagramConnected) && <> Para conectar os outros, veja <Link to="/redes-sociais?aba=contas">Redes sociais</Link>.</>}
+          </div>
+        )}
         <div className="form-grid">
           <label className="span-2" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <span className="switch"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /><i /></span>

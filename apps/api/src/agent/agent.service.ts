@@ -53,9 +53,11 @@ export function sanitizeLeadFields(f: Record<string, unknown> | undefined): Reco
 }
 
 /**
- * Agente de atendimento por IA no WhatsApp. Responde leads na hora, envia fotos, tira dúvidas com base nos imóveis do sistema
- * e nos documentos da empresa, e transfere para uma pessoa quando pedido (ou quando não sabe). Com a conversa nas mãos de uma
- * pessoa (handler HUMAN) ele não interage; volta quando alguém devolve ou a conversa é encerrada e o cliente escreve de novo.
+ * Agente de atendimento por IA — WhatsApp, Messenger e Instagram Direct. Responde leads na hora, envia fotos, tira
+ * dúvidas com base nos imóveis do sistema e nos documentos da empresa, e transfere para uma pessoa quando pedido
+ * (ou quando não sabe). Com a conversa nas mãos de uma pessoa (handler HUMAN) ele não interage; volta quando alguém
+ * devolve ou a conversa é encerrada e o cliente escreve de novo. O envio em si (como falar com cada canal) fica no
+ * WhatsappService, que é quem também entende Messenger/Instagram — aqui a lógica é a mesma para os três.
  */
 @Injectable()
 export class AgentService implements OnModuleDestroy {
@@ -185,12 +187,19 @@ Ações possíveis (todas opcionais):
     finally { await this.prisma.conversation.update({ where: { id: conversationId }, data: { botLockUntil: null } }).catch(() => undefined); }
   }
 
+  /** WhatsApp: número conectado em Integrações. Messenger/Instagram: a conta que recebeu a mensagem ainda está ativa. */
+  private async channelReady(companyId: string, channel: string, socialAccountId: string | null) {
+    if (channel === 'WHATSAPP') return this.integrations.isConnected(companyId);
+    if (!socialAccountId) return false;
+    return (await this.prisma.socialAccount.count({ where: { id: socialAccountId, companyId, status: 'ACTIVE' } })) > 0;
+  }
+
   private async respond(conversationId: string) {
     const conv = await this.prisma.conversation.findUnique({ where: { id: conversationId }, include: { lead: { include: { customer: { select: { name: true } } } } } });
-    if (!conv || conv.channel !== 'WHATSAPP' || conv.handler !== 'BOT' || conv.status !== 'OPEN' || !conv.leadId || !conv.lead) return;
+    if (!conv || conv.handler !== 'BOT' || conv.status !== 'OPEN' || !conv.leadId || !conv.lead) return;
     const { companyId } = conv;
     const s = await this.settings.get(companyId);
-    if (!s.enabled || !s.modelId || !(await this.integrations.isConnected(companyId))) return;
+    if (!s.enabled || !s.modelId || !(await this.channelReady(companyId, conv.channel, conv.socialAccountId))) return;
 
     // O que o cliente disse desde a última resposta (de qualquer pessoa ou do robô).
     // Ordem de gravação (ids UUIDv7 são cronológicos): a hora que a Meta informa vem em segundos inteiros e pode empatar ou divergir do relógio do servidor.

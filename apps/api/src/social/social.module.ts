@@ -8,5 +8,6 @@ import { SocialController } from './social.controller';
 @Module({
   controllers: [SocialController],
   providers: [SocialAccountsService, SocialPostsService, SocialPublisher, SocialMediaService],
+  exports: [SocialAccountsService],
 })
 export class SocialModule {}

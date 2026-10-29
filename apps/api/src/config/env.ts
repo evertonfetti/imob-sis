@@ -31,6 +31,8 @@ const schema = z.object({
   META_OAUTH_URL: z.string().default('https://www.facebook.com'),
   SOCIAL_POLL_MS: z.coerce.number().default(3000), // espera entre consultas do processamento de mídia do Instagram
   SOCIAL_TICK_MS: z.coerce.number().default(20000), // frequência do agendador de publicações
+  // Token de verificação do webhook do app padrão do servidor (cada app próprio de uma empresa tem o seu, gerado por nós).
+  SOCIAL_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
   WHATSAPP_GRAPH_URL: z.string().default('https://graph.facebook.com'),
   WHATSAPP_API_VERSION: z.string().default('v22.0'),
   PUBLIC_COMPANY_ID: z.string().uuid().optional(),

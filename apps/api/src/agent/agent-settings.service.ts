@@ -29,9 +29,13 @@ export class AgentSettingsService {
   }
 
   async dto(companyId: string): Promise<AgentSettingsDto> {
-    const [settings, models, usage, connected] = await Promise.all([this.get(companyId), this.ai.textModels(companyId), this.usage(companyId), this.whatsapp.isConnected(companyId)]);
+    const [settings, models, usage, connected, social] = await Promise.all([
+      this.get(companyId), this.ai.textModels(companyId), this.usage(companyId), this.whatsapp.isConnected(companyId),
+      this.prisma.socialAccount.groupBy({ by: ['provider'], where: { companyId, status: 'ACTIVE' }, _count: true }),
+    ]);
     return {
       settings, defaults: DEFAULT_AGENT_SETTINGS, usage, whatsappConnected: connected,
+      facebookConnected: social.some((s) => s.provider === 'FACEBOOK_PAGE'), instagramConnected: social.some((s) => s.provider === 'INSTAGRAM'),
       textModels: models.map((m) => ({ id: m.id, label: m.label, model: m.model, tier: m.tier, accountName: m.account.name, provider: m.account.provider, priced: m.inputCostPerMTok != null && m.outputCostPerMTok != null })),
     };
   }

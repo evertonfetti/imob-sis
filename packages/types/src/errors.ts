@@ -98,6 +98,10 @@ export const ERROR_CODES = {
   WHATSAPP_TEST_FAILED: 'Não foi possível validar as credenciais com a Meta.',
   WHATSAPP_MEDIA_UNAVAILABLE: 'Não foi possível baixar o arquivo desta mensagem.',
   MESSAGE_NOT_RETRYABLE: 'Somente mensagens enviadas que falharam podem ser reenviadas.',
+  SOCIAL_INBOX_TEMPLATE_UNSUPPORTED: 'Modelos de mensagem existem só no WhatsApp.',
+  SOCIAL_INBOX_NOT_CONFIGURED: 'Esta conversa está com uma conta desconectada. Reconecte em Redes sociais.',
+  SOCIAL_INBOX_WINDOW_CLOSED: 'Passaram mais de 24 horas desde a última mensagem do cliente. Ele precisa escrever de novo para a conversa reabrir.',
+  SOCIAL_INBOX_SEND_FAILED: 'Não foi possível enviar a mensagem.',
   // Licenciamento (Bloco 11): usado tanto pela instalação do cliente quanto pelo servidor de licenças.
   LICENSE_SUSPENDED: 'A licença deste sistema está suspensa. Fale com o suporte.',
   LICENSE_LIMIT_REACHED: 'O plano contratado atingiu o limite deste recurso.',

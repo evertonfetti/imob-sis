@@ -30,7 +30,11 @@ export type UpdateSocialAppInput = z.infer<typeof updateSocialAppSchema>;
 export const connectSocialSchema = z.object({ appId: z.string().uuid().or(z.literal('server')).optional() }).default({});
 export type ConnectSocialInput = z.infer<typeof connectSocialSchema>;
 /** `mine`: cadastrado por você (só você edita/remove, salvo administradores em apps compartilhados). */
-export interface SocialAppDto { id: string; name: string; appId: string; source: 'company' | 'server'; accountCount: number; mine: boolean; shared: boolean; ownerName: string | null }
+export interface SocialAppDto {
+  id: string; name: string; appId: string; source: 'company' | 'server'; accountCount: number; mine: boolean; shared: boolean; ownerName: string | null;
+  /** Cole no campo "Verify Token" do produto Webhooks deste app, no painel de desenvolvedores da Meta. */
+  webhookVerifyToken: string | null;
+}
 
 export const activateAccountsSchema = z.object({ accountIds: z.array(z.string().uuid()).max(50) });
 

@@ -52,9 +52,15 @@ export interface MessageDto {
   readAt: string | null;
 }
 
+export const CONVERSATION_CHANNELS = ['WHATSAPP', 'FACEBOOK', 'INSTAGRAM'] as const;
+export type ConversationChannel = (typeof CONVERSATION_CHANNELS)[number];
+export const CONVERSATION_CHANNEL_LABELS: Record<ConversationChannel, string> = { WHATSAPP: 'WhatsApp', FACEBOOK: 'Messenger', INSTAGRAM: 'Instagram' };
+
 export interface ConversationDto {
   id: string;
+  channel: ConversationChannel;
   contactName: string | null;
+  /** No WhatsApp é o telefone; no Messenger/Instagram é só um identificador interno, não mostre como telefone. */
   phone: string;
   status: 'OPEN' | 'CLOSED';
   /** Quem atende: o robô ou uma pessoa. Com HUMAN o agente de IA não responde. */

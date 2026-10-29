@@ -1,6 +1,6 @@
 import type { ConversationDto, MessageDto, Paginated } from '@imob/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, CheckCheck, Clock, FileText, MessageCircle, Search, Send, Bot, UserRound, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Clock, Facebook, FileText, Instagram, MessageCircle, Search, Send, Bot, UserRound, CheckCircle2, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StagePill } from '../components/crm';
@@ -17,6 +17,9 @@ const dayLabel = (iso: string) => {
   return d.toDateString() === t.toDateString() ? 'Hoje' : d.toDateString() === y.toDateString() ? 'Ontem' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
 };
 const phoneOf = (wa: string) => formatPhone(wa.startsWith('55') && wa.length > 11 ? wa.slice(2) : wa);
+// No WhatsApp o identificador é o telefone; no Messenger/Instagram é um id interno (PSID/IGSID) — não mostramos como telefone.
+const contactOf = (c: ConversationDto) => c.contactName ?? (c.channel === 'WHATSAPP' ? phoneOf(c.phone) : c.channel === 'FACEBOOK' ? 'Cliente do Messenger' : 'Cliente do Instagram');
+const ChannelIcon = ({ channel }: { channel: ConversationDto['channel'] }) => channel === 'FACEBOOK' ? <Facebook size={12} /> : channel === 'INSTAGRAM' ? <Instagram size={12} /> : null;
 
 export function Conversations() {
   const { id } = useParams();
@@ -32,7 +35,7 @@ export function Conversations() {
 
   return (
     <>
-      <div className="page-head"><div><h1 className="page-title">Conversas</h1><p className="page-sub">Atendimento pelo WhatsApp, junto do histórico de cada lead.</p></div></div>
+      <div className="page-head"><div><h1 className="page-title">Conversas</h1><p className="page-sub">Atendimento pelo WhatsApp, Messenger e Instagram, junto do histórico de cada lead.</p></div></div>
       <div className={`inbox ${id ? 'has-active' : ''}`}>
         <div className="inbox-list">
           <div className="inbox-search">
@@ -41,12 +44,12 @@ export function Conversations() {
           </div>
           <div className="inbox-items">
             {list.isLoading ? <SkeletonRows rows={6} /> : !items.length ? (
-              <Empty icon={<MessageCircle />} title="Nenhuma conversa" hint="As mensagens recebidas no WhatsApp da imobiliária aparecem aqui." />
+              <Empty icon={<MessageCircle />} title="Nenhuma conversa" hint="As mensagens recebidas no WhatsApp, Messenger ou Instagram da imobiliária aparecem aqui." />
             ) : items.map((c) => (
               <div key={c.id} className={`conv ${c.id === id ? 'active' : ''}`} role="button" tabIndex={0} onClick={() => nav(`/conversas/${c.id}`)} onKeyDown={(e) => e.key === 'Enter' && nav(`/conversas/${c.id}`)}>
-                <div className="avatar">{initials(c.contactName ?? c.phone)}</div>
+                <div className="avatar">{initials(contactOf(c))}</div>
                 <div className="conv-body">
-                  <div className="conv-top"><span className="conv-name">{c.contactName ?? phoneOf(c.phone)}{c.status === 'OPEN' && c.handler === 'BOT' && <Bot size={12} style={{ marginLeft: 6, verticalAlign: -1, color: 'var(--accent)' }} aria-label="Atendido pelo assistente de IA" />}</span><span className="conv-time">{c.lastMessageAt ? timeAgo(c.lastMessageAt) : ''}</span></div>
+                  <div className="conv-top"><span className="conv-name"><ChannelIcon channel={c.channel} /> {contactOf(c)}{c.status === 'OPEN' && c.handler === 'BOT' && <Bot size={12} style={{ marginLeft: 6, verticalAlign: -1, color: 'var(--accent)' }} aria-label="Atendido pelo assistente de IA" />}</span><span className="conv-time">{c.lastMessageAt ? timeAgo(c.lastMessageAt) : ''}</span></div>
                   <div className="conv-prev"><span>{c.lastMessagePreview ?? '—'}</span>{c.unreadCount > 0 && <span className="unread">{c.unreadCount}</span>}</div>
                   {c.lead && <div className="card-sub" style={{ marginTop: 3, fontSize: 12 }}><StagePill stage={c.lead.stage} />{c.lead.property ? ` · ${c.lead.property.code}` : ''}</div>}
                 </div>
@@ -106,8 +109,8 @@ function ThreadView({ id }: { id: string }) {
       <div className="thread-head">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
           <Button variant="ghost" size="icon" className="inbox-back" onClick={() => nav('/conversas')} aria-label="Voltar"><ArrowLeft size={18} /></Button>
-          <div className="avatar">{initials(c.contactName ?? c.phone)}</div>
-          <div style={{ minWidth: 0 }}><strong>{c.contactName ?? phoneOf(c.phone)}</strong><div className="card-sub">{phoneOf(c.phone)}</div></div>
+          <div className="avatar">{initials(contactOf(c))}</div>
+          <div style={{ minWidth: 0 }}><strong><ChannelIcon channel={c.channel} /> {contactOf(c)}</strong>{c.channel === 'WHATSAPP' && <div className="card-sub">{phoneOf(c.phone)}</div>}</div>
         </div>
         <div className="toolbar" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {c.status === 'CLOSED' ? <Badge plain>Finalizada</Badge> : <Badge tone={c.handler === 'BOT' ? 'accent' : 'ok'}>{c.handler === 'BOT' ? <><Bot size={12} style={{ marginRight: 4, verticalAlign: -1 }} />Assistente IA</> : <><UserRound size={12} style={{ marginRight: 4, verticalAlign: -1 }} />Atendimento humano</>}</Badge>}
@@ -144,7 +147,9 @@ function ThreadView({ id }: { id: string }) {
 
       {canSend && (
         <div className="composer">
-          {!c.windowOpen && !tpl ? (
+          {!c.windowOpen && c.channel !== 'WHATSAPP' ? (
+            <div className="window-note">Já se passaram mais de 24 horas desde a última mensagem do cliente. {c.channel === 'FACEBOOK' ? 'O Messenger' : 'O Instagram'} só permite responder de novo depois que ele escrever.</div>
+          ) : !c.windowOpen && !tpl ? (
             <div className="window-note">Já se passaram mais de 24 horas desde a última mensagem do cliente. O WhatsApp só permite enviar <strong>modelos de mensagem aprovados</strong> agora. <button type="button" className="btn btn-sm" style={{ marginLeft: 8 }} onClick={() => setTpl(true)}>Enviar modelo</button></div>
           ) : tpl || !c.windowOpen ? (
             <form onSubmit={sendTemplate} className="form-grid">
@@ -158,7 +163,7 @@ function ThreadView({ id }: { id: string }) {
               <textarea className="input textarea" rows={1} placeholder="Escreva uma mensagem…" value={text} maxLength={4096} onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} />
               <Button variant="primary" disabled={!text.trim() || send.isPending} aria-label="Enviar"><Send /></Button>
-              <Button type="button" variant="ghost" onClick={() => setTpl(true)} title="Enviar modelo aprovado"><FileText /></Button>
+              {c.channel === 'WHATSAPP' && <Button type="button" variant="ghost" onClick={() => setTpl(true)} title="Enviar modelo aprovado"><FileText /></Button>}
             </form>
           )}
         </div>

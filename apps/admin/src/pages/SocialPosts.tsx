@@ -11,7 +11,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dateTime } from '../lib/format';
 
-interface Accounts { configured: boolean; apps: SocialAppDto[]; redirectUri: string; accounts: SocialAccountDto[]; pending: SocialAccountDto[] }
+interface Accounts { configured: boolean; apps: SocialAppDto[]; redirectUri: string; webhookUrls: { messenger: string; instagram: string }; accounts: SocialAccountDto[]; pending: SocialAccountDto[] }
 
 const STATUS_TONE: Record<SocialPostStatus, 'ok' | 'warn' | 'danger' | 'accent' | undefined> = {
   SCHEDULED: 'accent', PUBLISHING: 'warn', PUBLISHED: 'ok', PARTIAL: 'warn', FAILED: 'danger', CANCELLED: undefined,
@@ -151,7 +151,7 @@ function AccountsTab({ status }: { status: string | null }) {
       {manage && <AppsCard s={s} onSaved={refresh} />}
       <section className="card">
         <div className="card-head">
-          <div><div className="card-title">Facebook e Instagram</div><div className="card-sub">Entre com o Facebook e escolha quais Páginas e contas do Instagram usar.</div></div>
+          <div><div className="card-title">Facebook e Instagram</div><div className="card-sub">Entre com o Facebook e escolha quais Páginas e contas do Instagram usar. As mesmas contas valem para publicar e para o agente de IA responder o inbox.</div></div>
           {manage && (
             <div className="toolbar">
               {apps.length > 1 && <Select style={{ width: 200 }} value={chosen} onChange={(e) => setAppPick(e.target.value)} aria-label="Aplicativo da Meta">{apps.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</Select>}
@@ -238,7 +238,7 @@ function AppsCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void
         <Button variant={apps.length ? 'default' : 'primary'} onClick={() => open()}><Plus /> Adicionar aplicativo</Button>
       </div>
       {apps.length > 0 && apps.map((a) => (
-        <div key={a.id} className="acc">
+        <div key={a.id} className="acc" style={{ flexWrap: 'wrap' }}>
           <div className="acc-info">
             <strong>{a.name}</strong>
             <span className="card-sub">ID {a.appId} · {a.accountCount} {a.accountCount === 1 ? 'conta conectada' : 'contas conectadas'}{a.source === 'server' ? ' · configurado no servidor' : !a.mine && a.ownerName ? ` · de ${a.ownerName}` : ''}</span>
@@ -249,6 +249,17 @@ function AppsCard({ s, onSaved }: { s: Accounts | undefined; onSaved: () => void
               <Button variant="ghost" onClick={() => open(a)}>Editar</Button>
               <Button variant="ghost" className="btn-danger" onClick={() => confirm(`Remover “${a.name}”? As contas já conectadas continuam publicando, mas novos logins por este app deixam de funcionar.`) && remove.mutate(a.id)}>Remover</Button>
             </div>
+          )}
+          {a.webhookVerifyToken && (
+            <details className="span-2" style={{ width: '100%', marginTop: 4 }}>
+              <summary className="card-sub" style={{ cursor: 'pointer' }}>Configurar o inbox do Messenger/Instagram (para o agente de IA responder mensagens)</summary>
+              <ol className="steps-list" style={{ marginTop: 8 }}>
+                <li>No app, adicione o produto <strong>Webhooks</strong> e, em permissões do <em>Login do Facebook</em>, peça <code>pages_messaging</code>, <code>instagram_manage_messages</code> e <code>pages_manage_metadata</code>.</li>
+                <li>No Webhooks, inscreva o objeto <strong>Page</strong> com URL <code style={{ overflowWrap: 'anywhere' }}>{s?.webhookUrls.messenger}</code> e o objeto <strong>Instagram</strong> com <code style={{ overflowWrap: 'anywhere' }}>{s?.webhookUrls.instagram}</code>, usando como "Verify Token": <code style={{ overflowWrap: 'anywhere' }}>{a.webhookVerifyToken}</code></li>
+                <li>Marque os campos <code>messages</code> e <code>messaging_postbacks</code> nos dois.</li>
+                <li>Contas já conectadas precisam reconectar (<em>Conectar mais contas</em>, escolhendo as mesmas) para o token ganhar as permissões novas.</li>
+              </ol>
+            </details>
           )}
         </div>
       ))}

@@ -64,6 +64,9 @@ export interface AgentSettingsDto {
   settings: AgentSettings; defaults: AgentSettings; textModels: AgentTextModelDto[];
   usage: { month: string; replies: number; handoffs: number; costUsd: number };
   whatsappConnected: boolean;
+  /** Ao menos uma Página do Facebook / conta do Instagram conectada e ativa (ver Redes sociais). */
+  facebookConnected: boolean;
+  instagramConnected: boolean;
 }
 export interface AgentRunDto { id: string; conversationId: string | null; contactName: string | null; model: string; outcome: string; actions: string[]; inputTokens: number; outputTokens: number; costUsd: number; error: string | null; createdAt: string }
 export interface AgentTestResult {

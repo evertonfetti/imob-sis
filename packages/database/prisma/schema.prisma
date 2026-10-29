@@ -112,6 +112,8 @@ enum IntegrationProvider {
 
 enum ConversationChannel {
   WHATSAPP
+  FACEBOOK
+  INSTAGRAM
 }
 
 enum ConversationStatus {
@@ -877,9 +879,12 @@ model Conversation {
   leadId             String?
   customerId         String?
   channel            ConversationChannel @default(WHATSAPP)
-  // Identificador do contato no canal (WhatsApp: wa_id, só dígitos).
+  // Identificador do contato no canal (WhatsApp: wa_id só dígitos; Messenger/Instagram: PSID/IGSID).
   externalId         String
   contactName        String?
+  // Facebook/Instagram: qual conta conectada (Página ou perfil) recebeu a mensagem — define com qual token responder.
+  // Null no WhatsApp, que tem um único número por empresa (configurado em Integrações).
+  socialAccountId    String?
   status             ConversationStatus  @default(OPEN)
   // Quem atende: o agente de IA (BOT) ou uma pessoa (HUMAN). Com HUMAN o robô não interage.
   handler            ConversationHandler @default(BOT)
@@ -895,14 +900,16 @@ model Conversation {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
-  company  Company   @relation(fields: [companyId], references: [id])
-  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  messages Message[]
+  company       Company       @relation(fields: [companyId], references: [id])
+  lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer      Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  socialAccount SocialAccount? @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  messages      Message[]
 
   @@unique([companyId, channel, externalId])
   @@index([companyId, lastMessageAt])
   @@index([leadId])
+  @@index([socialAccountId])
   @@map("conversations")
 }
 
@@ -982,6 +989,9 @@ model SocialApp {
   // Dono do app (quem cadastrou). Privado por padrão; `shared` libera para a equipe.
   createdById String?
   shared      Boolean  @default(false)
+  // Token que a Meta exige para validar o endpoint do webhook (gerado por nós; o usuário cola no painel de
+  // desenvolvedores da Meta). Gerado sob demanda: apps criados antes do inbox de Messenger/Instagram ainda não têm.
+  webhookVerifyToken String? @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1012,9 +1022,10 @@ model SocialAccount {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  company Company            @relation(fields: [companyId], references: [id])
-  app     SocialApp?         @relation(fields: [socialAppId], references: [id], onDelete: SetNull)
-  targets SocialPostTarget[]
+  company       Company            @relation(fields: [companyId], references: [id])
+  app           SocialApp?         @relation(fields: [socialAppId], references: [id], onDelete: SetNull)
+  targets       SocialPostTarget[]
+  conversations Conversation[]
 
   @@unique([companyId, connectedById, provider, externalId])
   @@index([companyId, status])

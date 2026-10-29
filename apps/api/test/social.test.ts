@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import sharp from 'sharp';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { SOCIAL_SCOPES } from '../src/social/social-accounts.service';
 import { SocialPublisher } from '../src/social/social-publisher.service';
 import { auth, bootApp, login, makeImage, resetAndSeed, uploadPhoto } from './helpers';
 
@@ -34,6 +35,7 @@ const fetchStub = vi.fn(async (input: any, init: any = {}) => {
 
   if (path === 'oauth/access_token') return json({ access_token: u.searchParams.get('grant_type') === 'fb_exchange_token' ? 'LONG-USER-TOKEN' : 'SHORT-USER-TOKEN' });
   if (path === 'me/accounts') return json({ data: PAGES });
+  if (/^PAGE\d\/subscribed_apps$/.test(path)) return json({ success: true }); // inscrição do webhook de mensagens, feita ao conectar
   if (/^(PAGE\d)\/photos$/.test(path)) return json(call.body?.published === false ? { id: `photo-${++n}` } : { id: `photo-${++n}`, post_id: `${path.split('/')[0]}_post${n}` });
   if (/\/feed$/.test(path)) return json({ id: `PAGE1_feed${++n}` });
   if (/^IG\d\/media$/.test(path)) return json({ id: `container-${++n}` });
@@ -260,7 +262,7 @@ describe('conexão com o Facebook', () => {
     expect(url.pathname).toMatch(/\/dialog\/oauth$/);
     expect(url.searchParams.get('client_id')).toBe('1234567890');
     expect(url.searchParams.get('redirect_uri')).toBe('https://api.teste.com.br/api/v1/social/oauth/callback');
-    expect(url.searchParams.get('scope')).toBe('pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish');
+    expect(url.searchParams.get('scope')).toBe(SOCIAL_SCOPES.join(','));
 
     expect(cb.statusCode).toBe(302);
     expect(cb.headers.location).toBe(`${ADMIN_URL}/redes-sociais?aba=contas&status=connected`);

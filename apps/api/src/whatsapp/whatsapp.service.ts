@@ -9,6 +9,9 @@ import { LeadsService } from '../crm/leads.service';
 import { canViewAll } from '../crm/visibility';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { SocialInboxEvents, type SocialInboxEvent } from '../social-inbox/social-inbox.events';
+import { SocialInboxService } from '../social-inbox/social-inbox.service';
+import { SocialApiError } from '../social/social.client';
 import { IntegrationsService } from './integrations.service';
 import { MetaApiError } from './meta.client';
 import { WhatsappEvents, type WhatsappEvent } from './whatsapp.events';
@@ -30,6 +33,9 @@ const preview = (s: string | null | undefined, n = 80) => {
   return t.length <= n ? t : `${t.slice(0, n - 1)}…`;
 };
 
+/** Canais cujo envio e janela de 24h são tratados aqui (as diferenças ficam isoladas no `deliver`/`markRead`). */
+const SOCIAL_CHANNELS = ['FACEBOOK', 'INSTAGRAM'];
+
 /** Converte uma mensagem do webhook em (tipo, texto, mídia). `null` = ignorar (ex.: reações). */
 export function extractContent(m: Row): { type: string; content: string; mediaId?: string; mediaMime?: string } | null {
   const t = String(m.type);
@@ -48,6 +54,12 @@ export function extractContent(m: Row): { type: string; content: string; mediaId
   return { type: 'unsupported', content: '[Mensagem não suportada]' };
 }
 
+/**
+ * Também é o serviço por trás da tela "Conversas" para TODOS os canais (WhatsApp, Messenger, Instagram): a leitura
+ * (listar, abrir, marcar como lida, assumir/devolver/finalizar) é igual nos três, pois Conversation/Message são
+ * genéricos. Só o recebimento (webhook) e o envio (`deliver`) são específicos — para Messenger/Instagram, o envio
+ * é delegado ao SocialInboxService, que fica no módulo social-inbox junto do webhook de cada um.
+ */
 @Injectable()
 export class WhatsappService {
   private readonly log = new Logger('WhatsApp');
@@ -58,9 +70,10 @@ export class WhatsappService {
     private readonly leads: LeadsService,
     private readonly storage: StorageService,
     private readonly events: EventEmitter2,
+    private readonly social: SocialInboxService,
   ) {}
 
-  private async emit(name: string, payload: WhatsappEvent) {
+  private async emit(name: string, payload: WhatsappEvent | SocialInboxEvent) {
     try { await this.events.emitAsync(name, payload); } catch (e) { this.log.error(`Falha ao processar ${name}: ${(e as Error).message}`); }
   }
 
@@ -225,7 +238,7 @@ export class WhatsappService {
     const last = c.lastInboundAt as Date | null;
     const open = !!last && Date.now() - last.getTime() < WINDOW_MS;
     return {
-      id: c.id, contactName: c.contactName, phone: c.externalId, status: c.status, handler: c.handler, handoffReason: c.handoffReason ?? null, unreadCount: c.unreadCount,
+      id: c.id, channel: c.channel, contactName: c.contactName, phone: c.externalId, status: c.status, handler: c.handler, handoffReason: c.handoffReason ?? null, unreadCount: c.unreadCount,
       lastMessageAt: c.lastMessageAt?.toISOString() ?? null, lastMessagePreview: c.lastMessagePreview,
       windowOpen: open, windowClosesAt: open && last ? new Date(last.getTime() + WINDOW_MS).toISOString() : null,
       lead: c.lead ? { id: c.lead.id, stage: c.lead.stage ?? null, broker: c.lead.broker ?? null, property: c.lead.property ?? null } : null,
@@ -286,9 +299,12 @@ export class WhatsappService {
     const c = await this.load(user, id);
     if (c.unreadCount === 0) return { ok: true };
     await this.prisma.conversation.update({ where: { id }, data: { unreadCount: 0 } });
-    const last = await this.prisma.message.findFirst({ where: { conversationId: id, direction: 'INBOUND', externalId: { not: null } }, orderBy: { createdAt: 'desc' } });
-    if (last?.externalId) {
-      try { await (await this.integrations.clientFor(user.companyId)).markRead(last.externalId); } catch { /* "lido" do lado do cliente é opcional */ }
+    // "Lido" do lado do cliente: só o WhatsApp tem esse recurso aqui (opcional — nunca impede marcar como lida).
+    if (c.channel === 'WHATSAPP') {
+      const last = await this.prisma.message.findFirst({ where: { conversationId: id, direction: 'INBOUND', externalId: { not: null } }, orderBy: { createdAt: 'desc' } });
+      if (last?.externalId) {
+        try { await (await this.integrations.clientFor(user.companyId)).markRead(last.externalId); } catch { /* opcional */ }
+      }
     }
     return { ok: true };
   }
@@ -298,10 +314,14 @@ export class WhatsappService {
   // ====================================================================
   async send(ctx: AuthedCtx, conversationId: string, input: SendMessageInput) {
     const c = await this.load(ctx.user, conversationId);
-    if (!(await this.integrations.isConnected(ctx.user.companyId))) throw new AppException('WHATSAPP_NOT_CONFIGURED', 409);
+    const social = SOCIAL_CHANNELS.includes(c.channel);
+    if (input.template && social) throw new AppException('SOCIAL_INBOX_TEMPLATE_UNSUPPORTED', 400); // modelo aprovado só existe no WhatsApp
+    if (!social && !(await this.integrations.isConnected(ctx.user.companyId))) throw new AppException('WHATSAPP_NOT_CONFIGURED', 409);
+    if (social && !c.socialAccountId) throw new AppException('SOCIAL_INBOX_NOT_CONFIGURED', 409);
     if (input.text) {
+      // Messenger e Instagram também só aceitam texto livre dentro de 24h da última mensagem do cliente (sem modelos aprovados).
       const last = c.lastInboundAt;
-      if (!last || Date.now() - last.getTime() > WINDOW_MS) throw new AppException('WHATSAPP_WINDOW_CLOSED', 422);
+      if (!last || Date.now() - last.getTime() > WINDOW_MS) throw new AppException(social ? 'SOCIAL_INBOX_WINDOW_CLOSED' : 'WHATSAPP_WINDOW_CLOSED', 422);
     }
     // Quando uma pessoa responde, o robô sai da conversa (até alguém devolver ou a conversa ser encerrada).
     if (c.handler === 'BOT') await this.setHandler(c.id, 'HUMAN', `${ctx.user.name ?? 'Um corretor'} assumiu a conversa`);
@@ -321,30 +341,38 @@ export class WhatsappService {
     if (!msg) throw notFound('Mensagem não encontrada.');
     if (msg.direction !== 'OUTBOUND' || msg.status !== 'FAILED') throw new AppException('MESSAGE_NOT_RETRYABLE', 409);
     const c = await this.load(ctx.user, msg.conversationId);
-    if (msg.type === 'text' && (!c.lastInboundAt || Date.now() - c.lastInboundAt.getTime() > WINDOW_MS)) throw new AppException('WHATSAPP_WINDOW_CLOSED', 422);
+    if (msg.type === 'text' && (!c.lastInboundAt || Date.now() - c.lastInboundAt.getTime() > WINDOW_MS)) throw new AppException(SOCIAL_CHANNELS.includes(c.channel) ? 'SOCIAL_INBOX_WINDOW_CLOSED' : 'WHATSAPP_WINDOW_CLOSED', 422);
     await this.prisma.message.update({ where: { id: msg.id }, data: { status: 'QUEUED', error: null } });
     return this.deliver(ctx.user.companyId, ctx.user.id, c, msg);
   }
 
   private async deliver(companyId: string, userId: string | null, c: Row, msg: Row) {
-    const client = await this.integrations.clientFor(companyId);
+    const social = SOCIAL_CHANNELS.includes(c.channel);
     try {
-      const tpl = msg.type === 'template' ? (msg.payload as { name: string; language: string; params?: string[] }) : null;
-      const wamid = tpl ? await client.sendTemplate(c.externalId, tpl.name, tpl.language, tpl.params)
-        : msg.type === 'image' ? await client.sendImage(c.externalId, (msg.payload as { link: string }).link, msg.content ?? undefined)
-        : await client.sendText(c.externalId, msg.content);
+      let externalId: string | undefined;
+      if (social) {
+        externalId = await this.social.deliver(c, msg);
+      } else {
+        const client = await this.integrations.clientFor(companyId);
+        const tpl = msg.type === 'template' ? (msg.payload as { name: string; language: string; params?: string[] }) : null;
+        externalId = tpl ? await client.sendTemplate(c.externalId, tpl.name, tpl.language, tpl.params)
+          : msg.type === 'image' ? await client.sendImage(c.externalId, (msg.payload as { link: string }).link, msg.content ?? undefined)
+          : await client.sendText(c.externalId, msg.content);
+      }
       const now = new Date();
-      const updated = await this.prisma.message.update({ where: { id: msg.id }, data: { externalId: wamid, status: 'SENT', sentAt: now, error: null } });
+      const updated = await this.prisma.message.update({ where: { id: msg.id }, data: { externalId, status: 'SENT', sentAt: now, error: null } });
       await this.prisma.conversation.update({ where: { id: c.id }, data: { lastMessageAt: now, lastMessagePreview: preview(msg.content) } });
       if (c.leadId) {
         const recentOut = await this.prisma.message.count({ where: { conversationId: c.id, direction: 'OUTBOUND', id: { not: msg.id }, createdAt: { gte: new Date(Date.now() - SESSION_GAP_MS) } } });
-        await this.emit(WhatsappEvents.Sent, { companyId, leadId: c.leadId, userId, conversationId: c.id, preview: preview(msg.content), sessionStart: recentOut === 0 });
+        const sessionStart = recentOut === 0;
+        if (social) await this.emit(SocialInboxEvents.Sent, { companyId, channel: c.channel, leadId: c.leadId, userId, conversationId: c.id, preview: preview(msg.content), sessionStart });
+        else await this.emit(WhatsappEvents.Sent, { companyId, leadId: c.leadId, userId, conversationId: c.id, preview: preview(msg.content), sessionStart });
       }
       return (await this.messageDtos(companyId, [updated]))[0]!;
     } catch (e) {
-      const reason = e instanceof MetaApiError ? e.message : 'Erro de conexão com a Meta';
+      const reason = e instanceof MetaApiError || e instanceof SocialApiError || e instanceof AppException ? e.message : 'Erro de conexão com a Meta';
       await this.prisma.message.update({ where: { id: msg.id }, data: { status: 'FAILED', error: preview(reason, 300) } });
-      throw new AppException('WHATSAPP_SEND_FAILED', 502, `Não foi possível enviar: ${reason}`);
+      throw new AppException(social ? 'SOCIAL_INBOX_SEND_FAILED' : 'WHATSAPP_SEND_FAILED', 502, `Não foi possível enviar: ${reason}`);
     }
   }
 

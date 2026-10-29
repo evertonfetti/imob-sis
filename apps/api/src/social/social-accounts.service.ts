@@ -10,8 +10,18 @@ import { LicenseService } from '../license/license.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SocialApiError, SocialGraph } from './social.client';
 
-/** Permissões pedidas no login: listar Páginas, publicar nelas e no Instagram profissional ligado. */
-export const SOCIAL_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'instagram_basic', 'instagram_content_publish'];
+/**
+ * Permissões pedidas no login: listar Páginas, publicar nelas e no Instagram ligado, e — para o agente de IA
+ * também atender o inbox — ler/enviar mensagens do Messenger e do Instagram Direct e inscrever o webhook.
+ * Contas conectadas antes destas três últimas precisam reconectar (o botão "Entrar com o Facebook" de novo)
+ * para o token ganhar a permissão nova.
+ */
+export const SOCIAL_SCOPES = [
+  'pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'instagram_basic', 'instagram_content_publish',
+  'pages_messaging', 'instagram_manage_messages', 'pages_manage_metadata',
+];
+/** Campos do webhook assinados automaticamente ao conectar uma Página (cobre Messenger; o Instagram ligado usa a mesma inscrição). */
+const WEBHOOK_FIELDS = ['messages', 'messaging_postbacks'];
 const STATE_TTL_MS = 10 * 60_000;
 const PENDING_TTL_MS = 60 * 60_000;
 
@@ -69,7 +79,9 @@ export class SocialAccountsService {
     if (!input.appSecret) throw new AppException('VALIDATION_FAILED', 400, 'Informe a chave secreta do aplicativo.');
     if (await this.prisma.socialApp.findFirst({ where: { companyId, createdById: ctx.user.id, appId: input.appId } })) throw new AppException('SOCIAL_APP_DUPLICATE', 409);
     await this.validate(input.appId, input.appSecret);
-    const saved = await this.prisma.socialApp.create({ data: { companyId, name: input.name, appId: input.appId, secrets: encryptJson({ appSecret: input.appSecret }, this.key), createdById: ctx.user.id, shared: !!input.shared } });
+    const saved = await this.prisma.socialApp.create({
+      data: { companyId, name: input.name, appId: input.appId, secrets: encryptJson({ appSecret: input.appSecret }, this.key), createdById: ctx.user.id, shared: !!input.shared, webhookVerifyToken: randomBytes(24).toString('hex') },
+    });
     await this.audit.record({ companyId, entity: 'INTEGRATION', entityId: saved.id, action: 'CREATE', after: { provider: 'META_APP', name: input.name, appId: input.appId, shared: !!input.shared }, ctx });
     return this.list(ctx.user);
   }
@@ -158,6 +170,9 @@ export class SocialAccountsService {
           const ig = p.instagram_business_account;
           await this.upsert(st.cid, st.uid, cred.ref === 'server' ? null : cred.ref, { provider: 'INSTAGRAM', externalId: ig.id, name: ig.username ?? `Instagram de ${p.name}`, username: ig.username ?? null, pictureUrl: ig.profile_picture_url ?? null, pageId: p.id, secrets });
         }
+        // Inscreve a Página para nos avisar de mensagens novas (cobre o Instagram ligado a ela também).
+        // Melhor esforço: sem a permissão pages_manage_metadata a chamada falha, mas a conta continua útil para publicar.
+        try { await g.subscribePageWebhook(p.id, p.access_token, WEBHOOK_FIELDS); } catch (e) { this.log.warn(`Não foi possível inscrever o webhook da Página ${p.id}: ${(e as Error).message}`); }
       }
       await this.audit.record({ companyId: st.cid, userId: st.uid, entity: 'SOCIAL_ACCOUNT', action: 'CONNECT', after: { pages: pages.length } });
       return 'connected';
@@ -187,6 +202,20 @@ export class SocialAccountsService {
     };
   }
 
+  /** Gera o token de verificação do webhook na primeira vez que falta (apps cadastrados antes deste recurso). */
+  private async webhookToken(app: { id: string; webhookVerifyToken: string | null }): Promise<string> {
+    if (app.webhookVerifyToken) return app.webhookVerifyToken;
+    const token = randomBytes(24).toString('hex');
+    await this.prisma.socialApp.update({ where: { id: app.id }, data: { webhookVerifyToken: token } });
+    return token;
+  }
+
+  /** URLs fixas do nosso servidor: vão no produto Webhooks do app, no painel de desenvolvedores da Meta. */
+  webhookUrls() {
+    const base = (this.env.API_PUBLIC_URL ?? '').replace(/\/$/, '');
+    return { messenger: `${base}/webhooks/meta/messenger`, instagram: `${base}/webhooks/meta/instagram` };
+  }
+
   /** Só o que o usuário pode ver: as próprias contas/apps e o que colegas compartilharam. */
   async list(user: { id: string; companyId: string }) {
     const [rows, apps] = await Promise.all([
@@ -196,12 +225,17 @@ export class SocialAccountsService {
     const ownerIds = [...new Set([...rows.map((r) => r.connectedById), ...apps.map((a) => a.createdById)].filter((x): x is string => !!x))];
     const owners = new Map((ownerIds.length ? await this.prisma.user.findMany({ where: { id: { in: ownerIds }, companyId: user.companyId }, select: { id: true, name: true } }) : []).map((o) => [o.id, o.name]));
     const pageNames = new Map(rows.filter((r) => r.provider === 'FACEBOOK_PAGE').map((r) => [r.externalId, r.name]));
-    const list: SocialAppDto[] = apps.map((a) => ({ id: a.id, name: a.name, appId: a.appId, source: 'company', accountCount: rows.filter((r) => r.socialAppId === a.id).length, mine: a.createdById === user.id, shared: a.shared, ownerName: a.createdById ? (owners.get(a.createdById) ?? null) : null }));
-    if (this.serverApp) list.push({ id: 'server', name: 'Padrão do sistema', appId: this.serverApp.appId, source: 'server', accountCount: rows.filter((r) => !r.socialAppId).length, mine: false, shared: true, ownerName: null });
+    const list: SocialAppDto[] = await Promise.all(apps.map(async (a) => ({
+      id: a.id, name: a.name, appId: a.appId, source: 'company' as const, accountCount: rows.filter((r) => r.socialAppId === a.id).length,
+      mine: a.createdById === user.id, shared: a.shared, ownerName: a.createdById ? (owners.get(a.createdById) ?? null) : null,
+      webhookVerifyToken: await this.webhookToken(a),
+    })));
+    if (this.serverApp) list.push({ id: 'server', name: 'Padrão do sistema', appId: this.serverApp.appId, source: 'server', accountCount: rows.filter((r) => !r.socialAppId).length, mine: false, shared: true, ownerName: null, webhookVerifyToken: this.env.SOCIAL_WEBHOOK_VERIFY_TOKEN ?? null });
     return {
       configured: list.length > 0,
       apps: list,
       redirectUri: this.redirectUri,
+      webhookUrls: this.webhookUrls(),
       accounts: rows.filter((r) => r.status !== 'PENDING').map((r) => this.dto(user, owners, r, pageNames)),
       pending: rows.filter((r) => r.status === 'PENDING').map((r) => this.dto(user, owners, r, pageNames)),
     };
@@ -262,4 +296,20 @@ export class SocialAccountsService {
   }
 
   markExpired(id: string) { return this.prisma.socialAccount.updateMany({ where: { id }, data: { status: 'EXPIRED' } }); }
+
+  // ---------- Uso interno pelo inbox (webhook de Messenger/Instagram) ----------
+  /** Conta ativa pelo identificador que a Meta manda no webhook (ID da Página, ou da conta do Instagram). */
+  async byExternalId(provider: 'FACEBOOK_PAGE' | 'INSTAGRAM', externalId: string) {
+    const a = await this.prisma.socialAccount.findFirst({ where: { provider, externalId, status: 'ACTIVE' } });
+    if (!a) return null;
+    const appSecret = a.socialAppId ? (await this.credentials(a.companyId, a.socialAppId))?.appSecret ?? null : (this.serverApp?.appSecret ?? null);
+    if (!appSecret) return null;
+    return { socialAccountId: a.id, companyId: a.companyId, appSecret };
+  }
+
+  /** O token de verificação que a Meta devolve na checagem inicial do webhook (um app da empresa ou o do servidor). */
+  async verifyWebhookToken(token: string) {
+    if (token && this.env.SOCIAL_WEBHOOK_VERIFY_TOKEN && token === this.env.SOCIAL_WEBHOOK_VERIFY_TOKEN) return true;
+    return !!(await this.prisma.socialApp.findFirst({ where: { webhookVerifyToken: token }, select: { id: true } }));
+  }
 }

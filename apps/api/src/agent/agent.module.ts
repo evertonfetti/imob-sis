@@ -9,6 +9,8 @@ import { AgentListener } from './agent.listener';
 import { AgentService } from './agent.service';
 import { KnowledgeService } from './knowledge.service';
 
+// O AgentListener escuta tanto o WhatsApp quanto o inbox de Messenger/Instagram (EventEmitter2 é global:
+// não é preciso importar o módulo de quem emite o evento, só conhecer o nome dele).
 @Module({
   imports: [AiModule, CrmModule, IntelligenceModule, WhatsappModule],
   controllers: [AgentController],
