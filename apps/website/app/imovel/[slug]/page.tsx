@@ -153,7 +153,7 @@ export default async function PropertyPage({ params }: Params) {
 
             {!gone && (
               <>
-                <WhatsAppButton whatsapp={company.whatsapp} message={waMsg} propertyId={p.id} className="btn btn-wa btn-block" />
+                <WhatsAppButton whatsapp={company.whatsapp} message={waMsg} propertyId={p.id} propertyCode={p.code} propertyTitle={p.title} className="btn btn-wa btn-block" />
                 <ShareButton title={p.title} code={p.code} />
                 <hr />
                 {p.broker && (
@@ -180,7 +180,7 @@ export default async function PropertyPage({ params }: Params) {
 
       {!gone && (
         <div className="mobile-bar">
-          <WhatsAppButton whatsapp={company.whatsapp} message={waMsg} propertyId={p.id} className="btn btn-wa" label="WhatsApp" />
+          <WhatsAppButton whatsapp={company.whatsapp} message={waMsg} propertyId={p.id} propertyCode={p.code} propertyTitle={p.title} className="btn btn-wa" label="WhatsApp" />
           <a href="#interesse" className="btn btn-primary">Tenho interesse</a>
         </div>
       )}

@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import Link from 'next/link';
 import { FilterPanel } from './FilterPanel';
 import { Pagination } from './Pagination';
+import { PixelEvent } from './PixelEvent';
 import { PropertyCard } from './PropertyCard';
 import { brl, plural } from '@/lib/format';
 import { getFilters, getProperties, type Filters } from '@/lib/api';
@@ -83,6 +84,12 @@ export async function ListingPage({ raw, base, fixedPurpose }: { raw: RawSP; bas
 
   return (
     <div className="wrap">
+      <PixelEvent
+        key={JSON.stringify(params)}
+        name={hasFilters(params) ? 'Search' : 'ViewCategory'}
+        custom={!hasFilters(params)}
+        params={{ content_type: 'home_listing', content_category: [params.purpose ?? fixedPurpose, params.type].filter(Boolean).join(' / ') || 'Todos', ...(params.q ? { search_string: params.q } : {}), ...(params.city ? { city: params.city } : {}), ...(params.neighborhood ? { region: params.neighborhood } : {}), results: data.total }}
+      />
       <div className="page-head">
         <h1>{titleFor(fixedPurpose ?? params.purpose, params.city)}</h1>
         <p>{data.total === 0 ? 'Nenhum imóvel encontrado com esses filtros.' : `${plural(data.total, 'imóvel encontrado', 'imóveis encontrados')}${pages > 1 ? ` · página ${page} de ${pages}` : ''}`}</p>
@@ -114,7 +121,7 @@ export async function ListingPage({ raw, base, fixedPurpose }: { raw: RawSP; bas
             </div>
           ) : (
             <div className="grid">
-              {data.items.map((p, i) => <PropertyCard key={p.id} p={p} prefer={fixedPurpose ?? (params.purpose as 'SALE' | 'RENT' | undefined)} priority={i < 3} />)}
+              {data.items.map((p, i) => <PropertyCard key={p.id} p={p} prefer={fixedPurpose ?? (params.purpose as 'SALE' | 'RENT' | undefined)} priority={i < 3} position={(page - 1) * PAGE_SIZE + i + 1} />)}
             </div>
           )}
           <Pagination page={page} pages={pages} href={(n) => url({ page: n > 1 ? String(n) : undefined })} />

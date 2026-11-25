@@ -10,8 +10,8 @@ import { getTracking, marketingFields, newEventId } from '@/lib/tracking';
  * Link do WhatsApp. Antes de abrir a conversa registra o clique (com a origem da visita),
  * sem bloquear a navegação: o link funciona mesmo se o registro falhar.
  */
-export function WhatsAppButton({ whatsapp, message, propertyId, className = 'btn btn-wa', label = 'Chamar no WhatsApp', textClass }: {
-  whatsapp: string | null; message?: string; propertyId?: string; className?: string; label?: string; textClass?: string;
+export function WhatsAppButton({ whatsapp, message, propertyId, propertyCode, propertyTitle, className = 'btn btn-wa', label = 'Chamar no WhatsApp', textClass }: {
+  whatsapp: string | null; message?: string; propertyId?: string; propertyCode?: string; propertyTitle?: string; className?: string; label?: string; textClass?: string;
 }) {
   const number = waNumber(whatsapp);
   if (!number) return null;
@@ -20,7 +20,10 @@ export function WhatsAppButton({ whatsapp, message, propertyId, className = 'btn
   function track() {
     const t = getTracking();
     const eventId = newEventId();
-    pixelTrack('Contact', {}, eventId);
+    pixelTrack('Contact', {
+      contact_method: 'whatsapp',
+      ...(propertyCode ? { content_ids: [propertyCode], content_type: 'home_listing', ...(propertyTitle ? { content_name: propertyTitle } : {}) } : {}),
+    }, eventId);
     try {
       void fetch(`${browserApi()}/public/whatsapp-click`, {
         method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' },

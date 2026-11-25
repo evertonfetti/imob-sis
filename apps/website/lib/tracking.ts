@@ -1,5 +1,7 @@
 'use client';
 
+import { isInternalTraffic } from './internal';
+
 /** Origem da visita: capturada na chegada e enviada junto com o formulário / clique no WhatsApp. */
 export interface Tracking {
   utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string; utmTerm?: string;
@@ -70,7 +72,7 @@ export const newEventId = () => uuid();
 
 /** Campos de marketing que acompanham o formulário e o clique no WhatsApp. */
 export function marketingFields(eventId: string) {
-  return { eventId, pageUrl: location.href.slice(0, 500), marketingConsent: getConsent() === 'granted' };
+  return { eventId, pageUrl: location.href.slice(0, 500), marketingConsent: getConsent() === 'granted' && !isInternalTraffic(window.__imobSiteHost) };
 }
 
 export function getTracking(): Tracking {
@@ -79,3 +81,5 @@ export function getTracking(): Tracking {
     return { ...t, fbc: cookie('_fbc') ?? t.fbc, fbp: cookie('_fbp') ?? t.fbp };
   } catch { return {}; }
 }
+
+declare global { interface Window { __imobSiteHost?: string } }

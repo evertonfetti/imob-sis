@@ -2,25 +2,29 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { isInternalTraffic } from '@/lib/internal';
+import { flushPixelQueue } from '@/lib/pixel';
 import { getConsent } from '@/lib/tracking';
 
 type Fbq = ((...a: unknown[]) => void) & { queue?: unknown[]; loaded?: boolean; callMethod?: (...a: unknown[]) => void; push?: unknown; version?: string };
 
 /**
  * Pixel da Meta. Só é carregado depois que o visitante aceita o aviso de cookies (LGPD).
- * Se ele recusar, nenhum script da Meta é baixado.
+ * Se ele recusar, nenhum script da Meta é baixado. Acessos internos (equipe, painel e subdomínios) também não carregam o Pixel.
  */
-export function MetaPixel({ pixelId }: { pixelId: string }) {
+export function MetaPixel({ pixelId, siteHost }: { pixelId: string; siteHost?: string }) {
   const [on, setOn] = useState(false);
   const started = useRef(false);
   const path = usePathname();
 
   useEffect(() => {
-    setOn(getConsent() === 'granted');
-    const h = (e: Event) => setOn((e as CustomEvent).detail === 'granted');
+    (window as unknown as { __imobSiteHost?: string }).__imobSiteHost = siteHost;
+    const internal = isInternalTraffic(siteHost);
+    setOn(!internal && getConsent() === 'granted');
+    const h = (e: Event) => setOn(!internal && (e as CustomEvent).detail === 'granted');
     window.addEventListener('imob:consent', h);
     return () => window.removeEventListener('imob:consent', h);
-  }, []);
+  }, [siteHost]);
 
   useEffect(() => {
     if (!on || started.current) return;
@@ -35,6 +39,7 @@ export function MetaPixel({ pixelId }: { pixelId: string }) {
     }
     w.fbq!('init', pixelId);
     w.fbq!('track', 'PageView');
+    flushPixelQueue();
   }, [on, pixelId]);
 
   // PageView nas navegações seguintes (o site troca de página sem recarregar).

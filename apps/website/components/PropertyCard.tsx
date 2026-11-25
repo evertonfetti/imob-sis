@@ -1,14 +1,17 @@
+'use client';
+
 import type { PublicPropertyCard } from '@imob/types';
 import { BedDouble, Car, ImageIcon, MapPin, Ruler } from 'lucide-react';
 import Link from 'next/link';
 import { area, brl, priceOf } from '@/lib/format';
+import { pixelTrackCustom } from '@/lib/pixel';
 
-export function PropertyCard({ p, prefer, priority }: { p: PublicPropertyCard; prefer?: 'SALE' | 'RENT'; priority?: boolean }) {
+export function PropertyCard({ p, prefer, priority, position }: { p: PublicPropertyCard; prefer?: 'SALE' | 'RENT'; priority?: boolean; position?: number }) {
   const price = priceOf(p, prefer);
   const other = p.purpose === 'SALE_AND_RENT' ? (price.kind === 'SALE' ? { v: p.rentPrice, s: '/mês' } : { v: p.salePrice, s: '' }) : null;
   const size = area(p.usefulArea ?? p.totalArea);
   return (
-    <Link href={`/imovel/${p.slug}`} className="pcard">
+    <Link href={`/imovel/${p.slug}`} className="pcard" onClick={() => pixelTrackCustom('PropertyCardClick', { content_ids: [p.code], content_name: p.title, content_type: 'home_listing', ...(position != null ? { position } : {}) })}>
       <div className="pcard-img">
         {p.coverUrl ? (
           <img

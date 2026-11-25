@@ -36,6 +36,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const c = await company();
   const accent = c.primaryColor && /^#[0-9a-fA-F]{6}$/.test(c.primaryColor) ? c.primaryColor : undefined;
+  const pixelId = c.metaPixelId ?? (/^\d{8,20}$/.test(process.env.META_PIXEL_ID ?? '') ? process.env.META_PIXEL_ID! : null);
+  const siteHost = new URL(siteUrl()).hostname;
   const org = {
     '@context': 'https://schema.org', '@type': 'RealEstateAgent', name: c.tradeName ?? c.name, url: siteUrl(),
     ...(c.phone && { telephone: c.phone }), ...(c.email && { email: c.email }), ...(c.logoUrl && { logo: c.logoUrl }),
@@ -48,7 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Footer company={c} />
         <TrackingCapture />
         <PhotoGuard />
-        {c.metaPixelId && <><MetaPixel pixelId={c.metaPixelId} /><ConsentBanner /></>}
+        {pixelId && <><MetaPixel pixelId={pixelId} siteHost={siteHost} /><ConsentBanner /></>}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(org) }} />
       </body>
     </html>

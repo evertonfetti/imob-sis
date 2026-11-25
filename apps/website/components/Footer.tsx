@@ -1,5 +1,6 @@
 import type { PublicCompany } from '@imob/types';
 import Link from 'next/link';
+import { ContactLink } from './ContactLink';
 import { digits } from '@/lib/format';
 
 export function Footer({ company }: { company: PublicCompany }) {
@@ -22,8 +23,8 @@ export function Footer({ company }: { company: PublicCompany }) {
         <div>
           <h4>Contato</h4>
           <ul>
-            {company.phone && <li><a href={`tel:+55${digits(company.phone)}`}>{company.phone}</a></li>}
-            {company.email && <li><a href={`mailto:${company.email}`}>{company.email}</a></li>}
+            {company.phone && <li><ContactLink href={`tel:+55${digits(company.phone)}`} method="phone">{company.phone}</ContactLink></li>}
+            {company.email && <li><ContactLink href={`mailto:${company.email}`} method="email">{company.email}</ContactLink></li>}
             {company.address && <li>{company.address}</li>}
           </ul>
         </div>
