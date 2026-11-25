@@ -10,6 +10,6 @@ import { MetaIntegrationService } from './meta-integration.service';
 @Module({
   controllers: [MarketingController],
   providers: [MarketingService, MarketingQueue, MarketingListener, MarketingReportsService, MetaConversionsService, MetaIntegrationService],
-  exports: [MetaIntegrationService],
+  exports: [MetaIntegrationService, MarketingService],
 })
 export class MarketingModule {}

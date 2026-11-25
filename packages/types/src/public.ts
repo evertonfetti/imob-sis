@@ -65,6 +65,7 @@ export const publicLeadSchema = z.object({
   // Mesmo ID do evento do Pixel no navegador: a Meta junta Pixel + CAPI em um só (deduplicação).
   eventId: z.string().trim().max(80).optional().nullable(),
   pageUrl: attr,
+  visitorId: z.string().trim().max(80).optional().nullable(),
   marketingConsent: z.boolean().optional(),
 });
 export type PublicLeadInput = z.infer<typeof publicLeadSchema>;
@@ -94,7 +95,10 @@ export interface PublicCompany {
   logoUrl: string | null;
   primaryColor: string | null;
   address: string | null;
+  /** Primeiro Pixel ativo (compatibilidade). */
   metaPixelId: string | null;
+  /** Todos os Pixels ativos: o site carrega cada um. */
+  metaPixelIds: string[];
 }
 
 export interface PublicPropertyCard {

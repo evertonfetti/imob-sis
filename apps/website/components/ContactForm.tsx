@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { browserApi } from '@/lib/site';
-import { pixelTrack } from '@/lib/pixel';
+import { pixelSetUser, pixelTrack } from '@/lib/pixel';
 import { getTracking, marketingFields, newEventId } from '@/lib/tracking';
 
 interface Props { propertyId?: string; propertyCode?: string; defaultMessage?: string; cta?: string }
@@ -36,7 +36,8 @@ export function ContactForm({ propertyId, propertyCode, defaultMessage = '', cta
         }),
       });
       if (res.ok) {
-        pixelTrack('Lead', propertyCode ? { content_ids: [propertyCode], content_type: 'home_listing' } : {}, eventId);
+        pixelSetUser({ email: String(f.get('email') ?? ''), phone: String(f.get('phone') ?? ''), name: String(f.get('name') ?? '') });
+        pixelTrack('Lead', propertyCode ? { content_ids: [propertyCode], content_type: 'home_listing' } : {}, eventId, { mirror: false }); // o servidor envia o Lead pelo próprio fluxo, com o mesmo event_id
         setState('ok');
         return;
       }

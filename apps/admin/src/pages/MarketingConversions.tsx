@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth';
 import { dateTime, timeAgo } from '../lib/format';
 
 interface Ev {
-  id: string; eventName: keyof typeof META_EVENT_LABELS; eventId: string; status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED'; error: string | null; attempts: number;
+  id: string; eventName: keyof typeof META_EVENT_LABELS; eventId: string; pixelId?: string; status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED'; error: string | null; attempts: number;
   createdAt: string; sentAt: string | null; lead: { id: string; customer: { name: string } } | null;
 }
 const STATUS: Record<Ev['status'], [string, 'ok' | 'warn' | 'danger' | undefined]> = {
@@ -78,7 +78,7 @@ export function MarketingConversions() {
               const [label, tone] = STATUS[e.status];
               return (
                 <tr key={e.id}>
-                  <td><strong style={{ fontWeight: 500 }}>{META_EVENT_LABELS[e.eventName] ?? e.eventName}</strong><div className="mono">{e.eventId.slice(0, 28)}</div></td>
+                  <td><strong style={{ fontWeight: 500 }}>{META_EVENT_LABELS[e.eventName] ?? e.eventName}</strong><div className="mono">{e.eventId.slice(0, 28)}</div>{e.pixelId && <div className="card-sub">Pixel {e.pixelId}</div>}</td>
                   <td>{e.lead ? <Link to={`/leads/${e.lead.id}`} style={{ color: 'var(--accent)', fontWeight: 500 }}>{e.lead.customer.name}</Link> : <span className="card-sub">—</span>}</td>
                   <td><Badge tone={tone}>{label}</Badge>{e.error && <div className="card-sub" style={{ marginTop: 4, maxWidth: 320, color: e.status === 'FAILED' ? 'var(--danger)' : undefined }}>{e.error}</div>}</td>
                   <td className="num">{e.attempts}</td>

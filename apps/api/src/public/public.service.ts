@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   slugify,
   type PublicCompany, type PublicLeadInput, type PublicListQuery, type PublicPropertyCard, type PublicPropertyDetail,
-  type WhatsappClickInput,
+  type PixelMirrorInput, type WhatsappClickInput,
 } from '@imob/types';
 import { LeadsService } from '../crm/leads.service';
 import { AppException, notFound } from '../common/app-exception';
@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MarketingEvents } from '../marketing/marketing.events';
+import { MarketingService } from '../marketing/marketing.service';
 import { MetaIntegrationService } from '../marketing/meta-integration.service';
 import { PublicCompanyService } from './public-company.service';
 
@@ -36,6 +37,7 @@ export class PublicService {
     private readonly storage: StorageService,
     private readonly leads: LeadsService,
     private readonly metaIntegration: MetaIntegrationService,
+    private readonly marketing: MarketingService,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -66,7 +68,7 @@ export class PublicService {
       name: c.name, tradeName: c.tradeName, creci: c.creci, email: c.email ?? branch?.email ?? null,
       phone: c.phone ?? branch?.phone ?? null, whatsapp: c.whatsapp ?? branch?.whatsapp ?? null,
       website: c.website, logoUrl: c.logoUrl, primaryColor: c.primaryColor, address: address || null,
-      metaPixelId: await this.metaIntegration.publicPixelId(id),
+      ...(await this.metaIntegration.publicPixelIds(id).then((ids) => ({ metaPixelId: ids[0] ?? null, metaPixelIds: ids }))),
     };
   }
 
@@ -250,7 +252,7 @@ export class PublicService {
           landingPage: clean(input.landingPage), referrer: clean(input.referrer),
           campaignId: clean(input.campaignId), adsetId: clean(input.adsetId), adId: clean(input.adId),
           // Guardados agora: a conversão pode ir à Meta dias depois, quando o visitante já saiu do site.
-          clientIp: ctx.ip ?? null, clientUserAgent: ctx.userAgent ?? null, eventId: clean(input.eventId), pageUrl: clean(input.pageUrl),
+          clientIp: ctx.ip ?? null, clientUserAgent: ctx.userAgent ?? null, eventId: clean(input.eventId), pageUrl: clean(input.pageUrl), visitorId: clean(input.visitorId),
           marketingConsent: input.marketingConsent === true,
         },
       });
@@ -278,5 +280,11 @@ export class PublicService {
     });
     // O Marketing decide se o clique vira um evento Contact na Meta (consentimento, Meta conectada...).
     try { await this.events.emitAsync(MarketingEvents.WhatsappClicked, { companyId, clickId: click.id }); } catch { /* nunca atrapalha o visitante */ }
+  }
+
+  /** Evento de navegação que o Pixel disparou no navegador: espelhado na Conversions API com o mesmo event_id. */
+  async pixelEvent(input: PixelMirrorInput, ctx: ReqCtx) {
+    const companyId = await this.company.id();
+    try { await this.marketing.mirror(companyId, input, ctx); } catch { /* nunca atrapalha o visitante */ }
   }
 }

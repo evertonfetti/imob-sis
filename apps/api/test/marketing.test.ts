@@ -5,29 +5,42 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { auth, bootApp, login, resetAndSeed, uploadPhoto } from './helpers';
 
 const PIXEL = '555444333222111';
+const PIXEL2 = '999888777666555';
+const TOKEN2 = 'EAAGsegundoTokenDeTesteDaMeta99999999';
 const TOKEN = 'EAAGcapiTokenDeTesteDaMeta1234567890';
 const sha = (v: string) => createHash('sha256').update(v).digest('hex');
 
 let app: NestFastifyApplication;
 const tk: Record<string, string> = {};
 let typeId: string;
+let pixelRowId: string;
 let stages: { id: string; name: string }[];
 const stage = (n: string) => stages.find((s) => s.name === n)!.id;
 const prisma = createPrismaClient(process.env.TEST_DATABASE_URL ?? '');
 
 // ---------- Meta simulada (CAPI) ----------
 let capiFail: string | null = null;
+let statsDenied = false;
 let failTimes = 0; // falha só as N primeiras chamadas
 const capiCalls: { url: string; auth: string | null; body: any }[] = [];
 const fetchStub = vi.fn(async (input: any, init: any = {}) => {
   const url = String(input);
   const json = (d: unknown, status = 200) => new Response(JSON.stringify(d), { status, headers: { 'content-type': 'application/json' } });
-  if (url.includes(`/${PIXEL}/events`)) {
+  if (url.includes(`/${PIXEL}/stats`) || url.includes(`/${PIXEL2}/stats`)) {
+    if (statsDenied) return json({ error: { message: 'Permissão ads_read necessária', code: 10 } }, 403);
+    const bySource = url.includes('event_detection_method');
+    return json({ data: [
+      { start_time: '2026-11-25T10:00:00+0000', data: bySource ? [{ value: 'browser', count: 7 }, { value: 'server', count: 5 }] : [{ value: 'PageView', count: 9 }, { value: 'Lead', count: 2 }] },
+      { start_time: '2026-11-25T11:00:00+0000', data: bySource ? [{ value: 'browser', count: 1 }] : [{ value: 'PageView', count: 3 }] },
+    ] });
+  }
+  if (url.includes(`/${PIXEL}/events`) || url.includes(`/${PIXEL2}/events`)) {
     capiCalls.push({ url, auth: init.headers?.authorization ?? null, body: JSON.parse(init.body) });
     if (capiFail || failTimes > 0) { failTimes--; return json({ error: { message: capiFail ?? 'Erro temporário', code: 100 } }, 400); }
     return json({ events_received: 1, fbtrace_id: 'TRACE123' });
   }
-  if (url.includes(`/${PIXEL}?fields=`)) return json({ id: PIXEL, name: 'Pixel Atelier' });
+  if (url.includes(`/${PIXEL}?fields=`)) return json({ id: PIXEL, name: 'Pixel Atelier', last_fired_time: '2026-11-25T11:30:00+0000', is_unavailable: false });
+  if (url.includes(`/${PIXEL2}?fields=`)) return json({ id: PIXEL2, name: 'Pixel Secundário' });
   return json({ error: { message: `sem rota simulada: ${url}` } }, 500);
 });
 
@@ -68,25 +81,30 @@ afterAll(async () => { vi.unstubAllGlobals(); await app.close(); await prisma.$d
 
 describe('conexão com a Meta', () => {
   it('guarda o token criptografado, nunca o devolve, valida com a Meta e respeita permissões', async () => {
-    expect((await call('GET', '/marketing/integrations/meta', 'admin')).json()).toMatchObject({ connected: false, pixelId: null });
-    expect((await call('PUT', '/marketing/integrations/meta', 'admin', { pixelId: PIXEL })).statusCode).toBe(400); // falta o token
-    expect((await call('PUT', '/marketing/integrations/meta', 'admin', { pixelId: 'abc', accessToken: TOKEN })).statusCode).toBe(400);
-    expect((await call('PUT', '/marketing/integrations/meta', 'broker', { pixelId: PIXEL, accessToken: TOKEN })).statusCode).toBe(403);
+    expect((await call('GET', '/marketing/integrations/meta', 'admin')).json()).toMatchObject({ connected: false, pixels: [] });
+    expect((await call('POST', '/marketing/integrations/meta/pixels', 'admin', { pixelId: PIXEL })).statusCode).toBe(400); // falta o token
+    expect((await call('POST', '/marketing/integrations/meta/pixels', 'admin', { pixelId: 'abc', accessToken: TOKEN })).statusCode).toBe(400);
+    expect((await call('POST', '/marketing/integrations/meta/pixels', 'broker', { pixelId: PIXEL, accessToken: TOKEN })).statusCode).toBe(403);
 
-    const saved = (await call('PUT', '/marketing/integrations/meta', 'marketing', { pixelId: PIXEL, accessToken: TOKEN, testEventCode: 'TEST123' })).json();
-    expect(saved).toMatchObject({ connected: true, pixelId: PIXEL, accessTokenSet: true, testEventCode: 'TEST123' });
+    const saved = (await call('POST', '/marketing/integrations/meta/pixels', 'marketing', { pixelId: PIXEL, accessToken: TOKEN, testEventCode: 'TEST123' })).json();
+    expect(saved).toMatchObject({ pixelId: PIXEL, accessTokenSet: true, testEventCode: 'TEST123', active: true });
     expect(JSON.stringify(saved)).not.toContain(TOKEN);
-    const row = await prisma.integration.findFirstOrThrow({ where: { provider: 'META_CAPI' } });
+    expect((await call('POST', '/marketing/integrations/meta/pixels', 'admin', { pixelId: PIXEL, accessToken: TOKEN })).statusCode).toBe(409); // já cadastrado
+    const list = (await call('GET', '/marketing/integrations/meta', 'admin')).json();
+    expect(list).toMatchObject({ connected: true });
+    expect(JSON.stringify(list)).not.toContain(TOKEN);
+    const row = await prisma.metaPixel.findFirstOrThrow({ where: { pixelId: PIXEL } });
     expect(row.secrets).not.toContain(TOKEN);
+    pixelRowId = row.id;
 
-    expect((await call('POST', '/marketing/integrations/meta/test', 'admin')).json()).toMatchObject({ ok: true, pixelName: 'Pixel Atelier' });
+    expect((await call('POST', `/marketing/integrations/meta/pixels/${pixelRowId}/test`, 'admin')).json()).toMatchObject({ ok: true, pixelName: 'Pixel Atelier' });
     const site = await app.inject({ method: 'GET', url: '/api/v1/public/company' });
-    expect(site.json().metaPixelId).toBe(PIXEL);
+    expect(site.json()).toMatchObject({ metaPixelId: PIXEL, metaPixelIds: [PIXEL] });
     expect(site.body).not.toContain(TOKEN);
 
     // evento de teste usa o código de teste da Meta e não entra no histórico
     capiCalls.length = 0;
-    expect((await call('POST', '/marketing/integrations/meta/test-event', 'admin')).json()).toMatchObject({ ok: true, eventsReceived: 1 });
+    expect((await call('POST', `/marketing/integrations/meta/pixels/${pixelRowId}/test-event`, 'admin')).json()).toMatchObject({ ok: true, eventsReceived: 1 });
     expect(capiCalls[0]!.body.test_event_code).toBe('TEST123');
     expect(await events()).toHaveLength(0);
   });
@@ -222,7 +240,7 @@ describe('evento Contact (clique no WhatsApp)', () => {
     // consentiu, mas sem fbc/fbp: ainda há IP e navegador do visitante (a Meta aceita, com menor qualidade de correspondência)
     await click({ eventId: 'evt-click-3', marketingConsent: true });
     expect(capiCalls).toHaveLength(1);
-    expect(Object.keys(lastCapi().user_data).sort()).toEqual(['client_ip_address', 'client_user_agent']);
+    expect(Object.keys(lastCapi().user_data).sort()).toEqual(['client_ip_address', 'client_user_agent', 'country']);
   });
 });
 
@@ -329,15 +347,98 @@ describe('relatórios de campanhas', () => {
   });
 });
 
+describe('vários Pixels: um token por Pixel, mesmo event_id em todos', () => {
+  it('cadastra um segundo Pixel; o site carrega os dois e cada conversão vai aos dois com o próprio token', async () => {
+    const p2 = (await call('POST', '/marketing/integrations/meta/pixels', 'admin', { pixelId: PIXEL2, accessToken: TOKEN2, name: 'Secundário' })).json();
+    expect(p2).toMatchObject({ pixelId: PIXEL2, name: 'Secundário' });
+    expect((await app.inject({ method: 'GET', url: '/api/v1/public/company' })).json().metaPixelIds).toEqual([PIXEL, PIXEL2]);
+
+    capiCalls.length = 0;
+    await siteLead({ phone: '11955551111', eventId: 'evt-dois-pixels', marketingConsent: true, fbp: 'fb.1.1.777', visitorId: 'visitante-123' });
+    expect(capiCalls).toHaveLength(2);
+    const byPixel = (px: string) => capiCalls.find((c) => c.url.includes(`/${px}/events`))!;
+    expect(byPixel(PIXEL).auth).toBe(`Bearer ${TOKEN}`);
+    expect(byPixel(PIXEL2).auth).toBe(`Bearer ${TOKEN2}`);
+    for (const px of [PIXEL, PIXEL2]) expect(byPixel(px).body.data[0]).toMatchObject({ event_name: 'Lead', event_id: 'evt-dois-pixels' });
+    expect(byPixel(PIXEL).body.test_event_code).toBeUndefined(); // código de teste só vale no "evento de teste"
+    // o visitante anônimo do navegador liga os eventos de navegação ao lead
+    const ud = byPixel(PIXEL).body.data[0].user_data;
+    expect(ud.external_id).toContain(sha('visitante-123'));
+    expect(ud.external_id).toHaveLength(2);
+    expect(ud.country).toEqual([sha('br')]);
+
+    const rows = (await events()).filter((r) => r.eventId === 'evt-dois-pixels');
+    expect(rows.map((r) => r.pixelId).sort()).toEqual([PIXEL, PIXEL2].sort());
+    expect(rows.every((r) => r.status === 'SENT')).toBe(true);
+  });
+
+  it('Pixel desativado deixa de receber conversões e some do site', async () => {
+    const p2 = await prisma.metaPixel.findFirstOrThrow({ where: { pixelId: PIXEL2 } });
+    expect((await call('PUT', `/marketing/integrations/meta/pixels/${p2.id}`, 'admin', { active: false })).json()).toMatchObject({ active: false });
+    expect((await app.inject({ method: 'GET', url: '/api/v1/public/company' })).json().metaPixelIds).toEqual([PIXEL]);
+    capiCalls.length = 0;
+    await siteLead({ phone: '11955552222', eventId: 'evt-um-pixel', marketingConsent: true, fbp: 'fb.1.1.778' });
+    expect(capiCalls.map((c) => c.url)).toEqual([expect.stringContaining(`/${PIXEL}/events`)]);
+    await call('PUT', `/marketing/integrations/meta/pixels/${p2.id}`, 'admin', { active: true });
+  });
+});
+
+describe('eventos de navegação espelhados no servidor', () => {
+  const post = (payload: unknown) => app.inject({ method: 'POST', url: '/api/v1/public/pixel-events', remoteAddress: '198.51.100.9', headers: { 'user-agent': 'Mozilla/5.0 (Visitante)' }, payload: payload as never });
+
+  it('envia em lote, com o mesmo event_id, IP/navegador/fbp e só os parâmetros permitidos', async () => {
+    capiCalls.length = 0;
+    const ok = { eventId: 'evt-vc-0001', fbp: 'fb.1.1.555', fbc: 'fb.1.1.IwAR9', visitorId: 'visitante-abc', pageUrl: 'https://site.com/imovel/x' };
+    expect((await post({ ...ok, name: 'ViewContent', params: { content_ids: ['CA-1'], content_name: 'Casa', value: 500000, currency: 'BRL', segredo: 'x' } })).statusCode).toBe(204);
+    expect((await post({ ...ok, eventId: 'evt-pv-0002', name: 'PageView' })).statusCode).toBe(204);
+    expect(capiCalls).toHaveLength(0); // ainda no lote
+    await vi.waitFor(() => expect(capiCalls.length).toBeGreaterThanOrEqual(2), { timeout: 5000 });
+    const sent = capiCalls.filter((c) => c.url.includes(`/${PIXEL}/events`));
+    expect(sent).toHaveLength(1); // uma chamada por Pixel, com os dois eventos
+    const [vc, pv] = sent[0]!.body.data;
+    expect(vc).toMatchObject({ event_name: 'ViewContent', event_id: 'evt-vc-0001', action_source: 'website', event_source_url: 'https://site.com/imovel/x' });
+    expect(vc.custom_data).toEqual({ content_ids: ['CA-1'], content_name: 'Casa', value: 500000, currency: 'BRL' });
+    expect(vc.user_data).toMatchObject({ client_ip_address: '198.51.100.9', client_user_agent: 'Mozilla/5.0 (Visitante)', fbp: 'fb.1.1.555', fbc: 'fb.1.1.IwAR9', external_id: [sha('visitante-abc')] });
+    expect(pv).toMatchObject({ event_name: 'PageView', event_id: 'evt-pv-0002' });
+    expect(await prisma.marketingEvent.count({ where: { eventId: { in: ['evt-vc-0001', 'evt-pv-0002'] } } })).toBe(0); // não polui o histórico
+  });
+
+  it('recusa evento fora da lista e dado malformado', async () => {
+    expect((await post({ name: 'Purchase', eventId: 'evt-fake-0001' })).statusCode).toBe(400);
+    expect((await post({ name: 'PageView', eventId: 'x' })).statusCode).toBe(400);
+  });
+});
+
+describe('monitoramento dos Pixels', () => {
+  it('junta o que a Meta recebeu (por evento e por origem) com o que o sistema enviou', async () => {
+    const [a, b] = (await call('GET', '/marketing/integrations/meta/monitor', 'admin')).json();
+    expect(a).toMatchObject({ pixelId: PIXEL, lastFiredTime: '2026-11-25T11:30:00+0000', isUnavailable: false, metaError: null, statsError: null });
+    expect(a.stats).toEqual([{ event: 'PageView', total: 12 }, { event: 'Lead', total: 2 }]);
+    expect(a.sources).toEqual({ browser: 8, server: 5 });
+    expect(a.sent24h.sent).toBeGreaterThan(0);
+    expect(b).toMatchObject({ pixelId: PIXEL2, lastFiredTime: null });
+    expect((await call('GET', '/marketing/integrations/meta/monitor', 'broker')).statusCode).toBe(403);
+  });
+
+  it('token sem permissão de leitura não derruba o monitor: mostra o motivo e segue com os dados locais', async () => {
+    statsDenied = true;
+    try {
+      const [a] = (await call('GET', '/marketing/integrations/meta/monitor', 'admin')).json();
+      expect(a).toMatchObject({ stats: null, sources: null, statsError: expect.stringContaining('ads_read') });
+      expect(a.sent24h.sent).toBeGreaterThan(0);
+    } finally { statsDenied = false; }
+  });
+});
+
 describe('desconectar', () => {
   it('sem Meta conectada nenhum evento é gerado; o Pixel some do site', async () => {
-    expect((await call('DELETE', '/marketing/integrations/meta', 'admin')).statusCode).toBe(204);
-    expect((await app.inject({ method: 'GET', url: '/api/v1/public/company' })).json().metaPixelId).toBeNull();
+    for (const r of await prisma.metaPixel.findMany()) expect((await call('DELETE', `/marketing/integrations/meta/pixels/${r.id}`, 'admin')).statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url: '/api/v1/public/company' })).json()).toMatchObject({ metaPixelId: null, metaPixelIds: [] });
     const before = await prisma.marketingEvent.count();
     capiCalls.length = 0;
     await siteLead({ phone: '11955550099', eventId: 'evt-desconectado', marketingConsent: true, fbp: 'fb.1.1.444' });
     expect(capiCalls).toHaveLength(0);
     expect(await prisma.marketingEvent.count()).toBe(before);
-    expect((await call('POST', '/marketing/integrations/meta/test', 'admin')).json().code).toBe('META_NOT_CONFIGURED');
+    expect((await call('POST', `/marketing/integrations/meta/pixels/${pixelRowId}/test`, 'admin')).statusCode).toBe(404);
   });
 });

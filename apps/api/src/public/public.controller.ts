@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import {
-  publicLeadSchema, publicListSchema, whatsappClickSchema,
-  type PublicLeadInput, type PublicListQuery, type WhatsappClickInput,
+  pixelMirrorSchema, publicLeadSchema, publicListSchema, whatsappClickSchema,
+  type PixelMirrorInput, type PublicLeadInput, type PublicListQuery, type WhatsappClickInput,
 } from '@imob/types';
 import { Public } from '../common/decorators';
 import { Ctx, ReqCtx } from '../common/request-context';
@@ -44,5 +44,11 @@ export class PublicController {
   @Post('whatsapp-click') @HttpCode(204)
   async click(@Body(new ZodPipe(whatsappClickSchema)) body: WhatsappClickInput, @Ctx() ctx: ReqCtx) {
     await this.svc.whatsappClick(body, ctx);
+  }
+
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @Post('pixel-events') @HttpCode(204)
+  async pixelEvent(@Body(new ZodPipe(pixelMirrorSchema)) body: PixelMirrorInput, @Ctx() ctx: ReqCtx) {
+    await this.svc.pixelEvent(body, ctx);
   }
 }

@@ -55,6 +55,15 @@ export function captureTracking() {
   } catch { /* navegação privada ou storage bloqueado: o site segue funcionando */ }
 }
 
+/** Cria o cookie `_fbp` (formato oficial da Meta) se ainda não existir; o Pixel reaproveita o valor. Só com consentimento. */
+export function ensureFbp() {
+  try {
+    if (cookie('_fbp')) return;
+    const v = `fb.1.${Date.now()}.${Math.floor(Math.random() * 1e10)}`;
+    document.cookie = `_fbp=${encodeURIComponent(v)}; max-age=${90 * 86400}; path=/; SameSite=Lax`;
+  } catch { /* sem cookies */ }
+}
+
 export type Consent = 'granted' | 'denied' | null;
 const CONSENT_KEY = 'imob.consent';
 

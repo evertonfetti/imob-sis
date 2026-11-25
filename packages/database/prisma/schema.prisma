@@ -253,6 +253,7 @@ model Company {
   conversations      Conversation[]
   messages           Message[]
   marketingEvents    MarketingEvent[]
+  metaPixels         MetaPixel[]
   socialAccounts     SocialAccount[]
   socialApps         SocialApp[]
   mediaGenerations   MediaGeneration[]
@@ -705,6 +706,8 @@ model LeadAttribution {
   clientUserAgent  String?
   eventId          String?
   pageUrl          String?
+  // Identificador anônimo do visitante: liga os eventos do navegador ao lead (external_id) e melhora a correspondência.
+  visitorId        String?
   marketingConsent Boolean  @default(false)
   createdAt        DateTime @default(now())
 
@@ -955,6 +958,8 @@ model MarketingEvent {
   eventName String
   // Mesmo ID usado no Pixel do navegador (deduplicação).
   eventId   String
+  // Pixel/conjunto de dados que recebeu o evento ("" = nenhum: evento ignorado antes do envio).
+  pixelId   String               @default("")
   status    MarketingEventStatus @default(PENDING)
   payload   Json?
   response  Json?
@@ -968,10 +973,30 @@ model MarketingEvent {
   customer   Customer? @relation(fields: [customerId], references: [id])
   customerId String?
 
-  @@unique([companyId, provider, eventId])
+  @@unique([companyId, provider, eventId, pixelId])
   @@index([companyId, createdAt])
   @@index([leadId, eventName])
   @@map("marketing_events")
+}
+
+// Pixels da Meta da empresa. Cada um tem o seu token da Conversions API (a Meta emite um token por Pixel);
+// o navegador carrega todos os ativos e o servidor envia cada conversão a todos os que têm token.
+model MetaPixel {
+  id            String   @id @default(uuid(7))
+  companyId     String
+  pixelId       String
+  name          String?
+  // JSON criptografado: { accessToken }. Nunca sai pela API.
+  secrets       String
+  testEventCode String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, pixelId])
+  @@map("meta_pixels")
 }
 
 // ---------- Bloco 8 — Publicação em redes sociais ----------

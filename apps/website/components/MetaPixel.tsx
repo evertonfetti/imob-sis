@@ -3,16 +3,16 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { isInternalTraffic } from '@/lib/internal';
-import { flushPixelQueue } from '@/lib/pixel';
-import { getConsent } from '@/lib/tracking';
+import { flushPixelQueue, pixelTrack, registerPixelIds } from '@/lib/pixel';
+import { ensureFbp, getConsent, getTracking } from '@/lib/tracking';
 
 type Fbq = ((...a: unknown[]) => void) & { queue?: unknown[]; loaded?: boolean; callMethod?: (...a: unknown[]) => void; push?: unknown; version?: string };
 
 /**
- * Pixel da Meta. Só é carregado depois que o visitante aceita o aviso de cookies (LGPD).
+ * Pixel(s) da Meta. Só é carregado depois que o visitante aceita o aviso de cookies (LGPD).
  * Se ele recusar, nenhum script da Meta é baixado. Acessos internos (equipe, painel e subdomínios) também não carregam o Pixel.
  */
-export function MetaPixel({ pixelId, siteHost }: { pixelId: string; siteHost?: string }) {
+export function MetaPixel({ pixelIds, siteHost }: { pixelIds: string[]; siteHost?: string }) {
   const [on, setOn] = useState(false);
   const started = useRef(false);
   const path = usePathname();
@@ -37,16 +37,20 @@ export function MetaPixel({ pixelId, siteHost }: { pixelId: string; siteHost?: s
       s.async = true; s.src = 'https://connect.facebook.net/en_US/fbevents.js';
       document.head.appendChild(s);
     }
-    w.fbq!('init', pixelId);
-    w.fbq!('track', 'PageView');
+    // O _fbp nasce antes do Pixel carregar: o espelho no servidor já sai com ele e a correspondência melhora.
+    ensureFbp();
+    const visitorId = getTracking().visitorId;
+    for (const id of pixelIds) w.fbq!('init', id, visitorId ? { external_id: visitorId } : {});
+    registerPixelIds(pixelIds);
+    pixelTrack('PageView');
     flushPixelQueue();
-  }, [on, pixelId]);
+  }, [on, pixelIds]);
 
   // PageView nas navegações seguintes (o site troca de página sem recarregar).
   const first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
-    (window as unknown as { fbq?: Fbq }).fbq?.('track', 'PageView');
+    if ((window as unknown as { fbq?: Fbq }).fbq) pixelTrack('PageView');
   }, [path]);
 
   return null;

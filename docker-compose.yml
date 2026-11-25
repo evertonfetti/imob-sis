@@ -108,7 +108,7 @@ services:
       # O servidor do site fala com a API pela rede interna do Docker; o navegador usa a URL pública.
       API_INTERNAL_URL: http://api:3333/api/v1
       SITE_URL: "${SITE_URL:?defina SITE_URL (ex. https://www.seudominio.com.br)}"
-      # Opcional: ID do Pixel usado no site quando nenhum foi conectado em Integrações.
+      # Opcional: ID(s) do Pixel (separados por vírgula) usados só no navegador quando nenhum foi cadastrado em Integrações.
       META_PIXEL_ID: "${META_PIXEL_ID:-}"
     expose:
       - "3000"

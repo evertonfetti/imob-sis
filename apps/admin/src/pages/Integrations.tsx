@@ -121,36 +121,117 @@ export function Integrations() {
   );
 }
 
-interface MetaStatus { connected: boolean; pixelId: string | null; pixelName: string | null; testEventCode: string | null; accessTokenSet: boolean }
+interface PixelRow { id: string; pixelId: string; name: string | null; active: boolean; testEventCode: string | null; accessTokenSet: boolean }
+interface MetaStatus { connected: boolean; pixels: PixelRow[] }
+interface PixelMonitor {
+  id: string; pixelId: string; name: string | null; active: boolean;
+  lastFiredTime: string | null; isUnavailable: boolean | null; metaError: string | null;
+  stats: { event: string; total: number }[] | null; statsError: string | null; sources: { browser: number; server: number } | null;
+  sent24h: { sent: number; failed: number; pending: number }; lastError: string | null;
+}
+
+const ago = (iso: string | null) => {
+  if (!iso) return null;
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return m < 1 ? 'agora há pouco' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.round(m / 60)} h` : `há ${Math.round(m / 1440)} dia(s)`;
+};
+
+function PixelItem({ px, mon }: { px: PixelRow; mon?: PixelMonitor }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [edit, setEdit] = useState(false);
+  const [f, setF] = useState({ name: px.name ?? '', testEventCode: px.testEventCode ?? '', accessToken: '' });
+  const [err, setErr] = useState<unknown>(null);
+  const fe = fieldErrors(err);
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['integration-meta'] }); qc.invalidateQueries({ queryKey: ['integration-meta-monitor'] }); };
+  const save = useMutation({
+    mutationFn: (body: object) => api(`/marketing/integrations/meta/pixels/${px.id}`, { method: 'PUT', body }),
+    onSuccess: () => { refresh(); setEdit(false); setErr(null); setF((v) => ({ ...v, accessToken: '' })); toast.show('Pixel atualizado.'); },
+    onError: setErr,
+  });
+  const test = useMutation({
+    mutationFn: () => api<{ pixelName: string | null }>(`/marketing/integrations/meta/pixels/${px.id}/test`, { method: 'POST' }),
+    onSuccess: (r) => { refresh(); toast.show(`Token ok${r.pixelName ? `: ${r.pixelName}` : ''}`); },
+    onError: (e) => toast.show(errorMessage(e)),
+  });
+  const testEvent = useMutation({
+    mutationFn: () => api<{ eventsReceived: number }>(`/marketing/integrations/meta/pixels/${px.id}/test-event`, { method: 'POST' }),
+    onSuccess: (r) => toast.show(`Evento de teste enviado (${r.eventsReceived} recebido). Confira em "Testar eventos" na Meta.`),
+    onError: (e) => toast.show(errorMessage(e)),
+  });
+  const remove = useMutation({
+    mutationFn: () => api(`/marketing/integrations/meta/pixels/${px.id}`, { method: 'DELETE' }),
+    onSuccess: () => { refresh(); toast.show('Pixel removido.'); },
+    onError: (e) => toast.show(errorMessage(e)),
+  });
+
+  const last = ago(mon?.lastFiredTime ?? null);
+  const stale = mon?.lastFiredTime ? Date.now() - new Date(mon.lastFiredTime).getTime() > 24 * 3600_000 : false;
+  const src = mon?.sources;
+  const total = src ? src.browser + src.server : 0;
+  return (
+    <div style={{ borderTop: '1px solid var(--line)', padding: '14px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <strong>{px.name ?? 'Pixel'}</strong> <span className="mono">{px.pixelId}</span>
+          <div className="card-sub">{px.testEventCode ? `Código de teste: ${px.testEventCode}` : 'Sem código de teste'}</div>
+        </div>
+        <div className="toolbar">
+          <Badge tone={px.active ? 'ok' : undefined}>{px.active ? 'Ativo' : 'Desativado'}</Badge>
+          <Button type="button" onClick={() => test.mutate()} disabled={test.isPending}>Testar token</Button>
+          {px.testEventCode && <Button type="button" onClick={() => testEvent.mutate()} disabled={testEvent.isPending}>Evento de teste</Button>}
+          <Button type="button" onClick={() => save.mutate({ active: !px.active })} disabled={save.isPending}>{px.active ? 'Desativar' : 'Ativar'}</Button>
+          <Button type="button" onClick={() => setEdit((v) => !v)}>{edit ? 'Fechar' : 'Editar'}</Button>
+          <Button type="button" variant="danger" onClick={() => confirm(`Remover o Pixel ${px.pixelId}? Ele some do site e deixa de receber eventos. O histórico é mantido.`) && remove.mutate()}>Remover</Button>
+        </div>
+      </div>
+
+      {mon && (
+        <div className="kv" style={{ marginTop: 10 }}>
+          <div className="kvrow"><span>Último disparo na Meta</span><span>{mon.metaError ? <span style={{ color: 'var(--danger)' }}>{mon.metaError}</span> : last ? <>{last} {stale && <Badge tone="warn">parado há mais de 24 h</Badge>}</> : 'Nenhum disparo registrado'}</span></div>
+          {mon.isUnavailable && <div className="kvrow"><span>Estado</span><Badge tone="danger">Pixel indisponível na Meta</Badge></div>}
+          <div className="kvrow"><span>Enviados pelo sistema (24 h)</span><span>{mon.sent24h.sent} enviados{mon.sent24h.failed > 0 && <> · <span style={{ color: 'var(--danger)' }}>{mon.sent24h.failed} com falha</span></>}{mon.sent24h.pending > 0 && <> · {mon.sent24h.pending} na fila</>}</span></div>
+          {mon.lastError && mon.sent24h.failed > 0 && <div className="kvrow"><span>Último erro</span><span style={{ color: 'var(--danger)' }}>{mon.lastError}</span></div>}
+          {mon.statsError ? (
+            <div className="kvrow"><span>Eventos recebidos (24 h)</span><span className="card-sub" style={{ maxWidth: 420, textAlign: 'right' }}>Este token não permite ler estatísticas: {mon.statsError}</span></div>
+          ) : (
+            <>
+              <div className="kvrow"><span>Origem dos eventos (24 h)</span><span>{src && total > 0 ? `Navegador ${src.browser} · Servidor ${src.server}${src.server === 0 ? ' — sem eventos do servidor' : src.browser === 0 ? ' — sem eventos do navegador' : ''}` : 'Sem eventos'}</span></div>
+              <div className="kvrow"><span>Eventos recebidos (24 h)</span><span style={{ textAlign: 'right' }}>{mon.stats?.length ? mon.stats.slice(0, 8).map((s) => `${s.event} ${s.total}`).join(' · ') : 'Nenhum'}</span></div>
+            </>
+          )}
+        </div>
+      )}
+
+      {edit && (
+        <form className="form-grid" style={{ marginTop: 12 }} onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate({ name: f.name, testEventCode: f.testEventCode, ...(f.accessToken && { accessToken: f.accessToken }) }); }}>
+          <Field label="Apelido" error={fe.name}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Ex.: Pixel principal" /></Field>
+          <Field label="Código de teste (opcional)" hint="Aba “Testar eventos”, ex.: TEST12345."><Input value={f.testEventCode} onChange={(e) => setF({ ...f, testEventCode: e.target.value })} /></Field>
+          <Field label="Token deste Pixel" className="span-2" error={fe.accessToken} hint="Já salvo. Preencha somente para trocar.">
+            <Input type="password" autoComplete="off" value={f.accessToken} onChange={(e) => setF({ ...f, accessToken: e.target.value })} placeholder="•••••••• (salvo)" />
+          </Field>
+          <div className="span-2"><Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Salvando…' : 'Salvar'}</Button></div>
+        </form>
+      )}
+      {toast.node}
+    </div>
+  );
+}
 
 function MetaCard() {
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey: ['integration-meta'], queryFn: () => api<MetaStatus>('/marketing/integrations/meta') });
+  // A leitura na Meta é mais lenta que o cadastro: carrega à parte e atualiza a cada 2 min.
+  const mon = useQuery({ queryKey: ['integration-meta-monitor'], queryFn: () => api<PixelMonitor[]>('/marketing/integrations/meta/monitor'), enabled: !!q.data?.pixels.length, refetchInterval: 120_000 });
   const s = q.data;
-  const [f, setF] = useState<{ pixelId?: string; accessToken: string; testEventCode?: string }>({ accessToken: '' });
+  const [f, setF] = useState({ pixelId: '', accessToken: '', name: '', testEventCode: '' });
   const [err, setErr] = useState<unknown>(null);
   const fe = fieldErrors(err);
-  const val = (k: 'pixelId' | 'testEventCode') => f[k] ?? (k === 'pixelId' ? s?.pixelId : s?.testEventCode) ?? '';
-  const save = useMutation({
-    mutationFn: () => api('/marketing/integrations/meta', { method: 'PUT', body: { pixelId: val('pixelId') || undefined, ...(f.accessToken && { accessToken: f.accessToken }), testEventCode: val('testEventCode') } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['integration-meta'] }); setF({ accessToken: '' }); setErr(null); toast.show('Conexão salva.'); },
+  const add = useMutation({
+    mutationFn: () => api('/marketing/integrations/meta/pixels', { method: 'POST', body: { pixelId: f.pixelId, accessToken: f.accessToken, name: f.name, testEventCode: f.testEventCode } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['integration-meta'] }); qc.invalidateQueries({ queryKey: ['integration-meta-monitor'] }); setF({ pixelId: '', accessToken: '', name: '', testEventCode: '' }); setErr(null); toast.show('Pixel adicionado.'); },
     onError: setErr,
-  });
-  const test = useMutation({
-    mutationFn: () => api<{ pixelName: string | null }>('/marketing/integrations/meta/test', { method: 'POST' }),
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['integration-meta'] }); toast.show(`Conexão ok${r.pixelName ? `: ${r.pixelName}` : ''}`); },
-    onError: (e) => toast.show(errorMessage(e)),
-  });
-  const testEvent = useMutation({
-    mutationFn: () => api<{ eventsReceived: number }>('/marketing/integrations/meta/test-event', { method: 'POST' }),
-    onSuccess: (r) => toast.show(`Evento de teste enviado (${r.eventsReceived} recebido). Confira em "Testar eventos" na Meta.`),
-    onError: (e) => toast.show(errorMessage(e)),
-  });
-  const remove = useMutation({
-    mutationFn: () => api('/marketing/integrations/meta', { method: 'DELETE' }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['integration-meta'] }); setF({ accessToken: '' }); toast.show('Meta desconectada.'); },
-    onError: (e) => toast.show(errorMessage(e)),
   });
 
   return (
@@ -158,34 +239,34 @@ function MetaCard() {
       <div className="card-head">
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div className="brand-mark" style={{ background: '#2f5d86' }}><Plug /></div>
-          <div><div className="card-title">Meta Pixel e Conversions API</div><div className="card-sub">Mede as campanhas e devolve à Meta os leads que realmente viram negócio.</div></div>
+          <div><div className="card-title">Meta Pixels e Conversions API</div><div className="card-sub">Você pode ter vários Pixels ativos ao mesmo tempo. Cada um tem o seu token, e cada conversão vai a todos com o mesmo identificador, para a Meta contar uma vez só.</div></div>
         </div>
-        <Badge tone={s?.connected ? 'ok' : undefined}>{s?.connected ? 'Conectado' : 'Não conectado'}</Badge>
+        <Badge tone={s?.connected ? 'ok' : undefined}>{s?.connected ? `${s.pixels.filter((p) => p.active).length} ativo(s)` : 'Não conectado'}</Badge>
       </div>
-      <form className="section-body" onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); save.mutate(); }}>
+      <div className="section-body">
         {q.isLoading ? <SkeletonRows rows={3} /> : (
           <>
-            {err != null && !Object.keys(fe).length && <div className="alert" style={{ marginBottom: 16 }}>{errorMessage(err)}</div>}
-            {s?.connected && s.pixelName && <div className="kvrow" style={{ marginBottom: 12 }}><span>Pixel</span><span>{s.pixelName}</span></div>}
-            <div className="form-grid">
-              <Field label="ID do Pixel (conjunto de dados)" error={fe.pixelId} hint="Gerenciador de Eventos → Fontes de dados."><Input required inputMode="numeric" value={val('pixelId')} onChange={(e) => setF({ ...f, pixelId: e.target.value })} placeholder="123456789012345" /></Field>
-              <Field label="Código de teste (opcional)" hint="Aba “Testar eventos”, ex.: TEST12345."><Input value={val('testEventCode')} onChange={(e) => setF({ ...f, testEventCode: e.target.value })} /></Field>
-              <Field label="Token de acesso da Conversions API" className="span-2" error={fe.accessToken} hint={s?.accessTokenSet ? 'Já salvo. Preencha somente para trocar.' : 'Gerado nas configurações do conjunto de dados. Fica criptografado e nunca é exibido de volta.'}>
-                <Input type="password" autoComplete="off" required={!s?.accessTokenSet} value={f.accessToken} onChange={(e) => setF({ ...f, accessToken: e.target.value })} placeholder={s?.accessTokenSet ? '•••••••• (salvo)' : 'EAAG…'} />
-              </Field>
-            </div>
-            <p className="card-sub" style={{ marginTop: 14 }}>Privacidade: e-mail e telefone vão sempre com <strong>hash</strong> (SHA-256), e só de visitantes que <strong>aceitaram</strong> o aviso de cookies do site. O Pixel só é carregado após esse aceite.</p>
-            <div className="toolbar" style={{ justifyContent: 'space-between', marginTop: 18 }}>
-              <div className="toolbar">
-                {s?.connected && <Button type="button" onClick={() => test.mutate()} disabled={test.isPending}>Testar conexão</Button>}
-                {s?.connected && s.testEventCode && <Button type="button" onClick={() => testEvent.mutate()} disabled={testEvent.isPending}>Enviar evento de teste</Button>}
-                {s?.connected && <Button type="button" variant="danger" onClick={() => confirm('Desconectar a Meta? O Pixel some do site e nenhum evento novo é enviado. O histórico é mantido.') && remove.mutate()}>Desconectar</Button>}
+            {s?.pixels.map((px) => <PixelItem key={px.id} px={px} mon={mon.data?.find((m) => m.id === px.id)} />)}
+            {!!s?.pixels.length && mon.isLoading && <div className="card-sub" style={{ marginBottom: 8 }}>Consultando a Meta…</div>}
+            <form style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }} onSubmit={(e: FormEvent) => { e.preventDefault(); setErr(null); add.mutate(); }}>
+              <div className="card-title" style={{ marginBottom: 10 }}>Adicionar Pixel</div>
+              {err != null && !Object.keys(fe).length && <div className="alert" style={{ marginBottom: 12 }}>{errorMessage(err)}</div>}
+              <div className="form-grid">
+                <Field label="ID do Pixel (conjunto de dados)" error={fe.pixelId} hint="Gerenciador de Eventos → Fontes de dados."><Input required inputMode="numeric" value={f.pixelId} onChange={(e) => setF({ ...f, pixelId: e.target.value })} placeholder="123456789012345" /></Field>
+                <Field label="Apelido (opcional)" error={fe.name}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Ex.: Pixel principal" /></Field>
+                <Field label="Token de acesso da Conversions API deste Pixel" className="span-2" error={fe.accessToken} hint="Gerado nas configurações do conjunto de dados. Fica criptografado e nunca é exibido de volta.">
+                  <Input type="password" autoComplete="off" required value={f.accessToken} onChange={(e) => setF({ ...f, accessToken: e.target.value })} placeholder="EAAG…" />
+                </Field>
+                <Field label="Código de teste (opcional)" hint="Aba “Testar eventos”, ex.: TEST12345. Usado só no botão “Evento de teste”."><Input value={f.testEventCode} onChange={(e) => setF({ ...f, testEventCode: e.target.value })} /></Field>
               </div>
-              <Button variant="primary" disabled={save.isPending}>{save.isPending ? 'Salvando…' : s?.connected ? 'Salvar alterações' : 'Conectar'}</Button>
-            </div>
+              <p className="card-sub" style={{ marginTop: 14 }}>Privacidade: e-mail e telefone vão sempre com <strong>hash</strong> (SHA-256), e só de visitantes que <strong>aceitaram</strong> o aviso de cookies do site. O Pixel só é carregado após esse aceite, e acessos da equipe (painel, subdomínios) ficam de fora.</p>
+              <div className="toolbar" style={{ justifyContent: 'flex-end', marginTop: 14 }}>
+                <Button variant="primary" disabled={add.isPending}>{add.isPending ? 'Adicionando…' : 'Adicionar Pixel'}</Button>
+              </div>
+            </form>
           </>
         )}
-      </form>
+      </div>
       {toast.node}
     </section>
   );

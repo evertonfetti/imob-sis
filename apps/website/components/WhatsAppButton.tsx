@@ -23,7 +23,7 @@ export function WhatsAppButton({ whatsapp, message, propertyId, propertyCode, pr
     pixelTrack('Contact', {
       contact_method: 'whatsapp',
       ...(propertyCode ? { content_ids: [propertyCode], content_type: 'home_listing', ...(propertyTitle ? { content_name: propertyTitle } : {}) } : {}),
-    }, eventId);
+    }, eventId, { mirror: false }); // o servidor registra o clique e envia o Contact pelo próprio fluxo, com o mesmo event_id
     try {
       void fetch(`${browserApi()}/public/whatsapp-click`, {
         method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' },

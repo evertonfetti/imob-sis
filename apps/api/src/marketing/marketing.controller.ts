@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
-import { listMarketingEventsSchema, marketingPeriodSchema, metaIntegrationSchema, type MetaIntegrationInput } from '@imob/types';
+import { createMetaPixelSchema, listMarketingEventsSchema, marketingPeriodSchema, updateMetaPixelSchema, type CreateMetaPixelInput, type UpdateMetaPixelInput } from '@imob/types';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
 import { notFound } from '../common/app-exception';
@@ -42,7 +42,7 @@ export class MarketingController {
     const [rows, total] = await Promise.all([
       this.prisma.marketingEvent.findMany({
         where, orderBy: { createdAt: 'desc' }, skip: (q.page - 1) * q.pageSize, take: q.pageSize,
-        select: { id: true, eventName: true, eventId: true, status: true, error: true, attempts: true, createdAt: true, sentAt: true, response: true, lead: { select: { id: true, customer: { select: { name: true } } } } },
+        select: { id: true, eventName: true, eventId: true, pixelId: true, status: true, error: true, attempts: true, createdAt: true, sentAt: true, response: true, lead: { select: { id: true, customer: { select: { name: true } } } } },
       }),
       this.prisma.marketingEvent.count({ where }),
     ]);
@@ -69,15 +69,22 @@ export class MarketingController {
   @Get('integrations/meta') @RequirePermissions('marketing.capi')
   status(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.meta.status(ctx.user!.companyId); }
 
-  @Put('integrations/meta') @RequirePermissions('marketing.capi')
-  save(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(metaIntegrationSchema)) body: MetaIntegrationInput): Promise<unknown> { return this.meta.save(c(ctx), body); }
+  @Post('integrations/meta/pixels') @HttpCode(201) @RequirePermissions('marketing.capi')
+  create(@Ctx() ctx: ReqCtx, @Body(new ZodPipe(createMetaPixelSchema)) body: CreateMetaPixelInput): Promise<unknown> { return this.meta.create(c(ctx), body); }
 
-  @Post('integrations/meta/test') @HttpCode(200) @RequirePermissions('marketing.capi')
-  test(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.meta.test(c(ctx)); }
+  @Put('integrations/meta/pixels/:id') @RequirePermissions('marketing.capi')
+  update(@Ctx() ctx: ReqCtx, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(updateMetaPixelSchema)) body: UpdateMetaPixelInput): Promise<unknown> { return this.meta.update(c(ctx), id, body); }
 
-  @Post('integrations/meta/test-event') @HttpCode(200) @RequirePermissions('marketing.capi')
-  testEvent(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.marketing.sendTestEvent(ctx.user!.companyId); }
+  @Post('integrations/meta/pixels/:id/test') @HttpCode(200) @RequirePermissions('marketing.capi')
+  test(@Ctx() ctx: ReqCtx, @Param('id', ParseUUIDPipe) id: string): Promise<unknown> { return this.meta.test(c(ctx), id); }
 
-  @Delete('integrations/meta') @HttpCode(204) @RequirePermissions('marketing.capi')
-  async remove(@Ctx() ctx: ReqCtx) { await this.meta.remove(c(ctx)); }
+  @Post('integrations/meta/pixels/:id/test-event') @HttpCode(200) @RequirePermissions('marketing.capi')
+  testEvent(@Ctx() ctx: ReqCtx, @Param('id', ParseUUIDPipe) id: string): Promise<unknown> { return this.marketing.sendTestEvent(ctx.user!.companyId, id); }
+
+  @Delete('integrations/meta/pixels/:id') @HttpCode(204) @RequirePermissions('marketing.capi')
+  async remove(@Ctx() ctx: ReqCtx, @Param('id', ParseUUIDPipe) id: string) { await this.meta.remove(c(ctx), id); }
+
+  /** Saúde dos Pixels: o que a Meta recebeu nas últimas 24 h (navegador x servidor) e o que o sistema enviou. */
+  @Get('integrations/meta/monitor') @RequirePermissions('marketing.capi')
+  monitor(@Ctx() ctx: ReqCtx): Promise<unknown> { return this.meta.monitor(ctx.user!.companyId); }
 }
