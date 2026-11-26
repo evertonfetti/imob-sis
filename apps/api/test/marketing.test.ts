@@ -21,6 +21,7 @@ const prisma = createPrismaClient(process.env.TEST_DATABASE_URL ?? '');
 // ---------- Meta simulada (CAPI) ----------
 let capiFail: string | null = null;
 let statsDenied = false;
+let readDenied = false;
 let failTimes = 0; // falha só as N primeiras chamadas
 const capiCalls: { url: string; auth: string | null; body: any }[] = [];
 const fetchStub = vi.fn(async (input: any, init: any = {}) => {
@@ -39,6 +40,7 @@ const fetchStub = vi.fn(async (input: any, init: any = {}) => {
     if (capiFail || failTimes > 0) { failTimes--; return json({ error: { message: capiFail ?? 'Erro temporário', code: 100 } }, 400); }
     return json({ events_received: 1, fbtrace_id: 'TRACE123' });
   }
+  if (readDenied && url.includes('?fields=')) return json({ error: { message: '(#100) Missing Permission', code: 100 } }, 400);
   if (url.includes(`/${PIXEL}?fields=`)) return json({ id: PIXEL, name: 'Pixel Atelier', last_fired_time: '2026-11-25T11:30:00+0000', is_unavailable: false });
   if (url.includes(`/${PIXEL2}?fields=`)) return json({ id: PIXEL2, name: 'Pixel Secundário' });
   return json({ error: { message: `sem rota simulada: ${url}` } }, 500);
@@ -427,6 +429,16 @@ describe('monitoramento dos Pixels', () => {
       expect(a).toMatchObject({ stats: null, sources: null, statsError: expect.stringContaining('ads_read') });
       expect(a.sent24h.sent).toBeGreaterThan(0);
     } finally { statsDenied = false; }
+  });
+});
+
+describe('token que só envia (sem permissão de leitura)', () => {
+  it('"Testar token" explica em vez de falhar; o monitor mostra o motivo', async () => {
+    readDenied = true;
+    try {
+      expect((await call('POST', `/marketing/integrations/meta/pixels/${pixelRowId}/test`, 'admin')).json()).toMatchObject({ ok: true, readable: false });
+      expect((await call('GET', '/marketing/integrations/meta/monitor', 'admin')).json()[0].metaError).toMatch(/sem permissão de leitura/);
+    } finally { readDenied = false; }
   });
 });
 

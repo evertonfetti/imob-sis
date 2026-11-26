@@ -150,8 +150,11 @@ function PixelItem({ px, mon }: { px: PixelRow; mon?: PixelMonitor }) {
     onError: setErr,
   });
   const test = useMutation({
-    mutationFn: () => api<{ pixelName: string | null }>(`/marketing/integrations/meta/pixels/${px.id}/test`, { method: 'POST' }),
-    onSuccess: (r) => { refresh(); toast.show(`Token ok${r.pixelName ? `: ${r.pixelName}` : ''}`); },
+    mutationFn: () => api<{ pixelName: string | null; readable: boolean }>(`/marketing/integrations/meta/pixels/${px.id}/test`, { method: 'POST' }),
+    onSuccess: (r) => {
+      refresh();
+      toast.show(r.readable ? `Token ok${r.pixelName ? `: ${r.pixelName}` : ''}` : 'A Meta aceitou o token, mas ele não tem permissão de leitura (comum em tokens do Gerenciador de Eventos). Isso não impede o envio: para validar, informe o código de teste e use “Evento de teste”.');
+    },
     onError: (e) => toast.show(errorMessage(e)),
   });
   const testEvent = useMutation({

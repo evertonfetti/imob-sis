@@ -14,6 +14,8 @@ export interface MetaConfig { id: string; pixelId: string; accessToken: string; 
 
 type PixelRow = { id: string; pixelId: string; name: string | null; active: boolean; testEventCode: string | null };
 const dto = (r: PixelRow): MetaPixelDto => ({ id: r.id, pixelId: r.pixelId, name: r.name, active: r.active, testEventCode: r.testEventCode, accessTokenSet: true });
+/** (#100) Missing Permission: o token (ex.: gerado no Gerenciador de Eventos) serve para ENVIAR eventos, mas não para LER dados do Pixel. */
+const noReadPermission = (e: unknown) => e instanceof MetaApiError && e.code === 100 && /permission/i.test(e.message);
 const metaMsg = (e: unknown) => (e instanceof MetaApiError ? e.message : (e as Error)?.message ?? 'sem resposta');
 
 @Injectable()
@@ -105,8 +107,10 @@ export class MetaIntegrationService {
     try {
       const px = await this.capi.getPixel(this.cfgOf(row));
       if (!row.name && px.name) await this.prisma.metaPixel.update({ where: { id }, data: { name: px.name } });
-      return { ok: true, pixelName: px.name ?? null };
+      return { ok: true, readable: true, pixelName: px.name ?? null };
     } catch (e) {
+      // Não é erro de envio: a Meta só recusou a LEITURA. O envio é validado com o "Evento de teste".
+      if (noReadPermission(e)) return { ok: true, readable: false, pixelName: null };
       throw new AppException('META_TEST_FAILED', 400, `A Meta recusou: ${metaMsg(e)}`);
     }
   }
@@ -134,7 +138,7 @@ export class MetaIntegrationService {
         id: r.id, pixelId: r.pixelId, name: r.name, active: r.active,
         lastFiredTime: 'v' in health ? health.v.last_fired_time ?? null : null,
         isUnavailable: 'v' in health ? health.v.is_unavailable ?? null : null,
-        metaError: 'e' in health ? health.e : null,
+        metaError: 'e' in health ? (health.e.includes('Missing Permission') ? 'Token sem permissão de leitura (ele só envia eventos)' : health.e) : null,
         stats: 'v' in byEvent ? [...byEvent.v].map(([event, total]) => ({ event, total })).sort((a, b) => b.total - a.total) : null,
         statsError: 'e' in byEvent ? byEvent.e : null,
         sources: src ? { browser: src.get('browser') ?? 0, server: src.get('server') ?? 0 } : null,

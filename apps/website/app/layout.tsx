@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Pixels ativos cadastrados em Integrações; sem nenhum, usa META_PIXEL_ID (um ou mais IDs separados por vírgula).
   const envIds = (process.env.META_PIXEL_ID ?? '').split(',').map((v) => v.trim()).filter((v) => /^\d{8,20}$/.test(v));
   const pixelIds = c.metaPixelIds?.length ? c.metaPixelIds : envIds;
-  // Padrão: o Pixel carrega sempre. PIXEL_REQUIRE_CONSENT=true volta a exigir o aceite do aviso de cookies.
+  // Padrão: o Pixel carrega sempre e o aviso de cookies é só informativo. PIXEL_REQUIRE_CONSENT=true exige o aceite.
   const requireConsent = process.env.PIXEL_REQUIRE_CONSENT === 'true';
   const siteHost = new URL(siteUrl()).hostname;
   const org = {
@@ -54,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Footer company={c} />
         <TrackingCapture />
         <PhotoGuard />
-        {pixelIds.length > 0 && <><MetaPixel pixelIds={pixelIds} siteHost={siteHost} requireConsent={requireConsent} />{requireConsent && <ConsentBanner />}</>}
+        {pixelIds.length > 0 && <><MetaPixel pixelIds={pixelIds} siteHost={siteHost} requireConsent={requireConsent} /><ConsentBanner ask={requireConsent} /></>}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(org) }} />
       </body>
     </html>
