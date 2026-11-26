@@ -7,6 +7,7 @@ import { SearchBox } from '@/components/SearchBox';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { getCompany, getFilters, getProperties } from '@/lib/api';
 import { brl, priceOf } from '@/lib/format';
+import { cityPath, hoodPath } from '@/lib/geo';
 
 export default async function Home() {
   const [company, filters, featured, recent] = await Promise.all([
@@ -56,6 +57,18 @@ export default async function Home() {
           <div className="section-head"><div><h2 id="tipos">Explore por tipo</h2></div></div>
           <div className="types">
             {filters.types.map((t) => <Link key={t.slug} href={`/imoveis?type=${t.slug}`} className="type-tile">{t.name}<span>{t.count}</span></Link>)}
+          </div>
+        </section>
+      )}
+
+      {filters.cities.length > 0 && (
+        <section className="section wrap" aria-labelledby="regioes">
+          <div className="section-head"><div><h2 id="regioes">Imóveis por região</h2></div></div>
+          <div className="types">
+            {filters.cities.map((c) => <Link key={c.name} href={cityPath('/imoveis', c.name)} className="type-tile">{c.name}<span>{c.count}</span></Link>)}
+            {[...filters.neighborhoods].filter((h) => h.city).sort((a, b) => b.count - a.count).slice(0, 12).map((h) => (
+              <Link key={`${h.city}-${h.name}`} href={hoodPath('/imoveis', h.city!, h.name)} className="type-tile">{h.name}<span>{h.count}</span></Link>
+            ))}
           </div>
         </section>
       )}

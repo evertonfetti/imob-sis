@@ -31,9 +31,10 @@ export function cleanParams(raw: RawSP, fixedPurpose?: 'SALE' | 'RENT') {
 
 export const hasFilters = (p: Record<string, string>) => Object.keys(p).some((k) => k !== 'page' && k !== 'purpose' && k !== 'sort') || !!p.sort;
 
-export function titleFor(purpose: string | undefined, city?: string) {
+export function titleFor(purpose: string | undefined, city?: string, neighborhood?: string) {
   const base = purpose === 'SALE' ? 'Imóveis à venda' : purpose === 'RENT' ? 'Imóveis para alugar' : 'Todos os imóveis';
-  return city ? `${base} em ${city}` : base;
+  const where = [neighborhood, city].filter(Boolean).join(', ');
+  return where ? `${base} em ${where}` : base;
 }
 
 function chips(p: Record<string, string>, f: Filters, fixed: boolean) {
@@ -54,7 +55,7 @@ function chips(p: Record<string, string>, f: Filters, fixed: boolean) {
   return out;
 }
 
-export async function ListingPage({ raw, base, fixedPurpose }: { raw: RawSP; base: string; fixedPurpose?: 'SALE' | 'RENT' }) {
+export async function ListingPage({ raw, base, fixedPurpose, intro, children }: { raw: RawSP; base: string; fixedPurpose?: 'SALE' | 'RENT'; intro?: string; children?: React.ReactNode }) {
   const params = cleanParams(raw, fixedPurpose);
   const [data, filters] = await Promise.all([
     getProperties({ ...params, pageSize: PAGE_SIZE }),
@@ -91,7 +92,7 @@ export async function ListingPage({ raw, base, fixedPurpose }: { raw: RawSP; bas
         params={{ content_type: 'home_listing', content_category: [params.purpose ?? fixedPurpose, params.type].filter(Boolean).join(' / ') || 'Todos', ...(params.q ? { search_string: params.q } : {}), ...(params.city ? { city: params.city } : {}), ...(params.neighborhood ? { region: params.neighborhood } : {}), results: data.total }}
       />
       <div className="page-head">
-        <h1>{titleFor(fixedPurpose ?? params.purpose, params.city)}</h1>
+        <h1>{titleFor(fixedPurpose ?? params.purpose, params.city, params.neighborhood)}</h1>
         <p>{data.total === 0 ? 'Nenhum imóvel encontrado com esses filtros.' : `${plural(data.total, 'imóvel encontrado', 'imóveis encontrados')}${pages > 1 ? ` · página ${page} de ${pages}` : ''}`}</p>
       </div>
 
@@ -125,6 +126,8 @@ export async function ListingPage({ raw, base, fixedPurpose }: { raw: RawSP; bas
             </div>
           )}
           <Pagination page={page} pages={pages} href={(n) => url({ page: n > 1 ? String(n) : undefined })} />
+          {intro && <p className="seo-intro" style={{ marginTop: 32, color: 'var(--muted)', maxWidth: '70ch' }}>{intro}</p>}
+          {children}
         </section>
       </div>
     </div>

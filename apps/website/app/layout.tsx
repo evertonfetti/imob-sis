@@ -9,7 +9,7 @@ import { Header } from '@/components/Header';
 import { MetaPixel } from '@/components/MetaPixel';
 import { PhotoGuard } from '@/components/PhotoGuard';
 import { TrackingCapture } from '@/components/TrackingCapture';
-import { getCompany } from '@/lib/api';
+import { getCompany, getFilters } from '@/lib/api';
 import { siteUrl } from '@/lib/site';
 
 // O site lê dados da API a cada requisição (com cache de dados): nada é gerado no build.
@@ -24,10 +24,13 @@ async function company(): Promise<PublicCompany> {
 export async function generateMetadata(): Promise<Metadata> {
   const c = await company();
   const name = c.tradeName ?? c.name;
+  // Cidade com mais imóveis: entra no título e na descrição da home (é o que as pessoas pesquisam).
+  const top = await getFilters().then((f) => [...f.cities].sort((a, b) => b.count - a.count)[0]?.name).catch(() => undefined);
+  const where = top ? ` em ${top}` : '';
   return {
     metadataBase: new URL(siteUrl()),
-    title: { default: `${name} · Imóveis para comprar e alugar`, template: `%s · ${name}` },
-    description: `Encontre casas, apartamentos e terrenos para comprar ou alugar com a ${name}.`,
+    title: { default: `Imóveis${where}: comprar e alugar casas e apartamentos | ${name}`, template: `%s · ${name}` },
+    description: `Casas, apartamentos e terrenos para comprar ou alugar${where} com a ${name}. Veja fotos e valores e fale direto com um corretor.`,
     openGraph: { siteName: name, locale: 'pt_BR', type: 'website' },
     alternates: { canonical: '/' },
   };
