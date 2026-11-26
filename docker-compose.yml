@@ -110,6 +110,8 @@ services:
       SITE_URL: "${SITE_URL:?defina SITE_URL (ex. https://www.seudominio.com.br)}"
       # Opcional: ID(s) do Pixel (separados por vírgula) usados só no navegador quando nenhum foi cadastrado em Integrações.
       META_PIXEL_ID: "${META_PIXEL_ID:-}"
+      # Padrão: o Pixel carrega sempre. Use true para exigir o aceite do aviso de cookies antes.
+      PIXEL_REQUIRE_CONSENT: "${PIXEL_REQUIRE_CONSENT:-false}"
     expose:
       - "3000"
 

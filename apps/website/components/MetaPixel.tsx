@@ -9,22 +9,23 @@ import { ensureFbp, getConsent, getTracking } from '@/lib/tracking';
 type Fbq = ((...a: unknown[]) => void) & { queue?: unknown[]; loaded?: boolean; callMethod?: (...a: unknown[]) => void; push?: unknown; version?: string };
 
 /**
- * Pixel(s) da Meta. Só é carregado depois que o visitante aceita o aviso de cookies (LGPD).
- * Se ele recusar, nenhum script da Meta é baixado. Acessos internos (equipe, painel e subdomínios) também não carregam o Pixel.
+ * Pixel(s) da Meta. Carrega sempre; com `requireConsent` só depois que o visitante aceita o aviso de cookies.
+ * Acessos internos (equipe, painel e subdomínios) também não carregam o Pixel.
  */
-export function MetaPixel({ pixelIds, siteHost }: { pixelIds: string[]; siteHost?: string }) {
+export function MetaPixel({ pixelIds, siteHost, requireConsent = false }: { pixelIds: string[]; siteHost?: string; requireConsent?: boolean }) {
   const [on, setOn] = useState(false);
   const started = useRef(false);
   const path = usePathname();
 
   useEffect(() => {
     (window as unknown as { __imobSiteHost?: string }).__imobSiteHost = siteHost;
+    (window as unknown as { __imobRequireConsent?: boolean }).__imobRequireConsent = requireConsent;
     const internal = isInternalTraffic(siteHost);
-    setOn(!internal && getConsent() === 'granted');
-    const h = (e: Event) => setOn(!internal && (e as CustomEvent).detail === 'granted');
+    setOn(!internal && (!requireConsent || getConsent() === 'granted'));
+    const h = (e: Event) => setOn(!internal && (!requireConsent || (e as CustomEvent).detail === 'granted'));
     window.addEventListener('imob:consent', h);
     return () => window.removeEventListener('imob:consent', h);
-  }, [siteHost]);
+  }, [siteHost, requireConsent]);
 
   useEffect(() => {
     if (!on || started.current) return;

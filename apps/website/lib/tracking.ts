@@ -71,6 +71,14 @@ export function getConsent(): Consent {
   try { const v = localStorage.getItem(CONSENT_KEY); return v === 'granted' || v === 'denied' ? v : null; } catch { return null; }
 }
 
+/**
+ * O Pixel pode carregar sempre (padrão) ou só depois do aceite do aviso de cookies (PIXEL_REQUIRE_CONSENT=true no site).
+ * Quem decide é o servidor do site; o MetaPixel grava a escolha aqui.
+ */
+export function trackingAllowed(): boolean {
+  return window.__imobRequireConsent ? getConsent() === 'granted' : true;
+}
+
 export function setConsent(v: 'granted' | 'denied') {
   try { localStorage.setItem(CONSENT_KEY, v); } catch { /* sem storage: vale só nesta página */ }
   window.dispatchEvent(new CustomEvent('imob:consent', { detail: v }));
@@ -81,7 +89,7 @@ export const newEventId = () => uuid();
 
 /** Campos de marketing que acompanham o formulário e o clique no WhatsApp. */
 export function marketingFields(eventId: string) {
-  return { eventId, pageUrl: location.href.slice(0, 500), marketingConsent: getConsent() === 'granted' && !isInternalTraffic(window.__imobSiteHost) };
+  return { eventId, pageUrl: location.href.slice(0, 500), marketingConsent: trackingAllowed() && !isInternalTraffic(window.__imobSiteHost) };
 }
 
 export function getTracking(): Tracking {
@@ -91,4 +99,4 @@ export function getTracking(): Tracking {
   } catch { return {}; }
 }
 
-declare global { interface Window { __imobSiteHost?: string } }
+declare global { interface Window { __imobSiteHost?: string; __imobRequireConsent?: boolean } }
